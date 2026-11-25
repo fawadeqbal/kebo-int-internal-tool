@@ -16,7 +16,7 @@ import { CompanyTime } from "@/lib/time-client";
 import { RememberColours } from "./remember-colours";
 import { getSettings } from "@/lib/loaders";
 import { RowClicks } from "@/components/common/row-clicks";
-import { FileViewerProvider } from "@/components/files/viewer";
+import { AppFileViewer } from "@/components/files/viewer";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
 function logoUrl(logo: string | undefined) {
@@ -77,7 +77,7 @@ export default async function AppLayout({ children, window: win }: { children: R
   return (
     <CompanyTime style={timeStyleOf(me)}>
       {/* Files and papers open over the page, in the app (Fawad 21 Nov: not in a new tab). */}
-      <FileViewerProvider>
+      <AppFileViewer>
       {/* The company's colours (Settings › Company › The app's colours): the page takes the set it names, from the
           first paint and without a script (packages/ui/src/styles/theme.css). */}
       <span id="app-colours" data-colours={settings.company.colours} hidden />
@@ -115,7 +115,7 @@ export default async function AppLayout({ children, window: win }: { children: R
         <RowClicks />
       </Suspense>
       <KeyboardShortcuts canCreate={has("inquiries.create")} />
-      </FileViewerProvider>
+      </AppFileViewer>
     </CompanyTime>
   );
 }

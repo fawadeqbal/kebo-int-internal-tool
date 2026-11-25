@@ -338,8 +338,8 @@ export default async function OrderDocumentPrint({
 /**
  * A paper the app makes (sales contract, commercial invoice, …) in the same
  * template, from GET /orders/:id/papers/:kind/doc: a final version as it was
- * made, else made from the order now with a DRAFT watermark. ?embed=1 (the Make
- * page's preview) leaves out the toolbar.
+ * made, else made from the order now with a DRAFT watermark. In a frame (the
+ * order's window, ?embed=1) the toolbar hides and tells the window what it holds.
  */
 async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: PaperQuery & { copy?: string } }) {
   const p = await getPaper(id, kind, sp);
@@ -351,24 +351,23 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
   const asked = await chineseOf(paperTexts(p.doc), lang);
   return (
     <>
-      {sp.embed !== "1" && (
-        <PrintToolbar
-          title={`${p.label} ${p.doc.number}${p.paper && p.versions.length > 1 ? ` · version ${p.paper.version}` : ""}${p.final || p.live ? "" : p.kept ? (kind === "payment-request" ? " (not sent)" : "") : " (draft)"}`}
-          backHref={backTo(
-            sp.back,
-            // Kept as sent: no Make page to go back to. A request (a row of the payment plan now) and a receipt go
-            // back to the Payment step.
-            kind === "payment-request" && sp.ref && UUID.test(sp.ref)
+      {/* Always there: in a frame (the app's window) it hides itself and tells the window its PDF and switches. */}
+      <PrintToolbar
+        title={`${p.label} ${p.doc.number}${p.paper && p.versions.length > 1 ? ` · version ${p.paper.version}` : ""}${p.final || p.live ? "" : p.kept ? (kind === "payment-request" ? " (not sent)" : "") : " (draft)"}`}
+        backHref={backTo(
+          sp.back,
+          // Kept as sent: no Make page to go back to. A request (a row of the payment plan now) and a receipt go
+          // back to the Payment step.
+          kind === "payment-request" && sp.ref && UUID.test(sp.ref)
+            ? `/orders/${id}/payment`
+            : p.kept
               ? `/orders/${id}/payment`
-              : p.kept
-                ? `/orders/${id}/payment`
-                : `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`,
-          )}
-          pdfHref={pdf}
-          choices={paperChoices(`/print/orders/${id}/${kind}`, sp, kind, copy, lang)}
-          note={waitingNote(asked.waiting)}
-        />
-      )}
+              : `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`,
+        )}
+        pdfHref={pdf}
+        choices={paperChoices(`/print/orders/${id}/${kind}`, sp, kind, copy, lang)}
+        note={waitingNote(asked.waiting)}
+      />
       <div className={sp.embed === "1" ? "pt-4" : undefined}>
         <PaperSheet doc={p.doc} brand={await docBrand()} watermark={p.watermark} lang={lang} copy={copy} tr={asked.tr} />
       </div>

@@ -1,32 +1,24 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import {
-  ChevronLeft,
-  Copy,
-  Mail,
-  MessageCircle,
-  ChevronRight,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  Image as ImageIcon,
-  Info,
-  Minus,
-  MoreHorizontal,
-  Plus,
-  Printer,
-  Share2,
-  X,
-} from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { Download, FileText } from "lucide-react";
 import { fileSize } from "@kebo/shared";
 import { Button, buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
-import { useIsPhone, FloatingMenu } from "@/components/common/floating";
-import { useMounted } from "@/components/common/dialog";
-import { lockScroll } from "@/lib/scroll-lock";
-import type { PaperChoice } from "@/components/print/copies";
-import { toast } from "@kebo/ui/client";
+import { useIsPhone } from "@/components/common/floating";
+import { orderWindowOfPrint } from "@/lib/doc-links";
+import {
+  choicesOf,
+  DocWindow,
+  PaperStage,
+  saveHref,
+  usePaperView,
+  withLook,
+  type DocState,
+  type PaperLook,
+  type WindowAction,
+} from "@/components/window/doc-window";
+import { useSend } from "@/components/window/send";
 
 /* ---------------------------------------------------------------- what is shown */
 
@@ -47,13 +39,14 @@ export interface ViewFile {
   size?: number | null;
   /** Where it belongs: "Payment received · SO-2026-0010". */
   where?: string | null;
-  /** "About this file": label · value. */
+  /** Details: label · value. */
   facts?: [string, ReactNode][];
   /** Earlier versions: their name, day and download. */
   versions?: { key: string; label: string; href: string }[];
-  /** More things to do (Replace, Delete…), in ⋯ and under the details. */
-  actions?: { label: string; onClick: () => void; danger?: boolean }[];
-  onShare?: () => void;
+  /** More things to do: `main` (Replace) at the foot of Details, the rest (Rename, Delete…) in ⋯. */
+  actions?: { label: string; onClick: () => void; danger?: boolean; main?: boolean }[];
+  /** Send: the words to start from, and where the sending is noted (an order's History). */
+  send?: { message?: string; onNoted?: (via: "share" | "download", message: string) => Promise<unknown> };
 }
 
 const EXT_KIND: Record<string, ViewKind> = {
@@ -97,6 +90,8 @@ interface Viewer {
   /** Shows `set[at]`, with ‹ › through the others of the set. */
   open: (set: ViewFile[], at?: number) => void;
   close: () => void;
+  /** An order's paper goes to the order's window (the app's viewer only). */
+  toOrder?: (href: string) => void;
 }
 
 const ViewerContext = createContext<Viewer | null>(null);
@@ -135,10 +130,11 @@ function viewable(a: HTMLAnchorElement): ViewFile | null {
 /**
  * Around the app's pages: every stored file and every paper opens here, over the page, instead of in a new tab
  * (Fawad 21 Nov). Links need nothing special: a click on /files/…?view=1 or /print/… is caught, and the other
- * such links next to it (its list, table or box) are the set ‹ › go through. Ctrl/⌘-click or a middle click
+ * such links next to it (its list, table or box) are the set ‹ › go through. An order's paper opens in the order's
+ * own window instead (`toOrder`: one window for an order's documents, 26 Nov). Ctrl/⌘-click or a middle click
  * still open a new tab; a link marked data-new-tab always does.
  */
-export function FileViewerProvider({ children }: { children: ReactNode }) {
+export function FileViewerProvider({ children, toOrder }: { children: ReactNode; toOrder?: (href: string) => void }) {
   const [state, setState] = useState<{ set: ViewFile[]; at: number } | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const open = useCallback((set: ViewFile[], at = 0) => {
@@ -150,16 +146,19 @@ export function FileViewerProvider({ children }: { children: ReactNode }) {
     setState(null);
     opener.current?.focus?.({ preventScroll: true });
   }, []);
-  const viewer = useMemo<Viewer>(() => ({ open, close }), [open, close]);
+  const viewer = useMemo<Viewer>(() => ({ open, close, toOrder }), [open, close, toOrder]);
 
   useEffect(() => {
     const click = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
-      if (!a || a.closest("[data-file-viewer]")) return;
+      if (!a || a.closest("[data-doc-window]")) return;
       const file = viewable(a);
       if (!file) return;
       e.preventDefault();
+      // An order's paper: the order's window, with what it takes, Send, and the order's other documents.
+      const order = toOrder && file.kind === "paper" ? orderWindowOfPrint(file.href, window.location.pathname + window.location.search) : null;
+      if (order) return toOrder!(order);
       // The set: the links of the same kind in the same list, table or box, in page order.
       const scope = a.closest("[data-file-set], ul, ol, table, section, [role=dialog]") ?? document.body;
       const seen = new Set<string>();
@@ -172,7 +171,7 @@ export function FileViewerProvider({ children }: { children: ReactNode }) {
     // Before the page's own handlers (a Next <Link> would go to the page itself).
     document.addEventListener("click", click, true);
     return () => document.removeEventListener("click", click, true);
-  }, [open]);
+  }, [open, toOrder]);
 
   return (
     <ViewerContext.Provider value={viewer}>
@@ -180,6 +179,13 @@ export function FileViewerProvider({ children }: { children: ReactNode }) {
       {state && <FileViewer set={state.set} at={state.at} onMove={(at) => setState((s) => s && { ...s, at })} onClose={close} />}
     </ViewerContext.Provider>
   );
+}
+
+/** The app's viewer, its order papers going to the order's window (the app's layout puts it around every page). */
+export function AppFileViewer({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const toOrder = useCallback((href: string) => router.push(href), [router]);
+  return <FileViewerProvider toOrder={toOrder}>{children}</FileViewerProvider>;
 }
 
 /** Opens a link to a stored file or a paper in the viewer, from a menu rather than a link: false when it is not one. */
@@ -192,8 +198,11 @@ export function useOpenHere() {
       a.href = href;
       a.dataset.fileName = name;
       const file = viewable(a);
-      if (file) viewer.open([file]);
-      return !!file;
+      if (!file) return false;
+      const order = viewer.toOrder && file.kind === "paper" ? orderWindowOfPrint(file.href, window.location.pathname + window.location.search) : null;
+      if (order) viewer.toOrder!(order);
+      else viewer.open([file]);
+      return true;
     },
     [viewer],
   );
@@ -227,58 +236,15 @@ function useHeadOf(f: ViewFile) {
   return head;
 }
 
-/** A paper inside the viewer tells it its buttons (the PDF, Excel, its switches: which copy, the language). */
-interface PaperInfo {
-  title: string;
-  pdfHref: string;
-  excelHref?: string;
-  choices?: PaperChoice[];
-  /** A word on screen (the translator still writing some of the Chinese). */
-  note?: string;
-}
+const NO_LOOK: PaperLook = { copy: null, lang: null };
 
+/**
+ * Any file or paper in the one window (design 26 Nov): the file on grey with the view bar (zoom, and a paper's
+ * copy and language), Details and Send in the panel, the others of its list in the strip. Download and Print in
+ * the header; ⋯ only the rare things (Rename, Open in a new tab, Delete last).
+ */
 function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; onMove: (at: number) => void; onClose: () => void }) {
-  const mounted = useMounted();
-  const phone = useIsPhone();
-  const id = useId();
-  const given = set[at]!;
-  const head = useHeadOf(given);
-  const file: ViewFile = {
-    ...given,
-    name: given.name && given.name !== "File" ? given.name : (head?.name ?? given.name),
-    type: given.type ?? head?.type ?? null,
-    size: given.size ?? head?.size ?? null,
-  };
-  const kind = kindOf(file);
-  const prev = at > 0 ? at - 1 : null;
-  const next = at < set.length - 1 ? at + 1 : null;
-  const [details, setDetails] = useState(!phone && !!file.facts?.length);
-  const [more, setMore] = useState(false);
-  const moreRef = useRef<HTMLButtonElement>(null);
-  const [sharing, setSharing] = useState<HTMLElement | null>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const frame = useRef<HTMLIFrameElement>(null);
-  // What the paper in the frame said, and the copy picked: both for this file only.
-  const [paperOf, setPaperOf] = useState<{ key: string; info?: PaperInfo; href?: string } | null>(null);
-  const paper = paperOf?.key === given.key ? (paperOf.info ?? null) : null;
-  const paperHref = paperOf?.key === given.key ? (paperOf.href ?? null) : null;
-  const setPaperHref = (href: string) => setPaperOf((p) => ({ ...(p?.key === given.key ? p : null), key: given.key, href }));
-  const shown = kind === "paper" ? (paperHref ?? file.viewHref ?? file.href) : (file.viewHref ?? file.href);
-
-  // Esc closes, ← → move; the page under it stays still; the phone's Back closes it.
-  useEffect(() => {
-    const keys = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !more) onClose();
-      else if (e.key === "ArrowLeft" && prev !== null && !(e.target as HTMLElement).closest("input,textarea")) onMove(prev);
-      else if (e.key === "ArrowRight" && next !== null && !(e.target as HTMLElement).closest("input,textarea")) onMove(next);
-    };
-    window.addEventListener("keydown", keys);
-    const unlock = lockScroll();
-    return () => {
-      window.removeEventListener("keydown", keys);
-      unlock();
-    };
-  }, [onClose, onMove, prev, next, more]);
+  // The phone's Back closes it.
   useEffect(() => {
     window.history.pushState({ fileViewer: true }, "");
     const back = () => onClose();
@@ -288,349 +254,71 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
       if (window.history.state?.fileViewer) window.history.back();
     };
   }, [onClose]);
-  useEffect(() => {
-    if (mounted) titleRef.current?.focus({ preventScroll: true });
-  }, [mounted, given.key]);
-  // A paper in the frame says what its toolbar held.
-  useEffect(() => {
-    const got = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
-      const d = e.data as { type?: string } & PaperInfo;
-      if (d?.type === "kebo-paper")
-        setPaperOf((p) => ({
-          ...(p?.key === key ? p : null),
-          key,
-          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, choices: d.choices, note: d.note },
-        }));
-    };
-    const key = given.key;
-    window.addEventListener("message", got);
-    return () => window.removeEventListener("message", got);
-  }, [given.key]);
+  // Each file its own view (zoom, copy, tab): a new one starts fresh.
+  return <OneFile key={set[at]!.key} set={set} at={at} onMove={onMove} onClose={onClose} />;
+}
 
-  if (!mounted) return null;
+function OneFile({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; onMove: (at: number) => void; onClose: () => void }) {
+  const phone = useIsPhone();
+  const given = set[at]!;
+  const head = useHeadOf(given);
+  const file: ViewFile = {
+    ...given,
+    name: given.name && given.name !== "File" ? given.name : (head?.name ?? given.name),
+    type: given.type ?? head?.type ?? null,
+    size: given.size ?? head?.size ?? null,
+  };
+  const kind = kindOf(file);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const paperView = usePaperView();
+  const [imageZoom, setImageZoom] = useState<number | null>(null);
+  const [look, setLook] = useState<PaperLook>(NO_LOOK);
+  const [tab, setTab] = useState("details");
+
+  const paper = kind === "paper" ? paperView.info : null;
   const title = kind === "paper" && paper?.title ? paper.title : file.name;
-  const where = [
-    set.length > 1 ? `${at + 1} of ${set.length}` : null,
-    file.where,
-    kind !== "paper" && file.size ? `${fileSize(file.size)} · ${KIND_WORD[kind]}` : null,
-    kind === "paper" ? paper?.note : null,
-  ]
+  const shown = kind === "paper" ? withLook(file.viewHref ?? file.href, look) : (file.viewHref ?? file.href);
+  const download = kind === "paper" ? (paper?.pdfHref ?? null) : file.href;
+  const sendName = kind === "paper" ? `${title}.pdf` : file.name;
+  const detail = kind === "paper" ? [paper?.choices?.flatMap((c) => c.options.filter((o) => o.on).map((o) => o.word)).join(" · "), paperView.pages ? `${paperView.pages.of} page${paperView.pages.of === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || "PDF" : [file.size ? fileSize(file.size) : null, KIND_WORD[kind]].filter(Boolean).join(" · ");
+  const send = useSend({
+    what: { href: download ?? file.href, name: sendName, detail, paper: kind === "paper" },
+    subject: title,
+    message: file.send?.message ?? `Please find attached: ${title}.`,
+    link: kind === "paper" ? shown : file.href,
+    onNoted: file.send?.onNoted,
+  });
+  const canSend = !!download;
+  const print =
+    kind === "paper" || kind === "pdf"
+      ? () => frame.current?.contentWindow?.print()
+      : kind === "image"
+        ? () => printImage(file.viewHref ?? file.href, title)
+        : null;
+
+  const mains = (file.actions ?? []).filter((x) => x.main);
+  const more: WindowAction[] = [
+    ...(paper?.excelHref ? [{ label: "Download Excel", onClick: () => saveHref(paper.excelHref!) }] : []),
+    { label: "Open in a new tab", onClick: () => window.open(kind === "paper" ? shown : (file.viewHref ?? file.href), "_blank", "noopener") },
+    ...(file.actions ?? []).filter((x) => !x.main).sort((a, b) => Number(!!a.danger) - Number(!!b.danger)),
+  ];
+  const where = [file.where, kind !== "paper" && file.size ? `${fileSize(file.size)} · ${KIND_WORD[kind]}` : null, kind === "paper" ? paper?.note : null]
     .filter(Boolean)
     .join(" · ");
-  const download = kind === "paper" ? (paper?.pdfHref ?? null) : file.href;
-  const canPrint = kind === "paper" || kind === "image";
-  // Share: an order's file has its own (noted in History); any other file or paper, the share menu here.
-  const shareThis = download ? { href: download, name: kind === "paper" ? `${title}.pdf` : file.name } : null;
-  const share = (e: { currentTarget: HTMLElement }) => (file.onShare ? file.onShare() : setSharing(e.currentTarget));
-  const canShare = !!file.onShare || !!shareThis;
-  const print = () => {
-    if (kind === "paper") frame.current?.contentWindow?.print();
-    else printImage(file.viewHref ?? file.href, title);
-  };
-  const actions = [
-    ...(paper?.excelHref ? [{ label: "Download Excel", onClick: () => (window.location.href = paper.excelHref!) }] : []),
-    ...(file.actions ?? []),
-  ];
-  const hasDetails = !!(file.facts?.length || file.versions?.length);
-  const Icon = kind === "image" ? ImageIcon : kind === "sheet" || kind === "csv" ? FileSpreadsheet : FileText;
+  const openTab = canSend ? tab : "details";
 
-  const iconButton =
-    "grid size-9 shrink-0 place-items-center rounded-[10px] border border-line-strong bg-surface text-text-2 hover:bg-surface-2 disabled:opacity-40 max-sm:size-11 max-sm:rounded-full max-sm:border-0";
-
-  return createPortal(
-    <div className="fixed inset-0 z-[80] flex" data-file-viewer="">
-      <button type="button" aria-label="Close the viewer" tabIndex={-1} className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${id}-t`}
-        className="relative m-0 flex w-full flex-col overflow-hidden bg-surface shadow-pop sm:m-6 sm:rounded-2xl"
-      >
-        {/* Head: what it is, where it belongs, n of N; then ‹ ›, Print, Download, Share, ⋯, Details, ✕ (design 21 Nov). */}
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line pr-1 pl-1 sm:h-16 sm:gap-3 sm:pr-3 sm:pl-5">
-          <Button size="icon" variant="ghost" aria-label="Close the viewer" onClick={onClose} className="sm:hidden">
-            <X aria-hidden />
-          </Button>
-          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-soft text-primary max-sm:hidden">
-            <Icon className="size-[18px]" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 id={`${id}-t`} ref={titleRef} tabIndex={-1} className="truncate text-base font-semibold outline-none max-sm:font-bold">
-              {title}
-            </h2>
-            {where && <p className="truncate text-xs text-muted sm:text-md">{where}</p>}
+  const details = (
+    <div className="flex flex-col gap-4">
+      <dl className="grid grid-cols-[fit-content(45%)_minmax(0,1fr)] gap-x-3 gap-y-2.5 text-md" onClick={(e) => (e.target as Element).closest("a[href]") && onClose()}>
+        {(file.facts?.length ? file.facts : ([["Name", file.name], ["What it is", KIND_WORD[kind]], ...(file.size ? [["Size", fileSize(file.size)] as [string, ReactNode]] : []), ...(file.where ? [["Where", file.where] as [string, ReactNode]] : [])] as [string, ReactNode][])).map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="min-w-24 text-text-2">{k}</dt>
+            <dd className="min-w-0 font-medium break-words">{v}</dd>
           </div>
-          {set.length > 1 && (
-            <div className="flex items-center gap-1 max-sm:hidden">
-              <button
-                type="button"
-                className={iconButton}
-                disabled={prev === null}
-                aria-label={prev !== null ? `Previous: ${set[prev]!.name}` : "No previous file"}
-                onClick={() => prev !== null && onMove(prev)}
-              >
-                <ChevronLeft className="size-4" aria-hidden />
-              </button>
-              <button
-                type="button"
-                className={iconButton}
-                disabled={next === null}
-                aria-label={next !== null ? `Next: ${set[next]!.name}` : "No next file"}
-                onClick={() => next !== null && onMove(next)}
-              >
-                <ChevronRight className="size-4" aria-hidden />
-              </button>
-            </div>
-          )}
-          {set.length > 1 && <span aria-hidden className="h-6 w-px bg-line max-sm:hidden" />}
-          <div className="flex items-center gap-2 max-sm:hidden">
-            {paper?.choices?.map((c) => (
-              <div key={c.label} role="group" aria-label={c.label} className="flex rounded-[10px] bg-surface-2 p-0.5">
-                {c.options.map((o) => {
-                  const on = paperHref ? paperHref === o.href : o.on;
-                  return (
-                    <button
-                      key={o.key}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setPaperHref(o.href)}
-                      className={cn("h-8 rounded-lg px-2.5 text-md", on ? "bg-surface font-semibold shadow-card" : "text-text-2 hover:text-text")}
-                    >
-                      {o.word}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-            {download && (
-              <a href={download} download={kind === "paper" ? undefined : file.name} className={buttonClass("secondary", "md")}>
-                <Download aria-hidden /> {kind === "paper" ? "Download PDF" : "Download"}
-              </a>
-            )}
-            {canShare && (
-              <Button variant="secondary" onClick={share} aria-haspopup={file.onShare ? "dialog" : "menu"} aria-expanded={!!sharing}>
-                <Share2 aria-hidden /> Share
-              </Button>
-            )}
-            {canPrint && (
-              <Button variant={kind === "paper" ? "primary" : "secondary"} onClick={print}>
-                <Printer aria-hidden /> Print
-              </Button>
-            )}
-          </div>
-          {(actions.length > 0 || phone) && (
-            <button
-              ref={moreRef}
-              type="button"
-              className={iconButton}
-              aria-label="More"
-              aria-haspopup="menu"
-              aria-expanded={more}
-              onClick={() => setMore((m) => !m)}
-            >
-              <MoreHorizontal className="size-4 max-sm:size-5" aria-hidden />
-            </button>
-          )}
-          {hasDetails && !phone && (
-            <button
-              type="button"
-              className={cn(iconButton, details && "border-primary bg-primary-soft text-primary hover:bg-primary-soft")}
-              aria-label="Details"
-              aria-pressed={details}
-              onClick={() => setDetails((d) => !d)}
-            >
-              <Info className="size-4" aria-hidden />
-            </button>
-          )}
-          <Button size="icon-sm" variant="ghost" aria-label="Close the viewer (Esc)" onClick={onClose} className="max-sm:hidden">
-            <X aria-hidden />
-          </Button>
-          {sharing && shareThis && <ShareMenu file={shareThis} anchor={sharing} phone={phone} onClose={() => setSharing(null)} />}
-          {more && (
-            <FloatingMenu anchor={() => moreRef.current} onClose={() => setMore(false)} label="More">
-              {phone && canPrint && <MenuItem label="Print" onClick={print} close={() => setMore(false)} />}
-              {phone &&
-                paper?.choices?.flatMap((c) =>
-                  c.options
-                    .filter((o) => !(paperHref ? paperHref === o.href : o.on))
-                    .map((o) => <MenuItem key={`${c.label}-${o.key}`} label={o.word} onClick={() => setPaperHref(o.href)} close={() => setMore(false)} />),
-                )}
-              {actions.map((x) => (
-                <MenuItem key={x.label} label={x.label} danger={x.danger} onClick={x.onClick} close={() => setMore(false)} />
-              ))}
-              {phone && download && (
-                <MenuItem
-                  label={kind === "paper" ? "Download PDF" : "Download"}
-                  onClick={() => (window.location.href = download)}
-                  close={() => setMore(false)}
-                />
-              )}
-            </FloatingMenu>
-          )}
-        </header>
-
-        <div className="flex min-h-0 flex-1">
-          {/* The stage: the file on grey, ‹ › at its sides on a phone. */}
-          <div className="relative flex min-w-0 flex-1 flex-col bg-surface-3">
-            <div className="relative min-h-0 flex-1">
-              <Stage
-                key={`${given.key}:${shown}`}
-                file={file}
-                kind={kind}
-                src={shown}
-                frame={frame}
-                onShare={canShare ? share : undefined}
-              />
-              {set.length > 1 && phone && (
-                <>
-                  {prev !== null && (
-                    <button
-                      type="button"
-                      aria-label={`Previous: ${set[prev]!.name}`}
-                      onClick={() => onMove(prev)}
-                      className="absolute top-1/2 left-2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface/90 shadow-card"
-                    >
-                      <ChevronLeft className="size-5" aria-hidden />
-                    </button>
-                  )}
-                  {next !== null && (
-                    <button
-                      type="button"
-                      aria-label={`Next: ${set[next]!.name}`}
-                      onClick={() => onMove(next)}
-                      className="absolute top-1/2 right-2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface/90 shadow-card"
-                    >
-                      <ChevronRight className="size-5" aria-hidden />
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            {/* The set, along the bottom (laptop): the others of the same place. */}
-            {set.length > 1 && !phone && (
-              <nav
-                aria-label="Files here"
-                className="flex h-[76px] shrink-0 items-center gap-2.5 scroll-x scroll-lg border-t border-line bg-surface px-5"
-              >
-                {set.map((f, i) => {
-                  const k = kindOf(f);
-                  return (
-                    <button
-                      key={f.key}
-                      type="button"
-                      aria-current={i === at ? "true" : undefined}
-                      onClick={() => onMove(i)}
-                      className={cn(
-                        "flex h-12 max-w-56 shrink-0 items-center gap-2 rounded-[10px] border pr-3 pl-1.5 text-left text-md",
-                        i === at ? "border-2 border-primary bg-primary-soft font-semibold" : "border-line hover:border-line-strong",
-                      )}
-                    >
-                      <span
-                        aria-hidden
-                        className="grid size-9 shrink-0 place-items-center rounded-md bg-surface-2 text-2xs font-bold text-text-2 uppercase"
-                      >
-                        {k === "paper" ? "Doc" : (f.name.split(".").pop() ?? "").slice(0, 4) || KIND_WORD[k].slice(0, 3)}
-                      </span>
-                      <span className="truncate">{f.name}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            )}
-            {/* Phone: the things to do, along the bottom. */}
-            {phone && (
-              <nav
-                aria-label="This file"
-                className="flex shrink-0 justify-around gap-2 border-t border-line bg-surface px-3 pt-2.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]"
-              >
-                {download ? (
-                  <a
-                    href={download}
-                    download={kind === "paper" ? undefined : file.name}
-                    className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium"
-                  >
-                    <Download className="size-5" aria-hidden /> {kind === "paper" ? "PDF" : "Download"}
-                  </a>
-                ) : null}
-                {canShare && (
-                  <button
-                    type="button"
-                    onClick={share}
-                    className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium"
-                  >
-                    <Share2 className="size-5" aria-hidden /> Share
-                  </button>
-                )}
-                {canPrint && !hasDetails ? (
-                  <button
-                    type="button"
-                    onClick={print}
-                    className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium"
-                  >
-                    <Printer className="size-5" aria-hidden /> Print
-                  </button>
-                ) : null}
-                {hasDetails ? (
-                  <button
-                    type="button"
-                    onClick={() => setDetails(true)}
-                    className="flex h-14 min-w-20 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium"
-                  >
-                    <Info className="size-5" aria-hidden /> Details
-                  </button>
-                ) : null}
-              </nav>
-            )}
-          </div>
-
-          {/* About this file: beside the stage on a laptop, a sheet from the bottom on a phone. */}
-          {hasDetails && details && <Details file={file} phone={phone} onClose={() => setDetails(false)} onDone={onClose} />}
-        </div>
-      </section>
-    </div>,
-    document.body,
-  );
-}
-
-function MenuItem({ label, onClick, close, danger }: { label: string; onClick: () => void; close: () => void; danger?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={() => {
-        close();
-        onClick();
-      }}
-      className={cn(
-        "flex min-h-10 w-full items-center rounded-md px-3 text-left text-md hover:bg-surface-2 focus:bg-surface-2 focus:outline-none",
-        danger && "text-bad",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function Details({ file, phone, onClose, onDone }: { file: ViewFile; phone: boolean; onClose: () => void; onDone: () => void }) {
-  const body = (
-    <>
-      {!!file.facts?.length && (
-        // The records' facts: label at the left, the value beside it. A link in it leaves the viewer for that page.
-        <dl
-          className="grid grid-cols-[fit-content(45%)_minmax(0,1fr)] gap-x-3 gap-y-2.5 px-5 pt-2 pb-4 text-md max-sm:text-base"
-          onClick={(e) => (e.target as Element).closest("a[href]") && onDone()}
-        >
-          {file.facts.map(([k, v]) => (
-            <div key={k} className="contents">
-              <dt className="min-w-24 text-text-2">{k}</dt>
-              <dd className="min-w-0 font-medium break-words">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+        ))}
+      </dl>
       {!!file.versions?.length && (
-        <div className="border-t border-line px-5 py-3.5">
+        <div>
           <p className={capsClass}>Earlier versions</p>
           <ul className="mt-2 flex flex-col gap-1.5 text-md">
             {file.versions.map((v) => (
@@ -644,134 +332,97 @@ function Details({ file, phone, onClose, onDone }: { file: ViewFile; phone: bool
           </ul>
         </div>
       )}
-      {!!file.actions?.length && (
-        <div className="flex flex-wrap gap-2 border-t border-line px-5 py-3.5 sm:mt-auto">
-          {file.actions.map((x) => (
-            <Button key={x.label} size="sm" variant={x.danger ? "danger-ghost" : "secondary"} onClick={x.onClick}>
-              {x.label}
-            </Button>
-          ))}
-        </div>
-      )}
-    </>
+    </div>
   );
-  if (phone)
-    return (
-      <div className="absolute inset-0 z-10 flex flex-col justify-end">
-        <button type="button" aria-label="Close the details" tabIndex={-1} className="absolute inset-0 bg-black/45" onClick={onClose} />
-        <div
-          role="dialog"
-          aria-label="About this file"
-          className="relative max-h-[80%] scroll-y rounded-t-2xl bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-pop"
-        >
-          <div aria-hidden className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-line-strong" />
-          <div className="flex items-center justify-between py-1 pr-2 pl-5">
-            <h3 className="text-lg font-bold">About this file</h3>
-            <Button size="icon" variant="ghost" aria-label="Close the details" onClick={onClose}>
-              <X aria-hidden />
+  const foot =
+    openTab === "send"
+      ? send.foot
+      : mains.length
+        ? mains.map((x) => (
+            <Button key={x.label} variant="secondary" onClick={x.onClick}>
+              {x.label}…
             </Button>
-          </div>
-          {body}
-        </div>
-      </div>
-    );
+          ))
+        : null;
+
+  const state: DocState = kind === "paper" ? "doc" : "file";
   return (
-    <aside aria-label="About this file" className="flex w-80 shrink-0 flex-col scroll-y border-l border-line">
-      <h3 className="px-5 pt-4 pb-1.5 text-md font-semibold">About this file</h3>
-      {body}
-    </aside>
+    <DocWindow
+      kind="viewer"
+      title={title}
+      state={kind === "paper" ? null : { state, word: `Uploaded · ${KIND_WORD[kind]}` }}
+      sub={where || null}
+      icon={kind === "image" ? "image" : kind === "sheet" || kind === "csv" ? "sheet" : kind === "paper" ? "doc" : "file"}
+      items={set.map((f, i) => ({ key: f.key, name: f.name, state: kindOf(f) === "paper" ? "doc" : "file", go: () => onMove(i) }))}
+      at={at}
+      itemsLabel="Files here"
+      download={download ? { href: download, word: kind === "paper" ? "Download PDF" : "Download", name: kind === "paper" ? undefined : file.name } : null}
+      onPrint={print}
+      more={more}
+      onClose={onClose}
+      stage={
+        kind === "paper" ? (
+          <PaperStage src={shown} title={file.name} frame={frame} {...paperView.stage} />
+        ) : (
+          <FileStage file={file} kind={kind} src={shown} zoom={imageZoom} frame={frame} />
+        )
+      }
+      view={
+        kind === "paper"
+          ? { choices: choicesOf(paper, setLook), zoom: paperView.zoom, pages: paperView.pages }
+          : kind === "image"
+            ? { zoom: { value: imageZoom, shown: imageZoom ?? 1, set: setImageZoom } }
+            : null
+      }
+      panel={{
+        label: "About this file",
+        tabs: canSend ? [{ key: "details", label: "Details" }, { key: "send", label: "Send" }] : [{ key: "details", label: "Details" }],
+        tab: openTab,
+        onTab: setTab,
+        body: openTab === "send" ? send.body : details,
+        foot,
+        bar: { text: openTab === "send" ? send.bar : <><b className="font-semibold">Details</b> · {where || KIND_WORD[kind]}</>, state: phone ? state : undefined },
+      }}
+    />
   );
 }
 
 /* ---------------------------------------------------------------- the stage, by kind */
 
-function Stage({
+export function FileStage({
   file,
   kind,
   src,
+  zoom,
   frame,
-  onShare,
 }: {
   file: ViewFile;
   kind: ViewKind;
   src: string;
-  frame: React.RefObject<HTMLIFrameElement | null>;
-  onShare?: (e: { currentTarget: HTMLElement }) => void;
+  zoom: number | null;
+  /** A PDF's frame: the window's Print prints it. */
+  frame?: React.RefObject<HTMLIFrameElement | null>;
 }) {
-  if (kind === "image") return <ImageStage src={src} name={file.name} />;
-  if (kind === "pdf") return <iframe src={src} title={file.name} className="size-full border-0 bg-white" />;
-  if (kind === "paper") return <PaperFrame frame={frame} src={src} title={file.name} />;
+  if (kind === "image") return <ImageStage src={src} name={file.name} zoom={zoom} />;
+  // The browser's own PDF bar is hidden: Download and Print are the window's, once (one window, 26 Nov).
+  if (kind === "pdf")
+    return <iframe ref={frame} src={`${src}#toolbar=0&navpanes=0&view=FitH`} title={file.name} className="absolute inset-0 size-full border-0 bg-white" />;
   if (kind === "sheet") return <SheetStage href={file.href} />;
   if (kind === "csv" || kind === "text") return <TextStage href={file.href} csv={kind === "csv"} />;
-  return <NoPreview file={file} onShare={onShare} />;
+  return <NoPreview file={file} />;
 }
 
-/** The sheet's width on screen (A4 at 96 dpi with the grey around it). */
-const SHEET = 860;
-
-/**
- * One of our papers in its frame, the whole width of the sheet in view on any screen (a phone too): the page inside
- * is zoomed to the stage's width, and its pages follow one under the other.
- */
-function PaperFrame({ frame, src, title }: { frame: React.RefObject<HTMLIFrameElement | null>; src: string; title: string }) {
-  const box = useRef<HTMLDivElement>(null);
-  const fit = useCallback(() => {
-    const w = box.current?.clientWidth ?? SHEET;
-    frame.current?.contentDocument?.documentElement.style.setProperty("zoom", String(Math.min(1, (w - 8) / SHEET)));
-  }, [frame]);
-  useEffect(() => {
-    const el = box.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [fit]);
+/** A photo: fitted to the stage, or at the zoom picked under it (double-click: 100% and back). */
+function ImageStage({ src, name, zoom }: { src: string; name: string; zoom: number | null }) {
   return (
-    <div ref={box} className="absolute inset-0">
-      <iframe ref={frame} src={src} title={title} onLoad={fit} className="size-full border-0 bg-surface-3" />
-    </div>
-  );
-}
-
-/** A photo: fitted to the stage; − + and 100% zoom it, Fit puts it back (design 21 Nov). */
-function ImageStage({ src, name }: { src: string; name: string }) {
-  const [zoom, setZoom] = useState<number | null>(null);
-  const step = (d: number) => setZoom((z) => Math.min(4, Math.max(0.25, Math.round(((z ?? 1) + d) * 100) / 100)));
-  return (
-    <div className="absolute inset-0 flex flex-col">
-      <div className={cn("min-h-0 flex-1", zoom === null ? "flex items-center justify-center p-4 sm:p-6" : "scroll-xy scroll-lg p-4")}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- a stored file, served by our own /files route */}
-        <img
-          src={src}
-          alt={name}
-          onDoubleClick={() => setZoom((z) => (z === null ? 1 : null))}
-          className={cn("bg-white shadow-card", zoom === null ? "max-h-full max-w-full object-contain" : "max-w-none")}
-          style={zoom === null ? undefined : { width: `${zoom * 100}%` }}
-        />
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-        <div className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-line bg-surface p-1 shadow-pop">
-          <Button size="icon-sm" variant="ghost" aria-label="Zoom out" onClick={() => step(-0.25)}>
-            <Minus aria-hidden />
-          </Button>
-          <span className="min-w-[52px] text-center text-md font-semibold tabular">
-            {zoom === null ? "Fit" : `${Math.round(zoom * 100)}%`}
-          </span>
-          <Button size="icon-sm" variant="ghost" aria-label="Zoom in" onClick={() => step(0.25)}>
-            <Plus aria-hidden />
-          </Button>
-          <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-          {zoom === null ? (
-            <Button size="sm" variant="ghost" onClick={() => setZoom(1)}>
-              100%
-            </Button>
-          ) : (
-            <Button size="sm" variant="ghost" onClick={() => setZoom(null)}>
-              Fit
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className={cn("absolute inset-0", zoom === null ? "flex items-center justify-center p-4 pb-20 sm:p-6 sm:pb-20" : "scroll-xy scroll-lg p-4 pb-20")}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a stored file, served by our own /files route */}
+      <img
+        src={src}
+        alt={name}
+        className={cn("bg-white shadow-card", zoom === null ? "max-h-full max-w-full object-contain" : "max-w-none")}
+        style={zoom === null ? undefined : { width: `${zoom * 100}%` }}
+      />
     </div>
   );
 }
@@ -972,8 +623,8 @@ function StageNote({ children }: { children: ReactNode }) {
   return <p className="absolute inset-0 grid place-items-center px-6 text-center text-md text-text-2">{children}</p>;
 }
 
-/** A file with no preview here (Word, zip…): what it is, and Download (design 21 Nov). */
-function NoPreview({ file, onShare }: { file: ViewFile; onShare?: (e: { currentTarget: HTMLElement }) => void }) {
+/** A file with no preview here (Word, zip…): what it is; Download is in the header (on a phone, here too). */
+function NoPreview({ file }: { file: ViewFile }) {
   const ext = (file.name.split(".").pop() ?? "").toUpperCase();
   const word = /^DOCX?$/.test(ext) ? "Word document" : ext ? `${ext} file` : "File";
   return (
@@ -989,158 +640,16 @@ function NoPreview({ file, onShare }: { file: ViewFile; onShare?: (e: { currentT
         <p className="text-md text-text-2">
           This kind of file does not open in the app. Download it to open it{/^DOCX?$/.test(ext) ? " in Word" : ""}.
         </p>
-        <a href={file.href} download={file.name} className={buttonClass("primary", "lg", "w-full")}>
+        <a href={file.href} download={file.name} className={buttonClass("primary", "lg", "w-full sm:hidden")}>
           <Download aria-hidden /> Download
         </a>
-        {onShare && (
-          <Button size="lg" variant="secondary" className="w-full" onClick={onShare}>
-            <Share2 aria-hidden /> Share
-          </Button>
-        )}
       </div>
     </div>
   );
 }
 
-/** A file as itself, to hand to the phone's share sheet. */
-async function fileOf(href: string, name: string) {
-  const res = await fetch(href);
-  if (!res.ok) throw new Error(`The file could not be fetched (${res.status}).`);
-  const blob = await res.blob();
-  return new File([blob], name, { type: blob.type });
-}
-
-/** Can this browser hand files to the system's share sheet (WhatsApp, email, Teams, AirDrop…)? */
-const sharesFiles = () =>
-  typeof navigator !== "undefined" &&
-  "canShare" in navigator &&
-  navigator.canShare({ files: [new File([""], "x.pdf", { type: "application/pdf" })] });
-
-/**
- * Share a file or a paper outside the app (Fawad 21 Nov): the share sheet with the file itself where the browser
- * has one (phones, Windows, Mac), WhatsApp or email with the file downloaded to attach, or the link for the team.
- * The app sends nothing itself.
- */
-function ShareMenu({
-  file,
-  anchor,
-  phone,
-  onClose,
-}: {
-  file: { href: string; name: string };
-  anchor: HTMLElement;
-  phone: boolean;
-  onClose: () => void;
-}) {
-  const text = `Please find attached: ${file.name.replace(/\.[a-z0-9]+$/i, "")}.`;
-  const sheet = sharesFiles();
-  const download = () => {
-    const a = document.createElement("a");
-    a.href = file.href;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-  const viaSheet = async () => {
-    toast({ message: "Getting the file ready…", kind: "wait" });
-    try {
-      const f = await fileOf(file.href, file.name);
-      await navigator.share({ files: [f], title: file.name, text });
-      toast("Shared.");
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return toast("Not shared.");
-      toast({
-        message:
-          e instanceof Error && e.message.startsWith("The file")
-            ? e.message
-            : "This browser could not share the file. Download it and attach it instead.",
-        kind: "fail",
-      });
-    }
-  };
-  const run = (fn: () => void | Promise<void>) => () => {
-    onClose();
-    void fn();
-  };
-  const item =
-    "flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-md hover:bg-surface-2 focus:bg-surface-2 focus:outline-none";
-  return (
-    <FloatingMenu anchor={() => anchor} onClose={onClose} label={`Share ${file.name}`} width={300}>
-      {sheet && (
-        <button type="button" role="menuitem" className={item} onClick={run(viaSheet)}>
-          <Share2 className="size-4 shrink-0 text-text-2" aria-hidden />
-          <span className="min-w-0">
-            <span className="block font-medium">Share the file…</span>
-            <span className="block text-xs text-muted">WhatsApp, email, WeChat and the rest, with the file attached</span>
-          </span>
-        </button>
-      )}
-      <button
-        type="button"
-        role="menuitem"
-        className={item}
-        onClick={run(() => {
-          // A phone with a share sheet sends the file itself; a computer downloads it to attach in WhatsApp.
-          if (phone && sheet) return viaSheet();
-          download();
-          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
-          toast(`${file.name} downloaded: attach it in WhatsApp (the 📎).`);
-        })}
-      >
-        <MessageCircle className="size-4 shrink-0 text-text-2" aria-hidden />
-        <span className="min-w-0">
-          <span className="block font-medium">WhatsApp</span>
-          <span className="block text-xs text-muted">
-            {phone && sheet ? "Pick WhatsApp in the share sheet" : "Downloads the file, then opens WhatsApp to attach it"}
-          </span>
-        </span>
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={item}
-        onClick={run(() => {
-          if (phone && sheet) return viaSheet();
-          download();
-          window.location.assign(`mailto:?subject=${encodeURIComponent(file.name)}&body=${encodeURIComponent(text)}`);
-          toast(`${file.name} downloaded: attach it to the email.`);
-        })}
-      >
-        <Mail className="size-4 shrink-0 text-text-2" aria-hidden />
-        <span className="min-w-0">
-          <span className="block font-medium">Email</span>
-          <span className="block text-xs text-muted">
-            {phone && sheet ? "Pick your mail app in the share sheet" : "Downloads the file and opens a new email"}
-          </span>
-        </span>
-      </button>
-      <span role="separator" className="my-1 block h-px bg-line" />
-      <button
-        type="button"
-        role="menuitem"
-        className={item}
-        onClick={run(async () => {
-          try {
-            await navigator.clipboard.writeText(new URL(file.href, window.location.href).toString());
-            toast("Link copied: it opens for people signed in to the app.");
-          } catch {
-            toast("Could not copy the link.");
-          }
-        })}
-      >
-        <Copy className="size-4 shrink-0 text-text-2" aria-hidden />
-        <span className="min-w-0">
-          <span className="block font-medium">Copy link for the team</span>
-          <span className="block text-xs text-muted">Only people signed in to the app can open it</span>
-        </span>
-      </button>
-    </FloatingMenu>
-  );
-}
-
 /** A photo printed on its own page (a hidden frame with only the picture), never a new tab. */
-function printImage(src: string, title: string) {
+export function printImage(src: string, title: string) {
   const f = document.createElement("iframe");
   f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
   document.body.appendChild(f);
