@@ -68,7 +68,7 @@ export default async function TranslationsPage({ searchParams }: { searchParams:
           {list.rows.length ? (
             <TranslationList rows={list.rows} />
           ) : (
-            <p className="py-6 text-center text-md text-muted">
+            <p data-part="empty" className="py-6 text-center text-md text-muted">
               {show === "check" ? "Nothing to check: every Chinese the translator wrote has been checked." : "None."}
             </p>
           )}

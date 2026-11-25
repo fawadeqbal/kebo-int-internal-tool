@@ -14,7 +14,7 @@ import { translationAction } from "./actions";
  */
 export function TranslationList({ rows }: { rows: TranslationView[] }) {
   return (
-    <ul className="flex flex-col">
+    <ul data-part="table" className="flex flex-col">
       {rows.map((r) => (
         <Row key={r.id} r={r} />
       ))}

@@ -88,6 +88,7 @@ export const PAGE_SHAPES: Record<string, string> = {
   "/access/sign-ins": "header · tabs:2 · filter:1 · table",
 
   "/settings": "header · ~form:3",
+  "/settings/translations": "header · ~cards:2 · tabs:4 · table · ~pager",
   "/settings/address": "~form:2",
 };
 
