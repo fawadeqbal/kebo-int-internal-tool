@@ -277,13 +277,14 @@ describe("order items, one at a time", () => {
     await api(app, admin).post("/users", { name: "Packers", email, role: role.key, password }).expect(201);
     await patch(machine.id, { set: "customs", hsCode: "8422.30" }, await signIn(app, email, password)).expect(403);
 
-    // The packing list's lines carry them; the China customs copy's code is China's, else the customer's.
+    // The packing list's details carry both (the China customs copy prints China's); its items, their Chinese.
+    await patch(machine.id, { set: "customs", descriptionZh: "泡罩包装机" }).expect(200);
     const pl = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list`).expect(200)).body as {
-      lines: { id: string; hsCode: string | null; hsCodeCn: string | null }[];
-      details: { shipping: { hsCode: string | null; hsCodeCn: string | null } } | null;
+      lines: { id: string; descriptionZh: string | null }[];
+      details: { shipping: { hsCode: string | null; hsCodeCn: string | null } };
     };
-    expect(pl.lines.find((l) => l.id === machine.id)).toMatchObject({ hsCode: "8422.40", hsCodeCn: "8422.4090" });
-    if (pl.details) expect(pl.details.shipping).toMatchObject({ hsCode: "8422.40", hsCodeCn: "8422.4090" });
+    expect(pl.lines.find((l) => l.id === machine.id)).toMatchObject({ descriptionZh: "泡罩包装机" });
+    expect(pl.details.shipping).toMatchObject({ hsCode: expect.stringContaining("8422.40"), hsCodeCn: expect.stringContaining("8422.4090") });
   });
 
   it("a cancelled order's items do not change", async () => {

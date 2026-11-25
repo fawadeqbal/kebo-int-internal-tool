@@ -14,7 +14,6 @@ import {
   type BalanceTerms,
   type BuyerSnapshot,
   type Settings,
-  hsFor,
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
@@ -215,9 +214,6 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       /** The item in Chinese (printed under the English in English + 中文); null until written. */
       descriptionZh: l.descriptionZh,
       model: l.model,
-      /** The customer's country's HS code, and the China customs copy's (China's, else the customer's). */
-      hsCode: l.hsCode,
-      hsCodeCn: hsFor("customs", l.hsCode, l.hsCodeCn),
       quantity: l.quantity.toString(),
       unit: l.unit,
       unitPrice: goodsOnly ? null : l.unitPrice.toFixed(2),

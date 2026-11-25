@@ -422,9 +422,6 @@ export interface OrderDocument {
     /** The item in Chinese (under the English in English + 中文); versions made before 25 Nov 2026 have none. */
     descriptionZh?: string | null;
     model: string | null;
-    /** The customer's country's HS code, and China's (else the customer's) for the China customs copy. */
-    hsCode?: string | null;
-    hsCodeCn?: string | null;
     quantity: string;
     unit: string;
     unitPrice: string | null;
