@@ -36,6 +36,7 @@ import {
   type PaperOptions,
   type LineCondition,
   type Settings,
+  paperDetailsOf,
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import { orderLineNumbers } from "../orders/orders.service";
@@ -289,6 +290,27 @@ function portsOf(c: PaperCtx) {
   return { pol: p.portOfLoading, pod: p.portOfDischarge };
 }
 
+/**
+ * The details under the title (design "papers in the customer's format", 25 Nov 2026): shipper, buyer, the bank
+ * by the payment route (`withBank`: not on the contract, which the LC is opened against) and the shipping.
+ */
+function detailsOf(c: PaperCtx, withBank: boolean) {
+  const b = c.o.bankContract;
+  const { pol, pod } = portsOf(c);
+  return paperDetailsOf({
+    company: c.settings.company,
+    buyer: c.customer,
+    route: routeOf(c.o),
+    withBank,
+    contract: b
+      ? { number: b.number, reference: b.reference, customerBank: b.customerBank, customerBankAddress: b.customerBankAddress, openedOn: fromDbDateOrNull(b.openedOn) }
+      : null,
+    proformaIssuedOn: fromDbDateOrNull(c.o.proformaIssuedOn),
+    ports: { portOfLoading: pol, portOfDischarge: pod },
+    hsCodes: c.o.lines.filter((l) => l.type === "goods").map((l) => l.hsCode),
+  });
+}
+
 const totalLabel = (c: PaperCtx) => `Total ${c.o.incoterm}${c.o.incotermPlace ? ` ${c.o.incotermPlace}` : ""}`;
 
 /** The goods with what each paper shows of them: number, item, HS code, quantity, prices. */
@@ -426,6 +448,7 @@ function salesContract(c: PaperCtx): Built {
       ],
       bank: c.settings.company.bankDetails || null,
       signatures: { left: `For the seller · ${c.company.name}`, right: `For the buyer · ${c.customer.name}` },
+      details: detailsOf(c, false),
     },
   };
 }
@@ -480,8 +503,10 @@ function commercialInvoice(c: PaperCtx): Built {
     ],
     doc: {
       date: shipped ?? c.today,
+      // The LC or contract number prints in the details' bank part, under the title; beside the date only while it
+      // is missing, so the draft shows it is "needed" where the eye looks.
       meta: [
-        ...(BANK_ROUTE(c) ? [{ label: `${lcWord(c)} No.`, value: lcNo }] : []),
+        ...(BANK_ROUTE(c) && !lcNo ? [{ label: `${lcWord(c)} No.`, value: null }] : []),
         { label: s?.mode === "air" ? "AWB No." : "B/L No.", value: blNo },
       ],
       heading: c.o.documentTitle,
@@ -500,6 +525,7 @@ function commercialInvoice(c: PaperCtx): Built {
       ],
       bank: null,
       signatures: null,
+      details: detailsOf(c, true),
     },
   };
 }
@@ -693,7 +719,6 @@ const m3 = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 3 }
 function shippingAdvice(c: PaperCtx): Built {
   const ship = shipOf(c);
   const s = ship.primary;
-  const { pol, pod } = portsOf(c);
   const blNo = ship.blNo;
   // Once it has sailed, the day it left (as the commercial invoice says), not the booking's ETD (review 24 Nov:
   // "ETD: JAN 10, 2027" printed after the ship left on 24 Nov).
@@ -759,8 +784,7 @@ function shippingAdvice(c: PaperCtx): Built {
         ...(s?.vessel ? [{ label: air ? "Flight:" : "Vessel:", value: s.vessel }] : []),
         ...(blNo ? [{ label: air ? "AWB No.:" : "B/L No.:", value: blNo }] : []),
         ...(s?.containerNo ? [{ label: "Container:", value: `${s.containerNo}${s.containerType ? ` (${s.containerType})` : ""}` }] : []),
-        ...(pol ? [{ label: "Port of loading:", value: pol }] : []),
-        ...(pod ? [{ label: "Port of discharge:", value: pod }] : []),
+        // The ports are in the details under the title.
         ...(etd ? [{ label: sailed ? (air ? "Departed:" : "Sailed on:") : "ETD:", value: date(etd) }] : []),
         ...(eta ? [{ label: "ETA:", value: date(eta) }] : []),
         ...(s?.forwarder ? [{ label: "Forwarder:", value: s.forwarder }] : []),
@@ -768,6 +792,7 @@ function shippingAdvice(c: PaperCtx): Built {
       ],
       bank: null,
       signatures: null,
+      details: detailsOf(c, true),
     },
   };
 }
@@ -1198,8 +1223,9 @@ function beneficiaryCertificate(c: PaperCtx): Built {
     ],
     doc: {
       date: c.today,
+      // The LC number prints in the details' bank part; beside the date only while it is missing ("needed").
       meta: [
-        { label: "LC No.", value: b?.number ?? null },
+        ...(b?.number ? [] : [{ label: "LC No.", value: null }]),
         { label: "Invoice No.", value: paperNumber(c.o.refNo, "commercial-invoice") },
       ],
       heading: c.o.documentTitle,
@@ -1218,6 +1244,7 @@ function beneficiaryCertificate(c: PaperCtx): Built {
           ],
       bank: null,
       signatures: { left: `For and on behalf of ${c.company.name}`, right: "Authorised signature" },
+      details: detailsOf(c, true),
     },
   };
 }

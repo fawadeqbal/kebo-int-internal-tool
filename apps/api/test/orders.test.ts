@@ -170,7 +170,14 @@ describe("orders: four stages", () => {
     expect(packed.goods).toMatchObject({ packed: true, containerNo: "TGHU 123456-7", totals: { packages: 10, grossWeightKg: "1250.50", cbm: "8.400" } });
     expect(packed.needs.title).toBe("Packed and ready: mark as shipped");
     const pl = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list`).expect(200)).body;
-    expect(pl.lines[0].packing).toEqual({ packages: 10, packageType: "Wooden case", netWeightKg: "1100.00", grossWeightKg: "1250.50", cbm: "8.400" });
+    expect(pl.lines[0].packing).toEqual({
+      packages: 10,
+      packageType: "Wooden case",
+      netWeightKg: "1100.00",
+      grossWeightKg: "1250.50",
+      cbm: "8.400",
+      cases: [expect.objectContaining({ count: 10, packageType: "Wooden case", grossWeightKg: "1250.50" })],
+    });
     expect(pl.packing).toMatchObject({ done: true, containerNo: "TGHU 123456-7", shippingMarks: "KANO AGRO\nLAGOS", totals: { packages: 10 } });
   });
 

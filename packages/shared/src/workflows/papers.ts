@@ -3,6 +3,7 @@ import type { OrderDocumentKind, PaymentRoute, ShipMode } from "../enums";
 import type { Tone } from "../labels";
 import type { PlanFeature } from "../platform";
 import { requiredDocuments, type FlowStep } from "./flow";
+import type { PaperDetails } from "./packing";
 
 /**
  * Order flow v3, papers: every paper the app makes from the order, in the one
@@ -532,6 +533,11 @@ export interface PaperDoc {
   bank: string | null;
   /** Two signature lines (a contract, a handover). */
   signatures: { left: string; right: string } | null;
+  /**
+   * Under the title, in place of the party's box: shipper and buyer, the bank by the payment route and the
+   * shipping (the trade papers; papers made final before 25 Nov 2026 have none and print as they were).
+   */
+  details?: PaperDetails | null;
 }
 
 /** One line of the Make page's "Filled from the order". */

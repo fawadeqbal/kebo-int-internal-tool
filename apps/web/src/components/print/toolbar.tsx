@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
 import { Button, buttonClass } from "@kebo/ui";
+import type { DocLang } from "./zh";
+
+/** The words on the language switch (the toolbar and the app's viewer). */
+export const LANG_WORD: Record<DocLang, string> = { en: "English", zh: "English + 中文" };
 
 /**
  * Above the sheet on screen, gone on paper: back to the order, the customer's or
- * the internal copy, print, or download the PDF.
+ * the internal copy, English or English with Chinese, print, or download the PDF.
  */
 export function PrintToolbar({
   title,
@@ -16,6 +20,7 @@ export function PrintToolbar({
   pdfHref,
   excelHref,
   copies,
+  languages,
 }: {
   title: string;
   backHref: string;
@@ -24,6 +29,8 @@ export function PrintToolbar({
   excelHref?: string;
   /** Priced documents: switch between the customer's copy (one total) and the internal one (every price, cost and payment). */
   copies?: { current: "customer" | "internal"; customer: string; internal: string };
+  /** The paper in English, or with Chinese beside every label (?lang=zh); English unless chosen. */
+  languages?: { current: DocLang; en: string; zh: string };
 }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -38,10 +45,11 @@ export function PrintToolbar({
         pdfHref: abs(pdfHref),
         excelHref: excelHref && abs(excelHref),
         copies: copies && { current: copies.current, customer: abs(copies.customer), internal: abs(copies.internal) },
+        languages: languages && { current: languages.current, en: abs(languages.en), zh: abs(languages.zh) },
       },
       window.location.origin,
     );
-  }, [title, pdfHref, excelHref, copies]);
+  }, [title, pdfHref, excelHref, copies, languages]);
   return (
     <div className="no-print sticky [html[data-embedded]_&]:hidden top-0 z-20 mb-6 border-b border-[#d0d7e2] bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-[210mm] max-w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-[#16151c]">
@@ -79,6 +87,24 @@ export function PrintToolbar({
                   }
                 >
                   {k === "customer" ? "Customer copy" : "Internal copy"}
+                </Link>
+              ))}
+            </div>
+          )}
+          {languages && (
+            <div role="group" aria-label="Language" className="flex rounded-md border border-[#e4e4ea] bg-[#f6f6f8] p-0.5 text-sm">
+              {(["en", "zh"] as const).map((k) => (
+                <Link
+                  key={k}
+                  href={languages[k]}
+                  aria-current={languages.current === k ? "page" : undefined}
+                  className={
+                    languages.current === k
+                      ? "rounded px-2.5 py-1 font-medium bg-white text-[#16151c] shadow-sm"
+                      : "rounded px-2.5 py-1 text-[#4a4857] hover:text-[#16151c]"
+                  }
+                >
+                  {LANG_WORD[k]}
                 </Link>
               ))}
             </div>

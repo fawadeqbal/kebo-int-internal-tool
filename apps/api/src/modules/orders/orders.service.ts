@@ -38,6 +38,8 @@ import {
   ORDER_STAGES,
   type OrderStage,
   type PackingInput,
+  type LineCasesInput,
+  caseTotals,
   type ReceiptInput,
   type LineCondition,
   LINE_CONDITION_LABEL,
@@ -52,6 +54,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../../common/auth/order-access";
+import { caseRowOf, caseRowsSelect, caseView, rowsFromTotals, setLineCases } from "./line-cases";
 import { SettingsService } from "../settings/settings.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
@@ -107,6 +110,8 @@ const orderInclude = {
       },
       // The factory it was bought from (frozen when the order was made).
       factory: { select: { id: true, name: true } },
+      // How it is packed, case by case (the packing list's rows).
+      cases: caseRowsSelect,
     },
   },
   customer: { select: { id: true, name: true, country: true } },
@@ -219,6 +224,8 @@ function lineView(l: LineRow, no: string, show: LineShows) {
       netWeightKg: l.netWeightKg?.toFixed(2) ?? null,
       grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null,
       cbm: l.cbm?.toFixed(3) ?? null,
+      /** Case by case: what the totals above add up. */
+      cases: l.cases.map(caseView),
     },
     delivered: show.delivered
       ? { qty: trimQty(l.deliveredQty), condition: (l.deliveredCondition as LineCondition | null) ?? null, note: l.deliveryNote }
@@ -1529,24 +1536,12 @@ export class OrdersService {
       for (const p of input.lines) {
         if (p.netWeightKg !== null && p.grossWeightKg !== null && p.netWeightKg > p.grossWeightKg)
           throw new DomainError(`${byId.get(p.lineId)!.description.split("\n")[0]}: the net weight cannot be more than the gross weight.`);
-        await tx.orderLine.update({
-          where: { id: p.lineId },
-          data: {
-            packages: p.packages,
-            packageType: p.packageType,
-            netWeightKg: p.netWeightKg,
-            grossWeightKg: p.grossWeightKg,
-            cbm: p.cbm,
-          },
-        });
+        // Given as the item's totals: its rows (with their sizes) stay when the totals are what they add up to.
+        const rows = rowsFromTotals(byId.get(p.lineId)!.cases.map(caseRowOf), p);
+        if (rows) await setLineCases(tx, p.lineId, rows);
       }
-      // Made once every goods line has its packages counted.
-      const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
-      const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
-      await tx.order.update({
-        where: { id: o.id },
-        data: { shippingMarks: input.shippingMarks, packedAt: complete ? (o.packedAt ?? new Date()) : null },
-      });
+      const complete = await this.packedNow(tx, o);
+      await tx.order.update({ where: { id: o.id }, data: { shippingMarks: input.shippingMarks } });
       // The container is the shipment's: sent here (older clients), it is saved on Shipment 1.
       if (input.containerNo !== undefined && input.containerNo !== shipFacts(o.shipments).containerNo)
         await onPrimaryShipment(tx, o, { containerNo: input.containerNo });
@@ -1560,6 +1555,53 @@ export class OrdersService {
       });
     });
     return this.get(user, id);
+  }
+
+  /**
+   * The packing case by case (PUT /orders/:id/cases): for each item sent, its rows as the packing list prints
+   * them (case number, how many, packed in, each case's size in mm, weights; the volume worked out from the
+   * size). The items' totals follow; the other items stay as they are.
+   */
+  async saveCases(user: SessionUser, id: string, input: LineCasesInput) {
+    if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
+    await this.prisma.tx(async (tx) => {
+      const { o, byId } = await this.goodsLinesFor(
+        tx,
+        user,
+        id,
+        input.lines.map((l) => l.lineId),
+      );
+      const said: string[] = [];
+      for (const l of input.lines) {
+        const line = byId.get(l.lineId)!;
+        const before = caseTotals(line.cases.map(caseRowOf));
+        const t = await setLineCases(tx, l.lineId, l.cases);
+        const name = line.description.split("\n")[0]!.slice(0, 40);
+        const sum = (x: typeof t) =>
+          [`${x.packages ?? 0} case${x.packages === 1 ? "" : "s"}`, x.cbm !== null ? `${x.cbm} m³` : null, x.grossWeightKg !== null ? `${x.grossWeightKg} kg` : null]
+            .filter(Boolean)
+            .join(" · ");
+        said.push(`${name}: ${sum(before)} → ${sum(t)}`);
+      }
+      const complete = await this.packedNow(tx, o);
+      await this.freezePacking(tx, o.id, user.id);
+      await this.audit.record(tx, {
+        userId: user.id,
+        action: "packing_list",
+        entityType: "order",
+        entityId: o.id,
+        summary: `${o.refNo}: packing list case by case, ${said.join("; ")}${complete ? "" : " (not complete: some items have no packages)"}`,
+      });
+    });
+    return this.get(user, id);
+  }
+
+  /** The order is packed once every goods line has its packages counted; answers whether it is. */
+  private async packedNow(tx: Tx, o: { id: string; packedAt: Date | null }) {
+    const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
+    const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
+    await tx.order.update({ where: { id: o.id }, data: { packedAt: complete ? (o.packedAt ?? new Date()) : null } });
+    return complete;
   }
 
   /** What the screens show of the lines for this person and company. */
@@ -1629,11 +1671,10 @@ export class OrdersService {
           throw new DomainError(`${line.description.split("\n")[0]}: the net weight cannot be more than the gross weight.`);
         const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => next[k] !== was[k]);
         if (!changed.length) return o.id;
-        await tx.orderLine.update({ where: { id: line.id }, data: next });
-        // Made once every goods line has its packages counted (as the whole list).
-        const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
-        const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
-        await tx.order.update({ where: { id: o.id }, data: { packedAt: complete ? (o.packedAt ?? new Date()) : null } });
+        // Kept as rows (the item's totals follow them).
+        const rows = rowsFromTotals(line.cases.map(caseRowOf), next);
+        if (rows) await setLineCases(tx, line.id, rows);
+        const complete = await this.packedNow(tx, o);
         const label: Record<keyof typeof next, string> = {
           packages: "packages",
           packageType: "packed in",

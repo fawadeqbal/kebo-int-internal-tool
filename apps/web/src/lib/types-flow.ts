@@ -58,7 +58,11 @@ export interface BankContract {
   number: string | null;
   status: BankContractStatus;
   customerBank: string | null;
+  /** Printed under the bank's name as the papers' "Notify bank". */
+  customerBankAddress: string | null;
   ourBank: string | null;
+  /** The bank's own reference for it (e.g. AD1090926000595). */
+  reference: string | null;
   amount: number | null;
   currency: string | null;
   openedOn: string | null;

@@ -9,6 +9,7 @@ import type {
   OrderStage,
   OrderStatus,
   OrderWord,
+  PaperDetails,
   PaymentKind,
   PaymentMethod,
   RevisionStatus,
@@ -199,12 +200,27 @@ export interface AgreedView extends AgreedTerms {
 }
 
 /** The packing list figures of one goods line (null until filled in). */
+/** One row of an item's packing: `count` identical cases, each this size (mm); the weights and volume are the row's. */
+export interface LineCase {
+  caseNo: string | null;
+  count: number;
+  packageType: string;
+  lengthMm: number | null;
+  widthMm: number | null;
+  heightMm: number | null;
+  netWeightKg: string | null;
+  grossWeightKg: string | null;
+  cbm: string | null;
+}
+
 export interface LinePacking {
   packages: number | null;
   packageType: string | null;
   netWeightKg: string | null;
   grossWeightKg: string | null;
   cbm: string | null;
+  /** Case by case (what the totals above add up); versions printed before 25 Nov 2026 have none. */
+  cases?: LineCase[];
 }
 
 /** A line of GET /orders/:id: goods (received from the factory, packed) or a charge. */
@@ -380,12 +396,18 @@ export interface OrderDocument {
     warranty?: string | null;
     /** The customer's own order number. */
     customerRef?: string | null;
+    /** The proforma's number once issued (the packing list names it as its invoice). */
+    proformaNo?: string | null;
   };
   /** Packing list versions made since the shipment is the one place: its ports as printed (older ones: none). */
   shipment?: { mode: ShipMode; portOfLoading: string | null; portOfDischarge: string | null } | null;
   paymentTerms: string;
   /** "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
   paymentSentence: string;
+  /** Shipper, buyer, the bank by the route and the shipping, under the title (versions made before 25 Nov 2026: none). */
+  details?: PaperDetails | null;
+  /** The packing list's "Payment:" line ("100% irrevocable LC at sight (LC No. …) Ref. No. …"). */
+  paymentLine?: string | null;
   currency: string;
   showPrices: boolean;
   lines: {

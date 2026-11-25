@@ -14,7 +14,7 @@ import {
 import { REQUEST_CHANNELS } from "../workflows/flow";
 import { CLAIM_BEARERS, FREIGHT_TERMS } from "../workflows/order-sections";
 import { BALANCE_WHENS, LC_TERMS } from "../workflows/money-route";
-import { id, isoDate, optionalAmount, optionalDate, optionalId, optionalText, text } from "./common";
+import { id, isoDate, optionalAmount, optionalDate, optionalId, optionalText, text, keptText } from "./common";
 
 /**
  * Inputs for the order flow after the quotation (see workflows/flow). Where a
@@ -65,7 +65,11 @@ export const bankContractInput = z.object({
   number: optionalText(60),
   status: z.enum(BANK_CONTRACT_STATUSES).default("draft"),
   customerBank: optionalText(160),
+  /** Printed under the bank's name as the papers' "Notify bank"; left out (an older form), it stays as it is. */
+  customerBankAddress: keptText(300),
   ourBank: optionalText(160),
+  /** The bank's own reference for it (e.g. AD1090926000595); left out, it stays as it is. */
+  reference: keptText(60),
   amount: optionalAmount,
   currency: optionalEnum(CURRENCIES).optional().transform((v) => v ?? null),
   openedOn: optionalDate,
@@ -74,6 +78,8 @@ export const bankContractInput = z.object({
   note: optionalText(2000),
 });
 export type BankContractInput = z.infer<typeof bankContractInput>;
+/** The fields a bank contract form sends (one list for every form that saves it). */
+export const BANK_CONTRACT_FIELDS = bankContractInput.keyof().options;
 
 /**
  * When we placed the order with the factory (empty: not yet) and the factory's own number for it. Only the

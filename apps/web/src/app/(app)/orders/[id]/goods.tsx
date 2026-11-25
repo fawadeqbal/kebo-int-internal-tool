@@ -11,7 +11,19 @@ import { FileActions } from "@/components/common/file-actions";
 import { EditButton } from "@/components/common/edit-button";
 import { SidePanel } from "@/components/common/panel";
 import { EditsChip, editedMark } from "@/components/edits/edits";
-import { OrderLinesEditor, OrderLinesView } from "@/components/orders/order-lines";
+import { OrderLinesView } from "@/components/orders/order-lines";
+import {
+  CASE_FIELDS,
+  CASE_LABEL,
+  caseInput,
+  caseKey,
+  CasesEditor,
+  draftOf,
+  draftVolume,
+  PACKAGE_TYPES,
+  type CaseDraft,
+  type CaseField,
+} from "@/components/orders/cases-editor";
 import { FieldsForm } from "@/components/orders/step-view";
 import type { EditCard, EditRef, EditsView } from "@/lib/types-edits";
 import { headerKey, sheetNumber, type ReadSheet, type SheetSpec } from "@/lib/sheet-spec";
@@ -36,127 +48,121 @@ export interface GoodsLine {
 
 /* ---------------------------------------------------------------- packing list */
 
-interface PackRow {
-  lineId: string;
-  packages: string;
-  packageType: string;
-  netWeightKg: string;
-  grossWeightKg: string;
-  cbm: string;
-}
-
-const FIELDS: { key: Exclude<keyof PackRow, "lineId">; label: string; mode: "numeric" | "decimal" | "text"; width: string; digits?: number }[] = [
-  { key: "packages", label: "Packages", mode: "numeric", width: "6rem", digits: 0 },
-  { key: "packageType", label: "Package type", mode: "text", width: "8rem" },
-  { key: "netWeightKg", label: "Net kg", mode: "decimal", width: "6.5rem" },
-  { key: "grossWeightKg", label: "Gross kg", mode: "decimal", width: "6.5rem" },
-  { key: "cbm", label: "CBM (m³)", mode: "decimal", width: "6.5rem", digits: 3 },
-];
-
-const sum = (rows: PackRow[], k: keyof PackRow) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
-const rowsOf = (lines: GoodsLine[]): PackRow[] =>
-  lines.map((l) => ({
-    lineId: l.id,
-    packages: l.packing.packages === null ? "" : String(l.packing.packages),
-    packageType: l.packing.packageType ?? "",
-    netWeightKg: l.packing.netWeightKg === null ? "" : String(Number(l.packing.netWeightKg)),
-    grossWeightKg: l.packing.grossWeightKg === null ? "" : String(Number(l.packing.grossWeightKg)),
-    cbm: l.packing.cbm === null ? "" : String(Number(l.packing.cbm)),
-  }));
-const withDefaults = (rows: PackRow[]) => rows.map((r) => ({ ...r, packageType: r.packageType || "Carton" }));
-
-/** The packing list as a file: the goods, then the packing columns (a template has them to fill in). */
-function packingSheet(lines: GoodsLine[], rows: PackRow[], template: boolean): SheetSpec {
-  const goods = lines.map((l, i) => [
-    l.no,
-    l.description,
-    l.model,
-    Number(l.quantity),
-    l.unit,
-    ...FIELDS.map((f) => (f.mode === "text" ? rows[i]![f.key] || null : rows[i]![f.key] === "" ? null : Number(rows[i]![f.key]))),
-  ]);
+/** The packing list as a file: a row per case under each item (an item not packed yet: one row to fill in). */
+function packingSheet(lines: GoodsLine[], template: boolean): SheetSpec {
+  const rows = lines.flatMap((l) => {
+    const cases = l.packing.cases?.length ? l.packing.cases.map(draftOf) : [null];
+    return cases.map((c, n) => [
+      l.no,
+      n === 0 ? l.description : null,
+      n === 0 ? l.model : null,
+      n === 0 ? Number(l.quantity) : null,
+      n === 0 ? l.unit : null,
+      ...CASE_FIELDS.map((f) => (!c || c[f] === "" ? null : MODE_OF[f] === "text" ? c[f] : Number(f === "cbm" ? (draftVolume(c) ?? c[f]) : c[f]))),
+    ]);
+  });
+  const total = (k: "packages" | "netWeightKg" | "grossWeightKg" | "cbm") => lines.reduce((t, l) => t + (Number(l.packing[k]) || 0), 0);
   return {
     name: template ? "Packing list - template" : "Packing list",
     title: "Packing list",
     columns: [
-      { header: "No.", width: 7, note: "the order's item number: keep it as it is" },
-      { header: "Goods", width: 48 },
-      { header: "Model", width: 16 },
+      { header: "No.", width: 7, note: "the order's item number: keep it, and repeat it on each of the item's cases" },
+      { header: "Goods", width: 44 },
+      { header: "Model", width: 14 },
       { header: "Quantity", kind: "number", width: 10 },
       { header: "Unit", width: 9 },
-      ...FIELDS.map((f) => ({
-        header: f.label,
-        kind: f.mode === "text" ? ("text" as const) : ("number" as const),
-        width: 13,
-        choices: f.key === "packageType" ? PACKAGE_TYPES : undefined,
-        note: f.key === "packages" ? "a whole number" : f.key === "packageType" ? "pick one or type your own" : undefined,
+      ...CASE_FIELDS.map((f) => ({
+        header: CASE_LABEL[f],
+        kind: MODE_OF[f] === "text" ? ("text" as const) : ("number" as const),
+        width: f === "packageType" ? 22 : 10,
+        choices: f === "packageType" ? PACKAGE_TYPES : undefined,
+        note:
+          f === "count"
+            ? "how many identical cases on this row"
+            : f === "packageType"
+              ? "pick one or type your own"
+              : f === "cbm"
+                ? "worked out from L × W × H when they are given"
+                : f === "lengthMm"
+                  ? "each case's size, in mm"
+                  : undefined,
       })),
     ],
-    rows: goods,
-    foot: template
-      ? undefined
-      : ["Total", null, null, null, null, sum(rows, "packages"), null, sum(rows, "netWeightKg"), sum(rows, "grossWeightKg"), sum(rows, "cbm")],
+    rows,
+    foot: template ? undefined : ["Total", null, null, null, null, null, total("packages"), null, null, null, null, total("netWeightKg"), total("grossWeightKg"), total("cbm")],
     template: template
       ? {
           help: [
-            "Packing list: fill in the packing for each item of the order.",
-            "Keep the No., Goods, Quantity and Unit columns as they are: items are matched by their No.",
-            "Fill in Packages, Package type, Net kg, Gross kg and CBM, then upload the file with Excel › Upload a filled file.",
-            "The packing list is filled in from the file to check; nothing is saved until you press Save the packing list.",
+            "Packing list: fill in the packing of each item, a row per case (or per group of identical cases).",
+            "Keep the No. column: items are matched by their number. For an item in more cases, add a row under it with the same No.",
+            "Fill in Case No., Cases, Packed in, the size (L, W, H in mm), Net kg and Gross kg; the CBM is worked out from the size.",
+            "Upload the file with Excel › Upload a filled file. Nothing is saved until you press Save.",
           ],
         }
       : undefined,
   };
 }
 
-const PACKAGE_TYPES = ["Carton", "Wooden case", "Pallet", "Crate", "Bag", "Drum", "Bundle", "Roll", "Nude"];
+const MODE_OF: Record<CaseField, "text" | "number"> = {
+  caseNo: "text",
+  count: "number",
+  packageType: "text",
+  lengthMm: "number",
+  widthMm: "number",
+  heightMm: "number",
+  netWeightKg: "number",
+  grossWeightKg: "number",
+  cbm: "number",
+};
 
 /** Other headings a factory's own packing list may use. */
-const PACK_HEADINGS: Record<Exclude<keyof PackRow, "lineId">, string[]> = {
-  packages: ["packages", "pkgs", "ctns", "cartons", "noofpackages", "qtyofpackages", "packagesqty"],
-  packageType: ["packagetype", "packing", "packaging", "kindofpackages"],
+const PACK_HEADINGS: Record<CaseField, string[]> = {
+  caseNo: ["caseno", "case", "cno", "caseno.", "boxno", "packageno", "cartonno", "ctnno", "markno"],
+  count: ["cases", "packages", "pkgs", "ctns", "cartons", "noofpackages", "qtyofpackages", "packagesqty", "noofcases"],
+  packageType: ["packedin", "packagetype", "package", "packing", "packaging", "kindofpackages"],
+  lengthMm: ["lmm", "l", "length", "lengthmm"],
+  widthMm: ["wmm", "w", "width", "widthmm"],
+  heightMm: ["hmm", "h", "height", "heightmm"],
   netWeightKg: ["netkg", "nw", "nwkg", "netweight", "netweightkg"],
   grossWeightKg: ["grosskg", "gw", "gwkg", "grossweight", "grossweightkg"],
   cbm: ["cbm", "cbmm3", "volume", "m3", "meas", "measurement"],
 };
 
-/** The packing typed in an uploaded file, line by line (matched by No.), and what could not be used. */
-function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<string, Partial<PackRow>>; problems: string[]; error: string | null } {
+/** The cases typed in an uploaded file, grouped by item (rows matched by No.), and what could not be used. */
+function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<string, CaseDraft[]>; problems: string[]; error: string | null } {
   const keys = read.headers.map(headerKey);
   const noAt = keys.findIndex((k) => ["no", "sn", "sno", "itemno", "line", "lineno"].includes(k));
-  const at = Object.fromEntries(
-    Object.entries(PACK_HEADINGS).map(([field, names]) => [field, keys.findIndex((k) => names.includes(k))]),
-  ) as Record<keyof typeof PACK_HEADINGS, number>;
-  const fill = new Map<string, Partial<PackRow>>();
+  const at = Object.fromEntries(CASE_FIELDS.map((f) => [f, keys.findIndex((k) => PACK_HEADINGS[f].includes(k))])) as Record<CaseField, number>;
+  const fill = new Map<string, CaseDraft[]>();
   const problems: string[] = [];
   if (noAt < 0) return { fill, problems, error: "No “No.” column in the file: items are matched by their number. Download the template from Excel › Download a template." };
-  if (Object.values(at).every((i) => i < 0)) return { fill, problems, error: "No packing columns (Packages, Net kg, Gross kg, CBM) in the file." };
+  if (CASE_FIELDS.every((f) => at[f] < 0)) return { fill, problems, error: "No packing columns (Cases, Packed in, sizes, Net kg, Gross kg, CBM) in the file." };
   const byNo = new Map(lines.map((l) => [l.no, l]));
   read.rows.forEach((cells, r) => {
     const no = (cells[noAt] ?? "").trim().replace(/\.0+$/, "");
-    const values = FIELDS.filter((f) => at[f.key] >= 0 && (cells[at[f.key]] ?? "").trim());
-    if (!values.length) return;
+    const given = CASE_FIELDS.filter((f) => at[f] >= 0 && (cells[at[f]] ?? "").trim());
+    if (!given.length) return;
     const line = byNo.get(no);
     if (!line) {
       problems.push(`Row ${r + 2}: no item ${no || "(empty No.)"} on this order`);
       return;
     }
-    const got: Partial<PackRow> = {};
-    for (const f of values) {
-      const t = cells[at[f.key]]!.trim();
-      if (f.mode === "text") got[f.key] = t.slice(0, 40);
+    const d: CaseDraft = { key: caseKey(), caseNo: "", count: "1", packageType: "Carton", lengthMm: "", widthMm: "", heightMm: "", netWeightKg: "", grossWeightKg: "", cbm: "" };
+    for (const f of given) {
+      const t = cells[at[f]]!.trim();
+      if (MODE_OF[f] === "text") d[f] = t.slice(0, f === "caseNo" ? 20 : 80);
       else {
         const v = sheetNumber(t);
-        if (v === null || Number(v) < 0 || (f.mode === "numeric" && !Number.isInteger(Number(v)))) problems.push(`Row ${r + 2}, item ${no}: ${f.label} “${t}” is not ${f.mode === "numeric" ? "a whole number" : "a number"}`);
-        else got[f.key] = v;
+        const whole = f === "count" || f === "lengthMm" || f === "widthMm" || f === "heightMm";
+        if (v === null || Number(v) < 0 || (whole && !Number.isInteger(Number(v)))) problems.push(`Row ${r + 2}, item ${no}: ${CASE_LABEL[f]} “${t}” is not ${whole ? "a whole number" : "a number"}`);
+        else d[f] = String(v);
       }
     }
-    fill.set(line.id, got);
+    fill.set(line.id, [...(fill.get(line.id) ?? []), d]);
   });
   if (!fill.size && !problems.length) return { fill, problems, error: "The file has no packing filled in." };
   return { fill, problems, error: null };
 }
-
 
 /* ---------------------------------------------------------------- the cards */
 
@@ -181,7 +187,6 @@ export function PackingCard({
   action,
   marksAction,
   links,
-  today,
   edits,
 }: {
   title: string;
@@ -201,7 +206,6 @@ export function PackingCard({
   marksAction: Action;
   /** The paper's View / Print and PDF (once there is something on it). */
   links?: { view: string; pdf: string };
-  today: string;
   /** The order's saved edits ("Edited n×" on the lines and the marks). */
   edits?: EditsView;
 }) {
@@ -219,26 +223,20 @@ export function PackingCard({
     if (window.location.hash === "#edit-lines") history.replaceState(null, "", window.location.pathname + window.location.search);
   };
   const ref = (card: string) => ({ type: "order" as const, id: orderId, card });
-  const [fromFile, setFromFile] = useState<{ file: string; rows: PackRow[]; filled: number; problems: string[]; error: string | null } | null>(null);
-  const saved = rowsOf(goods);
+  const [fromFile, setFromFile] = useState<{ file: string; cases: Map<string, CaseDraft[]>; problems: string[]; error: string | null } | null>(null);
 
   const upload = (read: ReadSheet, file: string) => {
     const r = packingFromSheet(read, goods);
-    setFromFile({
-      file,
-      filled: r.fill.size,
-      problems: r.problems,
-      error: r.error,
-      rows: withDefaults(saved.map((row) => ({ ...row, ...r.fill.get(row.lineId) }))),
-    });
+    setFromFile({ file, cases: r.fill, problems: r.problems, error: r.error });
   };
+  const filled = fromFile?.cases.size ?? 0;
 
   const excel = (
     <ExcelMenu
       noun="packing"
-      template={canUpload ? () => packingSheet(goods, saved, true) : undefined}
+      template={canUpload ? () => packingSheet(goods, true) : undefined}
       onUpload={canUpload ? upload : undefined}
-      exportSheet={() => packingSheet(goods, saved, false)}
+      exportSheet={() => packingSheet(goods, false)}
     />
   );
 
@@ -265,7 +263,7 @@ export function PackingCard({
               <p className="text-bad">{fromFile.error}</p>
             ) : (
               <p className="text-text-2">
-                {fromFile.filled} item{fromFile.filled === 1 ? "" : "s"} filled in from the file. Save them to the packing list?
+                {filled} item{filled === 1 ? "" : "s"} filled in from the file, case by case. Save them to the packing list?
               </p>
             )}
             {fromFile.problems.length > 0 && (
@@ -277,15 +275,15 @@ export function PackingCard({
               </ul>
             )}
             <div className="mt-2 flex flex-wrap gap-2">
-              {!fromFile.error && fromFile.filled > 0 && (
+              {!fromFile.error && filled > 0 && (
                 <ActionForm action={action} onDone={() => setFromFile(null)} className="contents">
                   <input
                     type="hidden"
                     name="payload"
-                    value={JSON.stringify({ shippingMarks, lines: fromFile.rows })}
+                    value={JSON.stringify({ lines: [...fromFile.cases].map(([lineId, cases]) => ({ lineId, cases: cases.map(caseInput) })) })}
                   />
                   <SubmitButton size="xs" pendingText="Saving…">
-                    Save {fromFile.filled} item{fromFile.filled === 1 ? "" : "s"}
+                    Save {filled} item{filled === 1 ? "" : "s"}
                   </SubmitButton>
                 </ActionForm>
               )}
@@ -313,11 +311,15 @@ export function PackingCard({
         {editing && canEdit && (
           <SidePanel
             title="Edit packing list"
-            description="Packed in, packages, weights and volume of each line. Nothing is saved until Save changes."
+            description="Each item's cases as the packing list prints them: case number, how packed, size (mm) and weights. Nothing is saved until Save the packing."
             onClose={closeEditor}
             className={RULES.window.items}
           >
-            <OrderLinesEditor set="packing" orderId={orderId} lines={lines} today={today} edit={ref("lines.packing")} card={edits?.cards["lines.packing"]} />
+            <CasesEditor
+              items={goods.map((g) => ({ id: g.id, no: g.no, description: g.description, quantity: g.quantity, unit: g.unit, cases: g.packing.cases ?? [] }))}
+              action={action}
+              onDone={closeEditor}
+            />
           </SidePanel>
         )}
     </Card>
