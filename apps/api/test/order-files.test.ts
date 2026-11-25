@@ -17,6 +17,8 @@ type File = {
   note: string | null;
   attachedTo: { link: string; label: string; href: string };
   step: string | null;
+  /** A photo of one package (Packing's files). */
+  packageNo?: string | null;
   group: string;
   version: number;
   versions: { id: string; version: number }[];
