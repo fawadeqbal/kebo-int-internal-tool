@@ -14,14 +14,15 @@ import {
   type DocColumn,
 } from "./kebo-doc";
 import type { DocLang } from "./zh";
+import { detailsFor, type PaperCopy } from "./copies";
 
-/** A table cell or a detail beside the title, as Kebo's documents print it. */
-function cell(v: PaperCell | undefined): ReactNode {
+/** A table cell or a detail beside the title, as Kebo's documents print it (with Chinese: the item's and the unit's). */
+function cell(v: PaperCell | undefined, lang: DocLang = "en"): ReactNode {
   if (v === null || v === undefined) return "";
   if (typeof v === "string") return v;
-  if ("item" in v) return docItem(v.item, v.model);
+  if ("item" in v) return docItem(v.item, v.model, v.zh, lang);
   if ("money" in v) return docMoney(v.money, v.currency);
-  if ("qty" in v) return docQty(v.qty, v.unit);
+  if ("qty" in v) return docQty(v.qty, v.unit, lang);
   return docDate(v.date);
 }
 
@@ -55,19 +56,26 @@ export function PaperSheet({
   brand,
   watermark,
   lang = "en",
+  copy = "customer",
 }: {
   doc: PaperDoc;
   brand: DocBrand | null;
   watermark: string | null;
   lang?: DocLang;
+  /** The China customs copy prints China's HS codes (else the customer's: versions made before 25 Nov have only those). */
+  copy?: PaperCopy;
 }) {
+  const key = (k: string) => (k === "hs" && copy === "customs" ? "hsCn" : k);
   const columns: DocColumn<Row>[] = doc.columns.map((c) => ({
     label: c.label,
     width: c.width,
     align: c.align,
     wrap: c.wrap,
     // A draft shows an HS code still missing as "needed", where it will print (the Make window's amber).
-    render: (r) => (c.key === "hs" && !r[c.key] && watermark === "DRAFT" ? <Needed /> : cell(r[c.key])),
+    render: (r) => {
+      const v = r[key(c.key)] ?? r[c.key];
+      return c.key === "hs" && !v && watermark === "DRAFT" ? <Needed /> : cell(v, lang);
+    },
   }));
   const first = doc.foot ? doc.columns.findIndex((c) => c.key in doc.foot!.cells) : -1;
   const foot =
@@ -78,7 +86,7 @@ export function PaperSheet({
         </td>
         {doc.columns.slice(first).map((c, i, all) => (
           <td key={c.key} style={{ ...docFootCell(c.align), ...(i === all.length - 1 ? { paddingRight: 0 } : null) }}>
-            {cell(doc.foot!.cells[c.key])}
+            {cell(doc.foot!.cells[c.key], lang)}
           </td>
         ))}
       </tr>
@@ -113,7 +121,7 @@ export function PaperSheet({
       bank={doc.bank}
       signatures={doc.signatures}
       watermark={watermark}
-      details={doc.details ?? null}
+      details={detailsFor(doc.details ?? null, copy)}
       lang={lang}
     />
   );

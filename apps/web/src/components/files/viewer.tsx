@@ -25,8 +25,7 @@ import { Button, buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
 import { useIsPhone, FloatingMenu } from "@/components/common/floating";
 import { useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
-import { LANG_WORD } from "@/components/print/toolbar";
-import type { DocLang } from "@/components/print/zh";
+import type { PaperChoice } from "@/components/print/copies";
 import { toast } from "@kebo/ui/client";
 
 /* ---------------------------------------------------------------- what is shown */
@@ -228,13 +227,12 @@ function useHeadOf(f: ViewFile) {
   return head;
 }
 
-/** A paper inside the viewer tells it its buttons (the PDF, Excel, the customer's or internal copy). */
+/** A paper inside the viewer tells it its buttons (the PDF, Excel, its switches: which copy, the language). */
 interface PaperInfo {
   title: string;
   pdfHref: string;
   excelHref?: string;
-  copies?: { current: "customer" | "internal"; customer: string; internal: string };
-  languages?: { current: DocLang; en: string; zh: string };
+  choices?: PaperChoice[];
 }
 
 function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; onMove: (at: number) => void; onClose: () => void }) {
@@ -300,7 +298,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
         setPaperOf((p) => ({
           ...(p?.key === key ? p : null),
           key,
-          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, copies: d.copies, languages: d.languages },
+          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, choices: d.choices },
         }));
     };
     const key = given.key;
@@ -384,48 +382,24 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
           )}
           {set.length > 1 && <span aria-hidden className="h-6 w-px bg-line max-sm:hidden" />}
           <div className="flex items-center gap-2 max-sm:hidden">
-            {paper?.copies && (
-              <div role="group" aria-label="Which copy" className="flex rounded-[10px] bg-surface-2 p-0.5">
-                {(["customer", "internal"] as const).map((k) => {
-                  const on = paperHref ? paperHref === paper.copies![k] : paper.copies!.current === k;
+            {paper?.choices?.map((c) => (
+              <div key={c.label} role="group" aria-label={c.label} className="flex rounded-[10px] bg-surface-2 p-0.5">
+                {c.options.map((o) => {
+                  const on = paperHref ? paperHref === o.href : o.on;
                   return (
                     <button
-                      key={k}
+                      key={o.key}
                       type="button"
                       aria-pressed={on}
-                      onClick={() => setPaperHref(paper.copies![k])}
-                      className={cn(
-                        "h-8 rounded-lg px-2.5 text-md",
-                        on ? "bg-surface font-semibold shadow-card" : "text-text-2 hover:text-text",
-                      )}
+                      onClick={() => setPaperHref(o.href)}
+                      className={cn("h-8 rounded-lg px-2.5 text-md", on ? "bg-surface font-semibold shadow-card" : "text-text-2 hover:text-text")}
                     >
-                      {k === "customer" ? "Customer copy" : "Internal copy"}
+                      {o.word}
                     </button>
                   );
                 })}
               </div>
-            )}
-            {paper?.languages && (
-              <div role="group" aria-label="Language" className="flex rounded-[10px] bg-surface-2 p-0.5">
-                {(["en", "zh"] as const).map((k) => {
-                  const on = paperHref ? paperHref === paper.languages![k] : paper.languages!.current === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setPaperHref(paper.languages![k])}
-                      className={cn(
-                        "h-8 rounded-lg px-2.5 text-md",
-                        on ? "bg-surface font-semibold shadow-card" : "text-text-2 hover:text-text",
-                      )}
-                    >
-                      {LANG_WORD[k]}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            ))}
             {download && (
               <a href={download} download={kind === "paper" ? undefined : file.name} className={buttonClass("secondary", "md")}>
                 <Download aria-hidden /> {kind === "paper" ? "Download PDF" : "Download"}
@@ -474,20 +448,11 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
             <FloatingMenu anchor={() => moreRef.current} onClose={() => setMore(false)} label="More">
               {phone && canPrint && <MenuItem label="Print" onClick={print} close={() => setMore(false)} />}
               {phone &&
-                paper?.copies &&
-                (["customer", "internal"] as const).map((k) => (
-                  <MenuItem
-                    key={k}
-                    label={k === "customer" ? "Customer copy" : "Internal copy"}
-                    onClick={() => setPaperHref(paper.copies![k])}
-                    close={() => setMore(false)}
-                  />
-                ))}
-              {phone &&
-                paper?.languages &&
-                (["en", "zh"] as const).map((k) => (
-                  <MenuItem key={k} label={LANG_WORD[k]} onClick={() => setPaperHref(paper.languages![k])} close={() => setMore(false)} />
-                ))}
+                paper?.choices?.flatMap((c) =>
+                  c.options
+                    .filter((o) => !(paperHref ? paperHref === o.href : o.on))
+                    .map((o) => <MenuItem key={`${c.label}-${o.key}`} label={o.word} onClick={() => setPaperHref(o.href)} close={() => setMore(false)} />),
+                )}
               {actions.map((x) => (
                 <MenuItem key={x.label} label={x.label} danger={x.danger} onClick={x.onClick} close={() => setMore(false)} />
               ))}

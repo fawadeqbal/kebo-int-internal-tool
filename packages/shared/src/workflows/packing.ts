@@ -1,5 +1,6 @@
 import type { PaymentRoute } from "../enums";
 import type { RouteTerms } from "./money-route";
+import { hsFor } from "./hs";
 
 /**
  * Papers in the customer's format (25 Nov 2026): the packing case by case, and the details every trade paper
@@ -71,20 +72,22 @@ export const buyerTaxLabel = (country: string | null | undefined) => (country?.t
  * an LC) and the shipping (ports, HS code, origin).
  */
 export interface PaperDetails {
-  shipper: { name: string; address: string | null; phone: string | null; licenceNo: string | null };
+  /** nameLocal, addressLocal: ours in Chinese (printed under the English in English + 中文; none before 25 Nov). */
+  shipper: { name: string; nameLocal?: string | null; address: string | null; addressLocal?: string | null; phone: string | null; licenceNo: string | null };
   buyer: { name: string; address: string | null; country: string | null; taxLabel: string; taxNo: string | null; regNo: string | null };
   bank:
     | { kind: "lc"; number: string | null; refNo: string | null; invoiceDate: string | null; issuedOn: string | null; name: string | null; address: string | null }
     | { kind: "contract"; number: string | null; refNo: string | null; name: string | null; address: string | null }
     | null;
-  shipping: { portOfLoading: string | null; portOfDischarge: string | null; hsCode: string | null; origin: string };
+  /** hsCodeCn: China's codes, printed on the China customs copy (null: the same as the customer's; versions made before 25 Nov have none). */
+  shipping: { portOfLoading: string | null; portOfDischarge: string | null; hsCode: string | null; hsCodeCn?: string | null; origin: string };
 }
 
 /** Where the goods come from, as every paper says it ("Goods of Chinese origin."). */
 export const GOODS_ORIGIN = "China";
 
 export function paperDetailsOf(i: {
-  company: { name: string; address?: string | null; phone?: string | null; taxNo?: string | null };
+  company: { name: string; nameLocal?: string | null; address?: string | null; addressLocal?: string | null; phone?: string | null; taxNo?: string | null };
   buyer: { name: string; address?: string | null; country?: string | null; taxNo?: string | null; regNo?: string | null };
   route: PaymentRoute | null;
   /** The paper prints the bank part (not the proforma or the contract: the LC is opened against them). */
@@ -100,13 +103,22 @@ export function paperDetailsOf(i: {
   /** The proforma's issue day: the invoice the LC names. */
   proformaIssuedOn: string | null;
   ports: { portOfLoading: string | null; portOfDischarge: string | null };
-  /** The goods lines' HS codes. */
-  hsCodes: (string | null)[];
+  /** The goods lines' HS codes: the customer's country's and China's (empty: the same as the customer's). */
+  hsCodes: { customer: string | null; china: string | null }[];
 }): PaperDetails {
   const b = i.contract;
-  const hs = [...new Set(i.hsCodes.map((h) => h?.trim()).filter(Boolean))];
+  const list = (copy: "customer" | "customs") => [...new Set(i.hsCodes.map((h) => hsFor(copy, h.customer, h.china)).filter(Boolean))].join(", ") || null;
+  const hs = list("customer");
+  const cn = list("customs");
   return {
-    shipper: { name: i.company.name, address: i.company.address || null, phone: i.company.phone || null, licenceNo: i.company.taxNo || null },
+    shipper: {
+      name: i.company.name,
+      nameLocal: i.company.nameLocal || null,
+      address: i.company.address || null,
+      addressLocal: i.company.addressLocal || null,
+      phone: i.company.phone || null,
+      licenceNo: i.company.taxNo || null,
+    },
     buyer: {
       name: i.buyer.name,
       address: i.buyer.address || null,
@@ -130,7 +142,7 @@ export function paperDetailsOf(i: {
         : i.route === "bank_contract"
           ? { kind: "contract", number: b?.number ?? null, refNo: b?.reference ?? null, name: b?.customerBank ?? null, address: b?.customerBankAddress ?? null }
           : null,
-    shipping: { ...i.ports, hsCode: hs.length ? hs.join(", ") : null, origin: GOODS_ORIGIN },
+    shipping: { ...i.ports, hsCode: hs, hsCodeCn: cn === hs ? null : cn, origin: GOODS_ORIGIN },
   };
 }
 

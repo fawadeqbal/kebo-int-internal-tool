@@ -3,7 +3,7 @@
 import { Totals, type TotalsRow } from "@/components/records/totals";
 import { useMemo, type ReactNode } from "react";
 import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
-import { LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
+import { hsMismatch, LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
 import { Badge, cn, Dash } from "@kebo/ui";
 import { BatchLines } from "@/components/edits/batch-lines";
 import type { EditCard, EditRef } from "@/lib/types-edits";
@@ -19,8 +19,9 @@ import { ItemsBody, type ItemsPhoneRow } from "@/components/records/items-box";
  * - received: how many came in from the factory, when, and the status (Production)
  * - packing: packed in, packages, gross, net, CBM (Shipping)
  * - delivered: how many reached the customer, in what condition, a note (Delivery & SAT)
+ * - customs: the item's name in Chinese and its two HS codes, the customer's and China's (Documents)
  */
-export type LineSet = "factory" | "received" | "packing" | "delivered";
+export type LineSet = "factory" | "received" | "packing" | "delivered" | "customs";
 
 const n = (v: string | number | null | undefined, digits = 2) =>
   v === null || v === undefined || v === "" ? "" : Number(v).toLocaleString("en-US", { maximumFractionDigits: digits });
@@ -81,6 +82,10 @@ function valuesOf(l: OrderLineView): LineValues {
     deliveredQty: raw(l.delivered?.qty),
     condition: l.delivered?.condition ?? "",
     note: l.delivered?.note ?? "",
+    descriptionZh: l.customs?.descriptionZh ?? "",
+    zhBy: l.customs?.zhBy ?? "",
+    hsCode: l.customs?.hsCode ?? "",
+    hsCodeCn: l.customs?.hsCodeCn ?? "",
   };
 }
 
@@ -92,6 +97,8 @@ function phoneLine(set: LineSet, v: LineValues): string {
     return v.packages ? [`${n(v.packages, 0)} ${v.packageType || "packages"}`, v.grossWeightKg && `${n(v.grossWeightKg)} kg`, v.cbm && `${cbmOf(v.cbm)} CBM`].filter(Boolean).join(" · ") : `${qty} · not packed yet`;
   if (set === "delivered")
     return `Delivered ${n(v.deliveredQty) || 0} of ${qty}${v.condition ? ` · ${LINE_CONDITION_LABEL[v.condition as LineCondition]}` : ""}`;
+  if (set === "customs")
+    return [v.descriptionZh ? head(v.descriptionZh) : "No Chinese name", `HS ${v.hsCode || "—"}`, v.hsCodeCn && `China ${v.hsCodeCn}`].filter(Boolean).join(" · ");
   return v.factoryPrice ? `${v.factory} · ${formatMinor(toMinor(v.factoryPrice), v.factoryCurrency || "")}` : qty;
 }
 
@@ -197,6 +204,54 @@ function columnsOf(set: LineSet): LineColumn[] {
         },
         { key: "note", label: "Note", width: "8.5rem", input: "text", maxLength: 200, phoneHidden: true },
       ];
+    case "customs":
+      return [
+        base[0]!,
+        {
+          key: "descriptionZh",
+          label: "Name in Chinese",
+          width: "minmax(0,1fr)",
+          input: "textarea",
+          maxLength: 4000,
+          placeholder: "中文品名",
+          format: (v) =>
+            v.descriptionZh ? (
+              <>
+                <span lang="zh-Hans">{head(v.descriptionZh)}</span>
+                {/* Written by the translator: printed as it is, until someone checks it (typing here checks it). */}
+                {v.zhBy === "machine" && (
+                  <Badge size="sm" tone="warn" className="ml-1.5" title="Written by the translator: check it, or type the right one">
+                    To check
+                  </Badge>
+                )}
+              </>
+            ) : (
+              dash
+            ),
+        },
+        { key: "hsCode", label: "HS code", width: "6.5rem", input: "text", maxLength: 20, placeholder: "8422.40", format: (v) => v.hsCode || dash },
+        {
+          key: "hsCodeCn",
+          label: "China's HS code",
+          width: "7.5rem",
+          input: "text",
+          maxLength: 20,
+          placeholder: "Same",
+          phoneHidden: true,
+          format: (v) =>
+            v.hsCodeCn ? (
+              hsMismatch(v.hsCode, v.hsCodeCn) ? (
+                <span className="font-medium text-bad" title="The first six digits are the same in every country: one of the two is likely wrong">
+                  {v.hsCodeCn} · check
+                </span>
+              ) : (
+                v.hsCodeCn
+              )
+            ) : (
+              <span className="text-muted">Same</span>
+            ),
+        },
+      ];
   }
 }
 
@@ -273,11 +328,14 @@ export function OrderLinesEditor({
         edit={edit}
         card={card}
         askOnAdd={false}
+        // Names and codes are put right, not changed: saved without asking why (each change is in the history).
+        plain={set === "customs"}
         empty="No items on this order."
         below={
           <p className="text-xs text-muted">
             Click a cell and type: Enter keeps it and goes down, Esc cancels. Nothing is saved until Save changes.
             {set === "received" ? " The date is today unless you type another." : ""}
+            {set === "customs" ? " China's HS code empty: the same as the customer's. Chinese typed here counts as checked." : ""}
           </p>
         }
       />
@@ -331,6 +389,23 @@ function StepFigures({ set, lines, extra }: { set: LineSet; lines: OrderLineView
         {item("Gross", `${n(sum((l) => Number(l.packing.grossWeightKg)))} kg`)}
         {item("Net", `${n(sum((l) => Number(l.packing.netWeightKg)))} kg`)}
         {item("Volume", `${cbmOf(sum((l) => Number(l.packing.cbm)))} CBM`)}
+      </>
+    );
+  } else if (set === "customs") {
+    const zh = lines.filter((l) => l.customs?.descriptionZh).length;
+    const hs = lines.filter((l) => l.customs?.hsCode).length;
+    const check = lines.filter((l) => l.customs?.zhBy === "machine").length;
+    const odd = lines.filter((l) => hsMismatch(l.customs?.hsCode, l.customs?.hsCodeCn)).length;
+    body = (
+      <>
+        {item("In Chinese", `${zh} of ${lines.length}`)}
+        {item("HS codes", `${hs} of ${lines.length}`)}
+        {check > 0 && <span className="font-medium text-warn">{check} Chinese name{check === 1 ? "" : "s"} to check</span>}
+        {odd > 0 && (
+          <span className="font-medium text-bad">
+            {odd} item{odd === 1 ? "" : "s"} with two HS codes that differ in the first six digits
+          </span>
+        )}
       </>
     );
   } else {

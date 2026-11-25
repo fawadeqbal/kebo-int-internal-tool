@@ -237,6 +237,8 @@ export interface OrderLineView {
   lineTotal: string;
   /** The factory it was quoted from, when known. */
   factory: { id: string; name: string } | null;
+  /** The papers' customs side: the customer's and China's HS codes (China's empty: the same), the item in Chinese and who wrote it. */
+  customs: { hsCode: string | null; hsCodeCn: string | null; descriptionZh: string | null; zhBy: "machine" | "staff" | null };
   receivedQty: string;
   receivedOn: string | null;
   packing: LinePacking;
@@ -321,6 +323,8 @@ export interface CompanySnapshot {
   name: string;
   nameLocal?: string | null;
   address?: string | null;
+  /** The address in Chinese (printed under the English in English + 中文). */
+  addressLocal?: string | null;
   phone?: string | null;
   email?: string | null;
   email2?: string | null;
@@ -415,7 +419,12 @@ export interface OrderDocument {
     no: string;
     type: LineType;
     description: string;
+    /** The item in Chinese (under the English in English + 中文); versions made before 25 Nov 2026 have none. */
+    descriptionZh?: string | null;
     model: string | null;
+    /** The customer's country's HS code, and China's (else the customer's) for the China customs copy. */
+    hsCode?: string | null;
+    hsCodeCn?: string | null;
     quantity: string;
     unit: string;
     unitPrice: string | null;

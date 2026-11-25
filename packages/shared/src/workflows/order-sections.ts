@@ -524,6 +524,7 @@ export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
   shipping: { label: "Shipping", step: "shipping" },
   delivery: { label: "Delivery", step: "delivery" },
   "lines.delivered": { label: "Items delivered", step: "delivery" },
+  "lines.customs": { label: "Names and HS codes", step: "documents" },
 };
 /** "Lines from the factory" for "lines.received"; the key itself when it is not a known card. */
 export const editCardLabel = (card: string) => EDIT_CARDS[cardKey(card)]?.label ?? card;
@@ -555,6 +556,7 @@ export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | 
       return "shipping";
     case "flow.document":
     case "flow.bank_step":
+    case "customs_names":
       return "documents";
     case "flow.delivery":
     case "delivered":

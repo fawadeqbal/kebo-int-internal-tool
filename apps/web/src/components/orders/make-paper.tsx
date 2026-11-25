@@ -11,7 +11,7 @@ import { Switch } from "@/components/common/switch-list";
 import { FloatingMenu } from "@/components/common/floating";
 import { lockScroll } from "@/lib/scroll-lock";
 import type { ActionState } from "@/lib/actions";
-import type { PaperChecks } from "@/lib/types-papers";
+import type { HsLine, PaperChecks } from "@/lib/types-papers";
 import type { PaperOp } from "@/app/(app)/orders/papers-actions";
 import { useTime } from "@/lib/time-client";
 
@@ -35,7 +35,7 @@ function CheckRow({
 }: {
   c: PaperCheck;
   fix?: { label: string; type: "text" | "date"; saves: string };
-  hsLines: { id: string; description: string }[];
+  hsLines: HsLine[];
   canFix: boolean;
   base: string;
   onFix: (field: string, value: string, lineId?: string) => void;
@@ -139,6 +139,17 @@ function CheckRow({
                   </Button>
                 )}
               </form>
+              {/* The code the same item had on an earlier order: taken with one click, never filled in by itself. */}
+              {l.suggest && !hs[l.id]?.trim() && (
+                <button
+                  type="button"
+                  className={cn(linkClass, "mt-1 text-xs")}
+                  disabled={pending}
+                  onClick={() => save(l.id, l.suggest!.hsCode, () => onFix("hs", l.suggest!.hsCode, l.id))}
+                >
+                  Use {l.suggest.hsCode}, as on {l.suggest.from}
+                </button>
+              )}
             </li>
           ))}
           <li className="text-xs text-muted">Saved on the order&apos;s item, so every document has it.</li>

@@ -37,7 +37,7 @@ describe("order documents", () => {
     ready: boolean;
     canMake: boolean;
     checks: Check[];
-    hsLines: { id: string; description: string }[];
+    hsLines: { id: string; description: string; suggest?: { hsCode: string; from: string } | null }[];
     options: { key: string; on: boolean; field?: boolean }[];
     paper: { id: string; version: number; status: string; number: string } | null;
     versions: { version: number; status: string }[];
@@ -198,6 +198,8 @@ describe("order documents", () => {
     await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/fix`, { field: "lcNo", value: "LC/HBL/2026/118" }).expect(200);
     c = await checks("commercial-invoice");
     expect(c.hsLines).toHaveLength(1);
+    // Each with the code the same item had on an earlier order, if one had it (a suggestion, not filled in).
+    expect(c.hsLines[0]).toHaveProperty("suggest");
     await api(app, sana)
       .post(`/orders/${orderId}/papers/commercial-invoice/fix`, { field: "hs", value: "abc", lineId: c.hsLines[0]!.id })
       .expect(400);
@@ -213,6 +215,8 @@ describe("order documents", () => {
 
     d = await doc("commercial-invoice", "?opts=prices,showHs,lcStatement");
     expect(d.doc.columns.map((x: { key: string }) => x.key)).toEqual(["no", "item", "hs", "qty", "amount"]);
+    // The China customs copy's code (China's, else the customer's) and the item's Chinese travel with each row.
+    expect(d.doc.rows[0]).toMatchObject({ hs: "8422.40", hsCn: "8422.40", item: { zh: null } });
     expect(d.doc.company.stamp).toBeNull();
     expect(d.doc.bullets.at(-1)).toContain("LC/HBL/2026/118");
 

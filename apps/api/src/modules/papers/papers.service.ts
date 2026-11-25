@@ -56,6 +56,8 @@ import {
   type PaperState,
   type PlanFeature,
   type SendRequestInput,
+  HS_CODE,
+  HS_CODE_HINT,
 } from "@kebo/shared";
 import { dateIn, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -407,6 +409,27 @@ export class PapersService implements OnModuleInit {
     return last ? { n: last.version + 1, replaces: dateIn(last.finalAt ?? last.madeAt, this.clock.timeZone) } : null;
   }
 
+  /**
+   * Items without an HS code, each with the code the same item had on the latest earlier order (the same model,
+   * else the same name): a suggestion to take with one click, never filled in by itself.
+   */
+  private async hsSuggested(orderId: string, lines: { id: string; description: string; model: string | null }[]) {
+    if (!lines.length) return [];
+    const models = [...new Set(lines.map((l) => l.model?.trim()).filter((m): m is string => !!m))];
+    const names = [...new Set(lines.map((l) => l.description.trim().toLowerCase()))];
+    const rows = await this.prisma.db.$queryRaw<{ model: string | null; name: string; hs: string; ref: string }[]>`
+      select ol.model, lower(trim(split_part(ol.description, E'\n', 1))) as name, ol.hs_code as hs, o.ref_no as ref
+      from order_lines ol join orders o on o.id = ol.order_id
+      where ol.hs_code is not null and ol.order_id <> ${orderId}::uuid
+        and (ol.model = any(${models}::text[]) or lower(trim(split_part(ol.description, E'\n', 1))) = any(${names}::text[]))
+      order by o.created_at desc
+      limit 300`;
+    return lines.map((l) => {
+      const hit = (l.model?.trim() && rows.find((r) => r.model === l.model!.trim())) || rows.find((r) => r.name === l.description.trim().toLowerCase());
+      return { id: l.id, description: l.description, suggest: hit ? { hsCode: hit.hs, from: hit.ref } : null };
+    });
+  }
+
   /** GET /orders/:id/papers/:kind/checks — the Make page: what the paper takes from the order, options, versions. */
   async checks(user: SessionUser, orderId: string, kind: PaperKind, refIn?: string) {
     const o = await this.order(user, orderId);
@@ -436,8 +459,8 @@ export class PapersService implements OnModuleInit {
       state: this.stateOf(latest, ready),
       ready,
       checks,
-      /** Lines without an HS code, for the HS check's inputs. */
-      hsLines: checks.some((x) => x.key === "hs" && !x.ok) ? hsMissing(c) : [],
+      /** Lines without an HS code, for the HS check's inputs, each with the code it had on an earlier order. */
+      hsLines: checks.some((x) => x.key === "hs" && !x.ok) ? await this.hsSuggested(o.id, hsMissing(c)) : [],
       fixes: Object.fromEntries(checks.filter((x) => x.fix).map((x) => [x.key, PAPER_FIX_LABEL[x.fix!]])),
       options: paperOptionsOf(kind)
         .filter((k) => !(PAPER_FIELD_OPTIONS as readonly string[]).includes(k) || fields.includes(k))
@@ -1115,7 +1138,7 @@ export class PapersService implements OnModuleInit {
         break;
       case "hs": {
         if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make documents.");
-        if (v && !/^[0-9][0-9. ]{3,18}$/.test(v)) throw new DomainError("An HS code is digits, e.g. 8422.40.");
+        if (v && !HS_CODE.test(v)) throw new DomainError(HS_CODE_HINT);
         await this.prisma.tx(async (tx) => {
           const locked = await this.lock(tx, user, orderId);
           if (locked.status === "cancelled") throw new DomainError("This order is cancelled.");

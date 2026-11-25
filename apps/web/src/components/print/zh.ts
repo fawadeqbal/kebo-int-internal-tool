@@ -79,6 +79,7 @@ const ZH: Record<string, string> = {
   item: "项目",
   description: "描述",
   "description of goods": "货物名称",
+  model: "型号",
   "equipment description": "设备描述",
   qty: "数量",
   quantity: "数量",

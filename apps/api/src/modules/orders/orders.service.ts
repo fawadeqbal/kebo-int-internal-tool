@@ -47,6 +47,7 @@ import {
   orderWord,
   orderWordColumn,
   routeAsAccepted,
+  hsDigits,
 } from "@kebo/shared";
 import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -216,6 +217,8 @@ function lineView(l: LineRow, no: string, show: LineShows) {
     unitPrice: l.unitPrice.toFixed(2),
     lineTotal: l.lineTotal.toFixed(2),
     factory: l.factory ?? null,
+    /** The papers' customs side: the customer's and China's HS codes, the item in Chinese and who wrote it. */
+    customs: { hsCode: l.hsCode, hsCodeCn: l.hsCodeCn, descriptionZh: l.descriptionZh, zhBy: (l.zhBy as "machine" | "staff" | null) ?? null },
     receivedQty: trimQty(l.receivedQty),
     receivedOn: fromDbDateOrNull(l.receivedOn),
     packing: {
@@ -1620,6 +1623,8 @@ export class OrdersService {
     if (input.set === "delivered") {
       await this.limits.require("delivery_sat");
       if (!can(user, "delivery.manage")) throw new ForbiddenError("You cannot manage delivery and SAT.");
+    } else if (input.set === "customs") {
+      if (!can(user, "documents.manage")) throw new ForbiddenError("You cannot make documents.");
     } else if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     const today = this.clock.today();
     const orderId = await this.prisma.tx(async (tx) => {
@@ -1650,6 +1655,28 @@ export class OrdersService {
         const what =
           got !== was.receivedQty ? `${name} ${trimQty(line.receivedQty)} → ${got}` : `${name} received on ${was.receivedOn ?? "—"} → ${on}`;
         await record("goods_received", `${o.refNo}: received from the supplier (${on ?? "nothing in"}): ${what}`, { lineId, ...was }, { lineId, receivedQty: got, receivedOn: on });
+        return o.id;
+      }
+
+      if (input.set === "customs") {
+        const was = { hsCode: line.hsCode, hsCodeCn: line.hsCodeCn, descriptionZh: line.descriptionZh };
+        const next = { ...was };
+        for (const k of ["hsCode", "hsCodeCn", "descriptionZh"] as const) if (input[k] !== undefined) next[k] = input[k];
+        // China's the same as the customer's: kept empty (it follows the customer's).
+        if (next.hsCodeCn && next.hsCode && hsDigits(next.hsCodeCn) === hsDigits(next.hsCode)) next.hsCodeCn = null;
+        const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => next[k] !== was[k]);
+        if (!changed.length) return o.id;
+        // Chinese typed or changed here is staff's (checked); cleared, nobody's.
+        const zhBy = changed.includes("descriptionZh") ? (next.descriptionZh ? "staff" : null) : undefined;
+        await tx.orderLine.update({ where: { id: line.id }, data: { ...next, ...(zhBy !== undefined ? { zhBy } : {}) } });
+        const label: Record<keyof typeof next, string> = { hsCode: "HS code", hsCodeCn: "China's HS code", descriptionZh: "Chinese name" };
+        const said = (k: keyof typeof next, v: string | null) => (k === "descriptionZh" ? (v ? `"${v.split("\n")[0]!.slice(0, 40)}"` : "—") : (v ?? "—"));
+        await record(
+          "customs_names",
+          `${o.refNo}: ${name}: ${changed.map((k) => `${label[k]} ${said(k, was[k])} → ${said(k, next[k])}`).join(", ")}`,
+          { lineId, ...Object.fromEntries(changed.map((k) => [k, was[k]])) },
+          { lineId, step: "documents", ...Object.fromEntries(changed.map((k) => [k, next[k]])) },
+        );
         return o.id;
       }
 

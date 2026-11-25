@@ -14,6 +14,7 @@ import {
   type BalanceTerms,
   type BuyerSnapshot,
   type Settings,
+  hsFor,
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
@@ -132,7 +133,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       : null,
     proformaIssuedOn: fromDbDateOrNull(o.proformaIssuedOn),
     ports,
-    hsCodes: o.lines.filter((l) => l.type === "goods").map((l) => l.hsCode),
+    hsCodes: o.lines.filter((l) => l.type === "goods").map((l) => ({ customer: l.hsCode, china: l.hsCodeCn })),
   });
   const plan = o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) }));
   const paymentSentence = orderPaymentSentence({
@@ -211,7 +212,12 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       no: numbers[i],
       type: l.type,
       description: l.description,
+      /** The item in Chinese (printed under the English in English + 中文); null until written. */
+      descriptionZh: l.descriptionZh,
       model: l.model,
+      /** The customer's country's HS code, and the China customs copy's (China's, else the customer's). */
+      hsCode: l.hsCode,
+      hsCodeCn: hsFor("customs", l.hsCode, l.hsCodeCn),
       quantity: l.quantity.toString(),
       unit: l.unit,
       unitPrice: goodsOnly ? null : l.unitPrice.toFixed(2),
