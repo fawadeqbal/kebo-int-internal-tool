@@ -164,6 +164,18 @@ const ZH: Record<string, string> = {
   "amounts in": "金额单位",
   check: "检查项",
   "thank you for your business": "感谢您的惠顾",
+  // who signs
+  "for the seller": "卖方",
+  "for the buyer": "买方",
+  "for the supplier": "供应商",
+  "for and on behalf of": "谨代表",
+  "tested by": "测试方",
+  "witnessed by": "见证方",
+  "delivered by": "交货方",
+  "received by": "收货方",
+  "authorised signature": "授权签字",
+  name: "姓名",
+  title: "职务",
 };
 
 const key = (t: string) =>
