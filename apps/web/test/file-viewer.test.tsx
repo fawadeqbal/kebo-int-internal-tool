@@ -97,16 +97,36 @@ describe("the file viewer", () => {
     expect(screen.getAllByRole("link", { name: /Download/ })[0]!.getAttribute("href")).toBe("/files/eee");
   });
 
-  it("shares any file outside the app: WhatsApp, email, or the link for the team", () => {
+  it("sends any file from the panel's Send tab: email, WhatsApp, or the link for the team", () => {
     render(
       <FileViewerProvider>
         <a href="/files/fff?view=1">Bank slip.pdf</a>
       </FileViewerProvider>,
     );
     fireEvent.click(screen.getByText("Bank slip.pdf"));
-    fireEvent.click(screen.getAllByRole("button", { name: /Share/ })[0]!);
-    expect(screen.getByRole("menuitem", { name: /WhatsApp/ })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: /Email/ })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: /Copy link for the team/ })).toBeTruthy();
+    // One window: Download and Print in the header, sending in the panel (no Share button beside them).
+    expect(screen.queryByRole("button", { name: /^Share/ })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Send" }));
+    expect(screen.getByRole("radio", { name: "Email" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "WhatsApp" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Copy link" }));
+    expect(screen.getByRole("button", { name: /Copy the link/ })).toBeTruthy();
+  });
+
+  it("opens an order's paper in the order's own window, not the viewer", () => {
+    const toOrder = vi.fn();
+    const id = "6f1d2b3c-4a5b-4c6d-8e9f-0a1b2c3d4e5f";
+    render(
+      <FileViewerProvider toOrder={toOrder}>
+        <a href={`/print/orders/${id}/commercial-invoice?v=2&back=/orders/${id}/documents`}>View the commercial invoice</a>
+        <a href="/print/revisions/abc">The quotation</a>
+      </FileViewerProvider>,
+    );
+    fireEvent.click(screen.getByText("View the commercial invoice"));
+    expect(toOrder).toHaveBeenCalledWith(`/orders/${id}/papers/commercial-invoice?v=2&back=%2F`);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // A paper that is not an order's (a quotation's revision) still opens in the viewer.
+    fireEvent.click(screen.getByText("The quotation"));
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });

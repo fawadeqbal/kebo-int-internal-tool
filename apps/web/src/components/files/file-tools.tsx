@@ -146,11 +146,11 @@ export function FileToolsProvider({
       if (!viewer) return downloadHref(file.href);
       const all = set?.some((f) => f.id === file.id) ? set : [file];
       viewer.open(
-        all.map((f) => toView(f, t, setDialog, viewer.close)),
+        all.map((f) => toView(f, t, setDialog, viewer.close, orderId, share)),
         all.findIndex((f) => f.id === file.id),
       );
     },
-    [viewer, t],
+    [viewer, t, orderId, share],
   );
   const tools = useMemo<Tools>(() => ({ orderId, files, targets, share, view, open: setDialog }), [orderId, files, targets, share, view]);
   return (
@@ -353,7 +353,14 @@ export function FileChip({
  * added it, its earlier versions, and Share, Replace and Delete. What it is and where it is attached change
  * from its Details.
  */
-function toView(file: OrderFile, t: ReturnType<typeof useTime>, open: (d: Dialog) => void, close: () => void): ViewFile {
+function toView(
+  file: OrderFile,
+  t: ReturnType<typeof useTime>,
+  open: (d: Dialog) => void,
+  close: () => void,
+  orderId: string,
+  share: ShareContext,
+): ViewFile {
   const then = (d: Dialog) => () => {
     close();
     open(d);
@@ -388,10 +395,11 @@ function toView(file: OrderFile, t: ReturnType<typeof useTime>, open: (d: Dialog
       ["Size", `${fileSize(file.size)} · ${typeLabel(file)}`],
     ],
     versions: file.versions.map((v) => ({ key: v.id, label: `v${v.version} · ${v.name} · ${t.date(v.at)}`, href: v.href })),
-    onShare: then({ kind: "share", files: [file], papers: [] }),
+    // Send from the window's panel, noted in the order's History like Share… (the app sends nothing itself).
+    send: { message: shareMessage(share, [file.name]), onNoted: (via, message) => filesShareAction(orderId, { files: [file.id], papers: [], via, message }) },
     actions: [
       ...(file.can.rename ? [{ label: "Rename", onClick: then({ kind: "rename", file }) }] : []),
-      ...(file.can.replace ? [{ label: "Replace", onClick: then({ kind: "replace", file }) }] : []),
+      ...(file.can.replace ? [{ label: "Replace", main: true, onClick: then({ kind: "replace", file }) }] : []),
       ...(file.can.remove ? [{ label: "Delete", danger: true, onClick: then({ kind: "delete", files: [file] }) }] : []),
     ],
   };
