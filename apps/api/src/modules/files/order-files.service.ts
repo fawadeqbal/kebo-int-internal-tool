@@ -67,6 +67,8 @@ export interface OrderFileView {
   /** The section of the order's page it belongs to (null: only its stage, or the inquiry). */
   section: OrderSection | null;
   sectionLabel: string | null;
+  /** A photo of one package (section "packing"): its number as marked. */
+  packageNo?: string | null;
   group: OrderFileGroup;
   by: { id: string; name: string } | null;
   at: string;
@@ -252,7 +254,11 @@ export class OrderFilesService {
           link === "paper"
             ? { link, label: `Document · ${paper!.label}`, href: `${base}/documents?tab=all#papers` }
             : link === "section"
-                ? { link, label: ORDER_SECTION_LABEL[section!], href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : ORDER_SECTION_TAB[section!]}`.replace(/\/$/, "") }
+                ? {
+                    link,
+                    label: a.packageNo && section === "packing" ? `${ORDER_SECTION_LABEL[section]} · package ${a.packageNo}` : ORDER_SECTION_LABEL[section!],
+                    href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : ORDER_SECTION_TAB[section!]}`.replace(/\/$/, ""),
+                  }
               : link === "step"
                 ? {
                     link,
@@ -268,6 +274,7 @@ export class OrderFilesService {
         stepLabel: step ? FLOW_STEP_LABEL[step] : "Inquiry",
         section,
         sectionLabel: section ? ORDER_SECTION_LABEL[section] : null,
+        packageNo: section === "packing" ? (a.packageNo ?? null) : null,
         group: step ? STEP_FILE_GROUP[step] : "customer",
         by: a.uploadedBy,
         at: a.createdAt.toISOString(),
@@ -467,8 +474,10 @@ export class OrderFilesService {
     const section = meta.section ?? null;
     const step = (section ? sectionStep(section) : null) ?? meta.step ?? null;
     await this.prisma.tx(async (tx) => {
-      await tx.attachment.update({ where: { id: row.id }, data: { orderId, step, section } });
-      const where = section ? ORDER_SECTION_LABEL[section] : step ? FLOW_STEP_LABEL[step] : null;
+      // A photo of one package keeps its number (only in Packing).
+      const packageNo = section === "packing" ? meta.packageNo : null;
+      await tx.attachment.update({ where: { id: row.id }, data: { orderId, step, section, packageNo } });
+      const where = section ? `${ORDER_SECTION_LABEL[section]}${packageNo ? ` (package ${packageNo})` : ""}` : step ? FLOW_STEP_LABEL[step] : null;
       await this.log(tx, user, o, "upload", `added ${row.fileName}${where ? ` to ${where}` : ""}`, step, {
         file: row.fileName,
         ...(section ? { section } : {}),
@@ -573,12 +582,12 @@ export class OrderFilesService {
     } else if (input.to === "section") {
       step = sectionStep(input.target);
       label = ORDER_SECTION_LABEL[input.target];
-      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step, section: input.target } });
+      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step, section: input.target, packageNo: null } });
     } else {
       // Moved to a stage as a whole: it is no longer one section's file.
       step = input.target;
       label = FLOW_STEP_LABEL[step];
-      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step, section: null } });
+      await this.prisma.db.attachment.update({ where: { id: fileId }, data: { orderId, step, section: null, packageNo: null } });
     }
     await this.prisma.tx((tx) =>
       this.log(tx, user, o, "attach", `attached ${f.name} to ${input.to === "step" ? `${label} (files)` : label}`, step ?? f.step, {

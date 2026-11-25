@@ -27,7 +27,18 @@ export interface CaseRow {
   contents?: string | null;
   /** The shipment that takes it; empty: not given to one yet. */
   shipmentId?: string | null;
+  /**
+   * Inside another package of the order (a mixed pallet): its number as marked. Such a row counts no package and
+   * has no size or weight of its own (they are the other package's).
+   */
+  inPackage?: string | null;
 }
+
+/** Inside another package (no count, size or weight of its own). */
+export const insidePackage = (c: Pick<CaseRow, "inPackage">) => !!c.inPackage?.trim();
+
+/** An item is packed once some of it is in a package: its own, or another's. */
+export const itemPacked = (rows: Pick<CaseRow, "count" | "inPackage">[]) => rows.some((c) => c.count > 0 || insidePackage(c));
 
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
 
@@ -58,7 +69,8 @@ export function caseTotals(rows: CaseRow[]) {
   const packages = rows.reduce((s, r) => s + r.count, 0);
   return {
     packages: packages > 0 ? packages : null,
-    packageType: typesOf(rows),
+    // A row inside another package is packed in that one (it says so under it): not one of this item's ways.
+    packageType: typesOf(rows.filter((r) => !insidePackage(r))),
     netWeightKg: sumOf(rows.map((r) => r.netWeightKg), 2),
     grossWeightKg: sumOf(rows.map((r) => r.grossWeightKg), 2),
     cbm: sumOf(rows.map(caseVolume), 3),
@@ -109,7 +121,7 @@ export function packingWarnings(
 ): { notPacked: string[]; tooBig: number; noShipment: number } {
   const all = items.flatMap((i) => i.cases);
   return {
-    notPacked: items.filter((i) => !i.cases.some((c) => c.count > 0)).map((i) => i.name),
+    notPacked: items.filter((i) => !itemPacked(i.cases)).map((i) => i.name),
     tooBig: all.filter(tooBigForContainer).reduce((s, r) => s + r.count, 0),
     noShipment: shipmentIds.length > 1 ? all.filter((c) => shipmentOfCase(c, shipmentIds) === null).reduce((s, r) => s + r.count, 0) : 0,
   };

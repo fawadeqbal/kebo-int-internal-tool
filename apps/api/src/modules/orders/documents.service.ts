@@ -84,7 +84,7 @@ export class DocumentsService {
     if (shipmentId) {
       const o = await this.prisma.db.order.findUniqueOrThrow({ where: { id: orderId }, include: orderDocInclude });
       const live = buildOrderDoc(o, kind, { ...c, seeCosts: can(user, "sourcing.manage"), buyer: await buyerOf(this.prisma.db, o, c.today) }, { shipmentId });
-      const packed = live.lines.length > 0 && live.lines.every((l) => (l.packing?.packages ?? 0) > 0);
+      const packed = live.lines.length > 0 && live.lines.every((l) => (l.packing?.packages ?? 0) > 0 || !!l.packing?.cases?.some((c) => c.inPackage));
       return {
         ...live,
         rebuiltOn: null,

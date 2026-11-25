@@ -215,6 +215,8 @@ export interface LineCase {
   contents?: string | null;
   /** The shipment that takes it; empty: not given to one yet. */
   shipmentId?: string | null;
+  /** Inside another package of the order (a mixed pallet): that package's number; no count, size or weight of its own. */
+  inPackage?: string | null;
 }
 
 export interface LinePacking {

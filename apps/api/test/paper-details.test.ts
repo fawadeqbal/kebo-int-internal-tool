@@ -216,5 +216,19 @@ describe("papers in the customer's format", () => {
     await api(app, sana).delete(`/shipments/${air}`).expect(200);
     const after = (await order()).lines.find((l: { id: string }) => l.id === lineId).packing.cases;
     expect(after[1]).toMatchObject({ contents: "Punches and dies", shipmentId: null });
+
+    // A mixed package: the spare parts inside the crate. No package, size or weight of their own; the crate's shipment.
+    await api(app, sana)
+      .put(`/orders/${orderId}/cases`, {
+        lines: [{ lineId, cases: [{ ...press, caseNo: "1", contents: "Compression unit", shipmentId: sea }, { ...parts, caseNo: "2-5", contents: "Punches and dies", shipmentId: null, inPackage: "1" }] }],
+      })
+      .expect(200);
+    const mixed = (await order()).lines.find((l: { id: string }) => l.id === lineId).packing;
+    expect(mixed.packages).toBe(1);
+    expect(mixed.cases[1]).toMatchObject({ inPackage: "1", count: 0, caseNo: null, grossWeightKg: null, shipmentId: sea, contents: "Punches and dies" });
+    // Inside a package that is not on the packing list: refused.
+    await api(app, sana)
+      .put(`/orders/${orderId}/cases`, { lines: [{ lineId, cases: [{ ...press, caseNo: "1" }, { ...parts, inPackage: "9" }] }] })
+      .expect(400);
   });
 });

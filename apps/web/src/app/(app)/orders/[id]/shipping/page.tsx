@@ -548,6 +548,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
           edits={edits}
           shipments={caseShipments}
+          canPhotos={d.canFiles}
         />
       )}
 

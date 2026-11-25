@@ -56,7 +56,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../../common/auth/order-access";
-import { caseRowOf, caseRowsSelect, caseView, rowsFromTotals, setLineCases } from "./line-cases";
+import { caseRowOf, caseRowsSelect, caseView, rowsFromTotals, setLineCases, settlePackages } from "./line-cases";
 import { SettingsService } from "../settings/settings.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
@@ -1606,10 +1606,12 @@ export class OrdersService {
     return this.get(user, id);
   }
 
-  /** The order is packed once every goods line has its packages counted; answers whether it is. */
+  /**
+   * The order is packed once every goods line has its packages counted (or is inside another's package); answers
+   * whether it is. Packages inside others are checked here, after every change to the packing.
+   */
   private async packedNow(tx: Tx, o: { id: string; packedAt: Date | null }) {
-    const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
-    const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
+    const complete = await settlePackages(tx, o.id);
     await tx.order.update({ where: { id: o.id }, data: { packedAt: complete ? (o.packedAt ?? new Date()) : null } });
     return complete;
   }

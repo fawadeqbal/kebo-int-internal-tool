@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { caseVolume } from "@kebo/shared";
-import { Button, Input, Select } from "@kebo/ui";
+import { Button, cn, Input, Select } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import { PANEL_FORM, PanelBody, WindowFooter } from "@/components/common/panel";
@@ -13,9 +13,9 @@ import type { LineCase } from "@/lib/types-orders";
 /**
  * The packing package by package (design "papers in the customer's format", 25 Nov 2026; "packing for machines"
  * the same day): under each item its rows as the packing list prints them — the package number as marked, how
- * many identical packages, how they are packed, what is in it, each one's size in mm and the row's weights, and,
- * when the order goes in more than one shipment, which one takes it. The volume is worked out from the size
- * (else typed); the item's totals follow.
+ * many identical packages, how they are packed, what is in it, each one's size in mm and the row's weights, and
+ * where it goes: one of the order's shipments, or inside another package (a mixed pallet: then it has no count,
+ * size or weight of its own). The volume is worked out from the size (else typed); the item's totals follow.
  */
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -35,6 +35,8 @@ export interface CaseDraft {
   contents: string;
   /** The shipment that takes it ("": not given to one). */
   shipmentId: string;
+  /** Inside another package: its number ("": in a package of its own). */
+  inPackage: string;
 }
 
 export const CASE_FIELDS = ["caseNo", "count", "packageType", "contents", "lengthMm", "widthMm", "heightMm", "netWeightKg", "grossWeightKg", "cbm"] as const;
@@ -74,6 +76,7 @@ export const draftOf = (c: LineCase): CaseDraft => ({
   cbm: text(c.cbm),
   contents: c.contents ?? "",
   shipmentId: c.shipmentId ?? "",
+  inPackage: c.inPackage ?? "",
 });
 
 /** A new row: the one above's packing, size and shipment (identical packages are the usual), else a carton. */
@@ -90,6 +93,7 @@ const nextDraft = (above?: CaseDraft): CaseDraft => ({
   cbm: "",
   contents: "",
   shipmentId: above?.shipmentId ?? "",
+  inPackage: "",
 });
 
 const num = (v: string) => (v.trim() === "" ? null : Number(v));
@@ -107,7 +111,13 @@ export const caseInput = (d: CaseDraft) => ({
   cbm: d.cbm.trim() || null,
   contents: d.contents.trim() || null,
   shipmentId: d.shipmentId || null,
+  inPackage: d.inPackage.trim() || null,
 });
+
+/** Inside another package: no count, number, size or weight of its own. */
+const inside = (d: CaseDraft) => d.inPackage.trim() !== "";
+/** What an inside row leaves out (the other package's). */
+const OWN_FIELDS: CaseField[] = ["caseNo", "count", "packageType", "lengthMm", "widthMm", "heightMm", "netWeightKg", "grossWeightKg", "cbm"];
 
 /** The row's volume: from the size when it is all there, else what was typed. */
 export const draftVolume = (d: CaseDraft) =>
@@ -117,7 +127,8 @@ const sized = (d: CaseDraft) => !!(num(d.lengthMm) && num(d.widthMm) && num(d.he
 const fmt = (n: number, places: number) => n.toLocaleString("en-US", { maximumFractionDigits: places });
 
 /** "2 packages · 6.713 m³ · net 700 kg · gross 850 kg" */
-export function casesSummary(rows: CaseDraft[]) {
+export function casesSummary(all: CaseDraft[]) {
+  const rows = all.filter((r) => !inside(r));
   const count = rows.reduce((s, r) => s + (Number(r.count) || 0), 0);
   const cbm = rows.reduce((s, r) => s + (draftVolume(r) ?? 0), 0);
   const net = rows.reduce((s, r) => s + (num(r.netWeightKg) ?? 0), 0);
@@ -141,9 +152,9 @@ export interface CaseItem {
   cases: LineCase[];
 }
 
-/** The row's columns: number, packages, packed in, what is in it, L W H, net, gross, CBM, (shipment), remove. */
+/** The row's columns: number, packages, packed in, what is in it, L W H, net, gross, CBM, (goes in), remove. */
 const COLS = "sm:grid-cols-[4.5rem_4rem_minmax(8rem,1fr)_minmax(8rem,1fr)_4.5rem_4.5rem_4.5rem_5rem_5rem_5rem_2rem]";
-const COLS_SHIPMENT = "sm:grid-cols-[4.5rem_4rem_minmax(8rem,1fr)_minmax(8rem,1fr)_4.5rem_4.5rem_4.5rem_5rem_5rem_5rem_8rem_2rem]";
+const COLS_GOES = "sm:grid-cols-[4.5rem_4rem_minmax(7rem,1fr)_minmax(7rem,1fr)_4.5rem_4.5rem_4.5rem_5rem_5rem_5rem_9rem_2rem]";
 const MODE: Record<CaseField, "text" | "numeric" | "decimal"> = {
   caseNo: "text",
   count: "numeric",
@@ -177,10 +188,17 @@ export function CasesEditor({
   onDone: () => void;
 }) {
   const many = shipments.length > 1;
-  const cols = many ? COLS_SHIPMENT : COLS;
   const [rows, setRows] = useState<Record<string, CaseDraft[]>>(() => Object.fromEntries(items.map((i) => [i.id, i.cases.map(draftOf)])));
   const set = (id: string, next: CaseDraft[]) => setRows((r) => ({ ...r, [id]: next }));
   const all = items.flatMap((i) => rows[i.id] ?? []);
+  // Packages others can go inside: numbered, counted, not inside one themselves (each number once).
+  const hosts = all
+    .filter((r) => !inside(r) && r.caseNo.trim() && Number(r.count) > 0)
+    .map((r) => ({ key: r.key, no: r.caseNo.trim() }))
+    .filter((h, i, list) => list.findIndex((x) => x.no === h.no) === i);
+  // Where a package goes: with more than one shipment, which; with packages to go inside, another package.
+  const goes = many || items.length > 1 || all.some(inside);
+  const cols = goes ? COLS_GOES : COLS;
   const payload = JSON.stringify({ lines: items.map((i) => ({ lineId: i.id, cases: (rows[i.id] ?? []).map(caseInput) })) });
   return (
     <ActionForm action={action} onDone={onDone} className={PANEL_FORM}>
@@ -213,17 +231,38 @@ export function CasesEditor({
                         {CASE_LABEL[f]}
                       </span>
                     ))}
-                    {many && <span role="columnheader">Shipment</span>}
+                    {goes && <span role="columnheader">Goes in</span>}
                     <span />
                   </div>
                   {list.map((r, n) => {
                     const net = num(r.netWeightKg);
                     const gross = num(r.grossWeightKg);
                     const volume = draftVolume(r);
+                    const isIn = inside(r);
+                    const others = hosts.filter((h) => h.key !== r.key);
+                    // "s:<shipment>" or "p:<package no.>"; "" for its own package, in no shipment yet.
+                    const where = isIn ? `p:${r.inPackage}` : r.shipmentId ? `s:${r.shipmentId}` : "";
+                    const goTo = (v: string) =>
+                      set(
+                        item.id,
+                        list.map((x) =>
+                          x.key !== r.key
+                            ? x
+                            : v.startsWith("p:")
+                              ? { ...x, inPackage: v.slice(2), shipmentId: "", caseNo: "", count: "1", lengthMm: "", widthMm: "", heightMm: "", netWeightKg: "", grossWeightKg: "", cbm: "" }
+                              : { ...x, inPackage: "", shipmentId: v.startsWith("s:") ? v.slice(2) : "" },
+                        ),
+                      );
                     return (
                       <div key={r.key} role="row" className={`grid grid-cols-3 gap-2 rounded-lg border border-line p-2 sm:border-0 sm:p-0 ${cols}`}>
                         {CASE_FIELDS.map((f) =>
-                          f === "cbm" && sized(r) ? (
+                          isIn && OWN_FIELDS.includes(f) ? (
+                            // Inside another package: that one's number, count, size and weight.
+                            <span key={f} role="cell" className={cn("flex flex-col justify-center text-sm text-text-2", f === "packageType" && "col-span-3 sm:col-span-1")}>
+                              <span className="text-xs sm:sr-only">{CASE_LABEL[f]}</span>
+                              {f === "packageType" ? `In package ${r.inPackage}` : f === "caseNo" ? r.inPackage : ""}
+                            </span>
+                          ) : f === "cbm" && sized(r) ? (
                             // Worked out from the size: shown, not typed.
                             <span key={f} role="cell" className="flex flex-col justify-center text-right text-md tabular">
                               <span className="text-xs text-text-2 sm:sr-only">{CASE_LABEL[f]}</span>
@@ -250,18 +289,30 @@ export function CasesEditor({
                             </label>
                           ),
                         )}
-                        {many && (
+                        {goes && (
                           <label role="cell" className="col-span-3 flex flex-col sm:col-span-1">
                             <span className="text-xs text-text-2 sm:sr-only">
-                              Shipment<span className="sr-only">{` (package ${n + 1})`}</span>
+                              Goes in<span className="sr-only">{` (package ${n + 1})`}</span>
                             </span>
-                            <Select size="sm" value={r.shipmentId} onChange={(e) => change(r.key, "shipmentId", e.target.value)}>
-                              <option value="">Not given yet</option>
-                              {shipments.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.label}
-                                </option>
-                              ))}
+                            <Select size="sm" value={where} onChange={(e) => goTo(e.target.value)}>
+                              <option value="">{many ? "No shipment yet" : "Its own package"}</option>
+                              {many &&
+                                shipments.map((s) => (
+                                  <option key={s.id} value={`s:${s.id}`}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              {(others.length > 0 || isIn) && (
+                                <optgroup label="Inside another package">
+                                  {others.map((h) => (
+                                    <option key={h.key} value={`p:${h.no}`}>
+                                      {`In package ${h.no}`}
+                                    </option>
+                                  ))}
+                                  {/* Still shown when that package is gone or renumbered: saving then says so. */}
+                                  {isIn && !others.some((h) => h.no === r.inPackage) && <option value={where}>{`In package ${r.inPackage} (not on the list)`}</option>}
+                                </optgroup>
+                              )}
                             </Select>
                           </label>
                         )}

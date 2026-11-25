@@ -860,6 +860,8 @@ model Attachment {
   step           String?          @db.VarChar(20)
   /// The section of the order's page the file belongs to (see @kebo/shared ORDER_SECTIONS): booking, vessel, fat…
   section        String?          @db.VarChar(30)
+  /// A photo of one package and its marks (section "packing"): the package's number as marked ("3", "7-10").
+  packageNo      String?          @map("package_no") @db.VarChar(20)
   /// "Replace with a newer one": the newer file. The old one is kept (as an earlier version), out of the lists.
   replacedById   String?          @map("replaced_by") @db.Uuid
   replacedBy     Attachment?      @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
@@ -1404,6 +1406,10 @@ model OrderLineCase {
   /// lot apart. Empty: not given to a shipment yet (with one shipment, it goes in that one).
   shipmentId    String?   @map("shipment_id") @db.Uuid
   shipment      Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  /// Inside another package of the same order (a mixed pallet: the spare parts in the control cabinet's crate): that
+  /// package's number as marked. Such a row has no count, size or weight of its own and goes in that package's
+  /// shipment.
+  inPackage     String?   @map("in_package") @db.VarChar(20)
 
   @@index([lineId])
   @@index([companyId])

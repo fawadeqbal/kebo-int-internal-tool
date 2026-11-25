@@ -189,6 +189,22 @@ describe("order files", () => {
       .post(`/orders/${orderId}/files/attachment/${photos.sourceId}/attach`, { to: "section", target: "container" })
       .expect(200);
     expect((await byName("Loading photos.pdf"))!.attachedTo).toMatchObject({ link: "section", label: "Container and loading" });
+    // A photo of one package and its marks keeps the package's number (Packing only).
+    await upload(sana, `/orders/${orderId}/files`)
+      .field("section", "packing")
+      .field("kind", "photo")
+      .field("packageNo", "3")
+      .attach("file", pdf("case 3"), { filename: "Package 3.pdf", contentType: "application/pdf" })
+      .expect(201);
+    expect(await byName("Package 3.pdf")).toMatchObject({ section: "packing", packageNo: "3", attachedTo: { link: "section", label: "Packing · package 3" } });
+    await upload(sana, `/orders/${orderId}/files`)
+      .field("section", "booking")
+      .field("packageNo", "3")
+      .attach("file", pdf("booking"), { filename: "Booking note.pdf", contentType: "application/pdf" })
+      .expect(201);
+    expect((await byName("Booking note.pdf"))!.packageNo).toBeNull();
+    for (const name of ["Package 3.pdf", "Booking note.pdf"])
+      await api(app, sana).delete(`/orders/${orderId}/files/attachment/${(await byName(name))!.sourceId}`).expect(200);
     // The checklist is gone: nothing is attached to one of its lines.
     await api(app, sana).post(`/orders/${orderId}/files/attachment/${photos.sourceId}/attach`, { to: "checklist", target: "loaded" }).expect(422);
 

@@ -642,11 +642,19 @@ export const lineCaseInput = z
     contents: optionalText(120),
     /** The shipment that takes it (one of the order's); empty: not given to one yet. */
     shipmentId: optionalId,
+    /** Inside another package of the order (a mixed pallet): that package's number as marked. */
+    inPackage: optionalText(20),
   })
   .refine((c) => c.netWeightKg === null || c.grossWeightKg === null || c.netWeightKg <= c.grossWeightKg, {
     path: ["grossWeightKg"],
     message: "The gross weight is less than the net",
-  });
+  })
+  // Inside another package: no package, number, size or weight of its own (they are that package's).
+  .transform((c) =>
+    c.inPackage
+      ? { ...c, caseNo: null, count: 0, lengthMm: null, widthMm: null, heightMm: null, netWeightKg: null, grossWeightKg: null, cbm: null }
+      : c,
+  );
 export type LineCaseInput = z.infer<typeof lineCaseInput>;
 
 /** The packing case by case: for each item sent, its rows (none: not packed yet); the other items stay as they are. */

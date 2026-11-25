@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { packingWarnings, shipmentOfCase, shipmentPacking, tooBigForContainer, type CaseRow } from "../src";
+import { caseTotals, itemPacked, lineCaseInput, packingWarnings, shipmentOfCase, shipmentPacking, tooBigForContainer, type CaseRow } from "../src";
 
 const row = (over: Partial<CaseRow> = {}): CaseRow => ({
   caseNo: null,
@@ -71,5 +71,21 @@ describe("packingWarnings", () => {
   });
   it("with one shipment nothing is left out of a shipment", () => {
     expect(packingWarnings([{ name: "A", cases: [row()] }], ["s1"]).noShipment).toBe(0);
+  });
+});
+
+describe("a package inside another (a mixed pallet)", () => {
+  it("counts no package and adds no weight, but the item is packed", () => {
+    const own = row({ caseNo: "4", packageType: "Pallet", grossWeightKg: 420 });
+    const inside = row({ count: 0, packageType: "Carton", inPackage: "4" });
+    expect(caseTotals([own, inside])).toMatchObject({ packages: 1, packageType: "Pallet", grossWeightKg: 420 });
+    expect(caseTotals([inside])).toMatchObject({ packages: null, packageType: null });
+    expect(itemPacked([inside])).toBe(true);
+    expect(itemPacked([row({ count: 0 })])).toBe(false);
+    expect(packingWarnings([{ name: "Spare parts kit", cases: [inside] }], ["s1"]).notPacked).toEqual([]);
+  });
+  it("the input drops what belongs to the other package", () => {
+    const c = lineCaseInput.parse({ caseNo: "9", count: 3, packageType: "Carton", lengthMm: 600, grossWeightKg: 80, inPackage: "4", contents: "Wear parts" });
+    expect(c).toMatchObject({ caseNo: null, count: 0, lengthMm: null, grossWeightKg: null, inPackage: "4", contents: "Wear parts" });
   });
 });

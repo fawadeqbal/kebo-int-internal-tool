@@ -1,4 +1,5 @@
-import { caseTotals, caseVolume, type CaseRow } from "@kebo/shared";
+import { caseTotals, caseVolume, insidePackage, itemPacked, type CaseRow } from "@kebo/shared";
+import { DomainError } from "@kebo/utils";
 import type { Tx } from "../../database/prisma.service";
 
 /** The rows as they are kept, for the screens and the packing list (sizes in mm, weights in kg, volume in m³). */
@@ -16,6 +17,7 @@ type Stored = {
   cbm: { toString(): string } | null;
   contents?: string | null;
   shipmentId?: string | null;
+  inPackage?: string | null;
 };
 
 const num = (d: { toString(): string } | null) => (d === null ? null : Number(d.toString()));
@@ -33,6 +35,7 @@ export const caseRowOf = (r: Stored): CaseRow => ({
   cbm: num(r.cbm),
   contents: r.contents ?? null,
   shipmentId: r.shipmentId ?? null,
+  inPackage: r.inPackage ?? null,
 });
 
 /** A row for the screens and papers: weights to 2 places, volume to 3, as the line's own packing. */
@@ -50,6 +53,7 @@ export const caseView = (r: Stored) => {
     cbm: c.cbm === null ? null : c.cbm.toFixed(3),
     contents: c.contents ?? null,
     shipmentId: c.shipmentId ?? null,
+    inPackage: c.inPackage ?? null,
   };
 };
 export type CaseView = ReturnType<typeof caseView>;
@@ -76,6 +80,7 @@ export async function setLineCases(tx: Tx, lineId: string, rows: CaseRow[]) {
         cbm: caseVolume(r),
         contents: r.contents ?? null,
         shipmentId: r.shipmentId ?? null,
+        inPackage: insidePackage(r) ? r.inPackage!.trim() : null,
       })),
     });
   const t = caseTotals(rows);
@@ -121,4 +126,29 @@ export function rowsFromTotals(
       shipmentId: current.length > 0 && current.every((c) => c.shipmentId && c.shipmentId === current[0]!.shipmentId) ? current[0]!.shipmentId! : null,
     },
   ];
+}
+
+/**
+ * After the packing changes: every package inside another (a mixed pallet) names a package of the same order that
+ * is on the packing list (counted, with that number, not itself inside one), and goes in that package's shipment.
+ * Answers whether every goods item is packed (in its own packages or inside another's).
+ */
+export async function settlePackages(tx: Tx, orderId: string) {
+  const lines = await tx.orderLine.findMany({
+    where: { orderId, type: "goods" },
+    select: { description: true, cases: { select: { id: true, caseNo: true, count: true, inPackage: true, shipmentId: true } } },
+  });
+  const hosts = new Map<string, { shipmentId: string | null }>();
+  for (const c of lines.flatMap((l) => l.cases)) {
+    const no = c.caseNo?.trim();
+    if (no && c.count > 0 && !insidePackage(c) && !hosts.has(no)) hosts.set(no, c);
+  }
+  for (const l of lines)
+    for (const c of l.cases.filter(insidePackage)) {
+      const host = hosts.get(c.inPackage!.trim());
+      if (!host)
+        throw new DomainError(`${l.description.split("\n")[0]!.slice(0, 60)} is inside package ${c.inPackage}, which is not on the packing list.`);
+      if (c.shipmentId !== host.shipmentId) await tx.orderLineCase.update({ where: { id: c.id }, data: { shipmentId: host.shipmentId } });
+    }
+  return lines.length > 0 && lines.every((l) => itemPacked(l.cases));
 }

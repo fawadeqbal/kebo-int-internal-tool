@@ -60,7 +60,7 @@ function whereOf(l: OrderLineView, o: OrderView, poSent: boolean): { text: strin
   }
   if (o.word === "Arrived" || o.word === "Delivered" || o.word === "Done") return { text: "Arrived", tone: "info" };
   if (o.word === "Shipped") return { text: "On its way", tone: "info" };
-  if (l.packing.packages) return { text: "Packed", tone: "info" };
+  if (l.packing.packages || l.packing.cases?.some((c) => c.inPackage)) return { text: "Packed", tone: "info" };
   const got = Number(l.receivedQty);
   if (got >= n && n > 0) return { text: `Received${l.receivedOn ? ` ${dayMonth(l.receivedOn)}` : ""}`, tone: "ok" };
   if (got > 0) return { text: `${qty(got)} of ${qty(n)} in`, tone: "warn" };

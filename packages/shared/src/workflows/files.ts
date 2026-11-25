@@ -90,6 +90,13 @@ export const orderFileUploadInput = z.object({
     .max(300)
     .nullish()
     .transform((v) => (v ? v : null)),
+  /** A photo of one package and its marks (section "packing"): the package's number as marked. */
+  packageNo: z
+    .string()
+    .trim()
+    .max(20)
+    .nullish()
+    .transform((v) => (v ? v : null)),
   /** "paper:<target>" (see orderFileAttachInput). */
   attachTo: z.preprocess(
     blankToUndefined,
