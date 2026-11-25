@@ -53,6 +53,8 @@ export const companySettings = z.object({
   name: z.string().trim().min(1).max(200).default("Company"),
   nameLocal: z.string().trim().max(120).default(""),
   address: z.string().trim().max(500).default(""),
+  /** The address in Chinese: under the English one on papers in English + 中文 (the supplier, shipping and China customs read it). */
+  addressLocal: z.string().trim().max(300).default(""),
   phone: z.string().trim().max(60).default(""),
   email: companyEmail,
   email2: companyEmail,

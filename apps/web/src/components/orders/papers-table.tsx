@@ -322,6 +322,8 @@ function PaperLine({
   const { ask, dialog } = useConfirm();
   const from = fromOf(r);
   const print = printOf(orderId, r);
+  // The paper's name in the viewer's list ("Packing list PL-2026-0572"), not the link's words.
+  const paperName = [r.label, r.number].filter(Boolean).join(" ");
   const make = r.makeable ? makeHref(orderId, r) : null;
   const file = r.doc?.file ? (tools?.files.find((f) => f.sourceId === r.doc!.file!.id) ?? null) : null;
   const isDate = r.doc?.issuedOn ?? (/\d{4}-\d{2}-\d{2}/.exec(r.sub)?.[0] || null);
@@ -369,7 +371,7 @@ function PaperLine({
     <>
       {issue}
       {print && (
-        <Link href={print.view} className={buttonClass("ghost", "xs", "hidden sm:inline-flex")}>
+        <Link href={print.view} data-file-name={paperName} className={buttonClass("ghost", "xs", "hidden sm:inline-flex")}>
           View / Print
         </Link>
       )}
@@ -392,7 +394,7 @@ function PaperLine({
       {r.state === "draft" ? "Continue" : "Make"}
     </Link>
   ) : print && (paperDone(r.state) || r.live || r.kept) ? (
-    <Link href={print.view} className={buttonClass("ghost", "xs")}>
+    <Link href={print.view} data-file-name={paperName} className={buttonClass("ghost", "xs")}>
       View / Print
     </Link>
   ) : file ? (

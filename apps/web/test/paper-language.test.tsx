@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { paperDetailsOf } from "@kebo/shared";
-import { KeboDoc } from "@/components/print/kebo-doc";
+import { docItem, docQty, KeboDoc } from "@/components/print/kebo-doc";
+import { copyOf, detailsFor, langFor, paperChoices, pdfOf } from "@/components/print/copies";
 import { casesOf } from "@/components/print/cases";
 import { docLangOf, zhOf } from "@/components/print/zh";
 import type { OrderDocument } from "@/lib/types-orders";
@@ -18,7 +19,11 @@ const details = (route: "informal" | "letter_of_credit") =>
     contract: { number: "LCS/4/76/823", reference: "AD1090926000595", customerBank: "Habib Metropolitan Bank Limited", customerBankAddress: "Karachi 74200", openedOn: "2026-09-02" },
     proformaIssuedOn: "2026-08-21",
     ports: { portOfLoading: "Qingdao, China", portOfDischarge: "Karachi Port, Pakistan" },
-    hsCodes: ["8422.30", "8422.30", null],
+    hsCodes: [
+      { customer: "8422.30", china: null },
+      { customer: "8422.30", china: "8422.3090" },
+      { customer: null, china: null },
+    ],
   });
 
 const sheet = (d: ReturnType<typeof details>, lang: "en" | "zh") =>
@@ -92,5 +97,55 @@ describe("the packing list case by case", () => {
       // Not packed yet: one row for the item.
       ["3", "3", 1, 1],
     ]);
+  });
+});
+
+describe("papers in Chinese and the China customs copy (25 Nov 2026)", () => {
+  it("an item's Chinese under its name, the unit's after the quantity, only in English + 中文", () => {
+    const item = (lang: "en" | "zh") => render(<div data-testid={lang}>{docItem("Blister machine\nSpeed 60/min", "DPP-260", "泡罩包装机\n速度 60次/分钟", lang)}</div>);
+    item("en");
+    expect(screen.getByTestId("en").textContent).not.toContain("泡罩包装机");
+    item("zh");
+    expect(screen.getByTestId("zh").textContent).toContain("泡罩包装机");
+    expect(screen.getByTestId("zh").textContent).toContain("速度 60次/分钟");
+    expect(screen.getByTestId("zh").textContent).toContain("型号");
+    expect(docQty("2", "sets", "zh")).toBe("2 sets 套");
+    expect(docQty("2", "sets")).toBe("2 sets");
+  });
+
+  it("the details: ports and origin in Chinese, our Chinese name and address; China's HS codes on the customs copy", () => {
+    const d = details("informal");
+    d.shipper = { ...d.shipper, nameLocal: "山东科波国际贸易有限公司", addressLocal: "济宁市解放路5号" };
+    expect(d.shipping).toMatchObject({ hsCode: "8422.30", hsCodeCn: "8422.30, 8422.3090" });
+    expect(detailsFor(d, "customer")!.shipping.hsCode).toBe("8422.30");
+    expect(detailsFor(d, "customs")!.shipping.hsCode).toBe("8422.30, 8422.3090");
+    sheet(detailsFor(d, "customs")!, "zh");
+    expect(screen.getByText("山东科波国际贸易有限公司")).toBeTruthy();
+    expect(screen.getByText("济宁市解放路5号")).toBeTruthy();
+    expect(screen.getByText("青岛，中国")).toBeTruthy();
+    expect(screen.getByText("卡拉奇港，巴基斯坦")).toBeTruthy();
+    expect(screen.getByText("8422.30, 8422.3090")).toBeTruthy();
+  });
+
+  it("one set of switches: the copies a paper has, the language (none on the customs copy), the PDF as shown", () => {
+    expect(copyOf("packing-list", "customs")).toBe("customs");
+    expect(copyOf("packing-list", "internal")).toBe("customer");
+    expect(copyOf("proforma", "internal")).toBe("internal");
+    expect(copyOf("bill-of-exchange", "customs")).toBe("customer");
+    expect(langFor("customs", "en")).toBe("zh");
+    const sp = { back: "/orders/1", v: "2" };
+    const [copies, lang] = paperChoices("/print/orders/1/packing-list", sp, "packing-list", "customer", "en");
+    expect(copies!.options.map((o) => [o.word, o.href, o.on])).toEqual([
+      ["Customer copy", "/print/orders/1/packing-list?back=%2Forders%2F1&v=2", true],
+      ["China customs", "/print/orders/1/packing-list?back=%2Forders%2F1&v=2&copy=customs", false],
+    ]);
+    expect(lang!.options.map((o) => o.word)).toEqual(["English", "English + 中文"]);
+    // The customs copy is always in both languages: no language switch.
+    expect(paperChoices("/print/orders/1/packing-list", { copy: "customs" }, "packing-list", "customs", "zh").map((c) => c.label)).toEqual(["Which copy"]);
+    // A paper with one copy: the language only.
+    expect(paperChoices("/print/orders/1/bill-of-exchange", {}, "bill-of-exchange", "customer", "zh").map((c) => c.label)).toEqual(["Language"]);
+    expect(pdfOf("/pdf/packing-list/1?v=2", "customs", "zh")).toBe("/pdf/packing-list/1?v=2&copy=customs");
+    expect(pdfOf("/pdf/proforma/1", "internal", "zh")).toBe("/pdf/proforma/1?copy=internal&lang=zh");
+    expect(pdfOf("/pdf/proforma/1", "customer", "en")).toBe("/pdf/proforma/1");
   });
 });

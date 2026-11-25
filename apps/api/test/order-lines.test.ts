@@ -251,6 +251,42 @@ describe("order items, one at a time", () => {
     expect((await order()).lines.find((l) => l.id === machine.id)).toMatchObject({ receivedQty: "2", packing: { packages: 2 } });
   });
 
+  it("keeps each item's Chinese name and its two HS codes for the papers (25 Nov 2026)", async () => {
+    type Customs = { hsCode: string | null; hsCodeCn: string | null; descriptionZh: string | null; zhBy: string | null };
+    const customs = async () => ((await order()).lines.find((l) => l.id === machine.id) as unknown as { customs: Customs }).customs;
+    expect(await customs()).toEqual({ hsCode: null, hsCodeCn: null, descriptionZh: null, zhBy: null });
+
+    await patch(machine.id, { set: "customs", hsCode: "8422.40", hsCodeCn: "8422 40", descriptionZh: "泡罩包装机 DPP-260" }).expect(200);
+    // China's the same digits as the customer's: kept empty (it follows the customer's); Chinese typed is checked.
+    expect(await customs()).toEqual({ hsCode: "8422.40", hsCodeCn: null, descriptionZh: "泡罩包装机 DPP-260", zhBy: "staff" });
+    await patch(machine.id, { set: "customs", hsCodeCn: "8422.4090" }).expect(200);
+    expect(await customs()).toMatchObject({ hsCode: "8422.40", hsCodeCn: "8422.4090" });
+    // Only digits; cleared with an empty value.
+    const bad = await patch(machine.id, { set: "customs", hsCode: "eight" }).expect(422);
+    expect(JSON.stringify(bad.body)).toMatch(/An HS code is digits/);
+    await patch(machine.id, { set: "customs", descriptionZh: "" }).expect(200);
+    expect(await customs()).toMatchObject({ descriptionZh: null, zhBy: null });
+
+    // In the history, under Documents.
+    const h = await history("documents");
+    expect(h.some((x) => x.action === "customs_names" && /China's HS code — → 8422\.4090/.test(x.summary))).toBe(true);
+
+    // The papers' side: needs the right to make documents.
+    const role = (await api(app, admin).post("/roles", { name: `Packers ${tag}`, permissions: ["dashboard.view", "inquiries.viewAll", "orders.update"] }).expect(201)).body;
+    const email = `packers-${tag}@example.com`;
+    await api(app, admin).post("/users", { name: "Packers", email, role: role.key, password }).expect(201);
+    await patch(machine.id, { set: "customs", hsCode: "8422.30" }, await signIn(app, email, password)).expect(403);
+
+    // The packing list's details carry both (the China customs copy prints China's); its items, their Chinese.
+    await patch(machine.id, { set: "customs", descriptionZh: "泡罩包装机" }).expect(200);
+    const pl = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list`).expect(200)).body as {
+      lines: { id: string; descriptionZh: string | null }[];
+      details: { shipping: { hsCode: string | null; hsCodeCn: string | null } };
+    };
+    expect(pl.lines.find((l) => l.id === machine.id)).toMatchObject({ descriptionZh: "泡罩包装机" });
+    expect(pl.details.shipping).toMatchObject({ hsCode: expect.stringContaining("8422.40"), hsCodeCn: expect.stringContaining("8422.4090") });
+  });
+
   it("a cancelled order's items do not change", async () => {
     const manager = await signIn(app, "manager@example.com", "Manager@12345");
     await api(app, manager).post(`/orders/${orderId}/cancel`, { reason: "Customer cancelled (test)" }).expect(200);

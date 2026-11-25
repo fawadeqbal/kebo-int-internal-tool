@@ -1,5 +1,4 @@
 import "server-only";
-import type { DocLang } from "./zh";
 import { api, ApiError } from "@/lib/api";
 import type { CompanySnapshot, CustomerNow, CustomerSnapshot } from "@/lib/types-orders";
 import { localPath } from "@/lib/paths";
@@ -50,19 +49,3 @@ export async function optional<T>(fn: () => Promise<T>): Promise<T | null> {
   }
 }
 
-/**
- * The same paper in English and in English with Chinese (?lang=zh), for the toolbar's language switch: the
- * page's own query kept (the copy, the version, where Back goes).
- */
-export function langLinks(path: string, sp: Record<string, string | string[] | undefined>, current: DocLang) {
-  const href = (lang: DocLang) => {
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(sp)) if (k !== "lang" && typeof v === "string" && v) q.set(k, v);
-    if (lang === "zh") q.set("lang", "zh");
-    return `${path}${q.size ? `?${q}` : ""}`;
-  };
-  return { current, en: href("en"), zh: href("zh") };
-}
-
-/** A PDF link in the paper's language (?lang=zh added to its query). */
-export const pdfIn = (href: string, lang: DocLang) => (lang === "zh" ? `${href}${href.includes("?") ? "&" : "?"}lang=zh` : href);

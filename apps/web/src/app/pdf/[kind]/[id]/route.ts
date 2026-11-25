@@ -7,6 +7,7 @@ import { LEDGER_PARTY_KINDS, PAPER_KINDS, type PaperKind, type PaymentPaper } fr
 import type { LedgerStatement } from "@/lib/types-ledger";
 import { attachmentHeaders, pdfName, withChromium } from "../../render";
 import { UUID } from "@/lib/ids";
+import { copyOf } from "@/components/print/copies";
 
 /**
  * A document as a PDF: its print page rendered by headless Chromium with the
@@ -142,13 +143,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
   let target: Target;
   try {
     target = await KINDS[kind].target(id, session, new URL(req.url));
-    // Priced documents: the internal copy (every price, cost and payment) when asked for.
-    if ((kind === "revisions" || kind === "proforma") && new URL(req.url).searchParams.get("copy") === "internal") {
-      target = { name: `${target.name} (internal)`, path: `${target.path}${target.path.includes("?") ? "&" : "?"}copy=internal` };
+    // The copy asked for, when the paper has it (copiesOf): the internal one, or the China customs one (which is
+    // always in English + 中文); then the language (English unless chosen).
+    const url = new URL(req.url);
+    const copy = copyOf(kind, url.searchParams.get("copy"));
+    const add = (k: string, v: string) => (target = { ...target, path: `${target.path}${target.path.includes("?") ? "&" : "?"}${k}=${v}` });
+    if (copy !== "customer") {
+      target = { ...target, name: `${target.name} (${copy === "internal" ? "internal" : "China customs"})` };
+      add("copy", copy);
     }
-    // In English with Chinese beside the labels when asked for (English unless chosen).
-    if (new URL(req.url).searchParams.get("lang") === "zh")
-      target = { ...target, path: `${target.path}${target.path.includes("?") ? "&" : "?"}lang=zh` };
+    if (url.searchParams.get("lang") === "zh" && copy !== "customs") add("lang", "zh");
   } catch (e) {
     if (e instanceof ApiError)
       return new Response(e.status === 404 ? "Not found" : e.message, { status: e.status === 422 ? 404 : e.status });

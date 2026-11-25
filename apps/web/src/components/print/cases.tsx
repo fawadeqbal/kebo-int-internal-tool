@@ -1,5 +1,6 @@
 import type { LineCase, OrderDocument } from "@/lib/types-orders";
-import { docFootCell, docItem, docQty, said, type DocColumn } from "./kebo-doc";
+import { zhTerm } from "@kebo/shared";
+import { docFootCell, docItem, docQty, said, withZh, type DocColumn } from "./kebo-doc";
 import type { DocLang } from "./zh";
 
 /**
@@ -54,16 +55,19 @@ const size = (label: string, pick: (c: LineCase) => number | null): DocColumn<Ca
   render: (r) => (r.c ? mm(pick(r.c)) : ""),
 });
 
-/** Widths in pt, as every paper's (the description takes what is left: about 155 pt). */
-export const CASE_COLUMNS: DocColumn<CaseLine>[] = [
+/**
+ * Widths in pt, as every paper's (the description takes what is left: about 155 pt). With Chinese: the item's
+ * Chinese under its name, the unit's and the package's after them.
+ */
+export const caseColumns = (lang: DocLang): DocColumn<CaseLine>[] => [
   { label: "Case No.", width: 34, wrap: true, render: (r) => r.caseNo, span: (r) => r.caseSpan },
-  { label: "Description of goods", render: (r) => docItem(r.line.description, r.line.model), span: (r) => r.lineSpan },
-  { label: "Qty", width: 40, wrap: true, render: (r) => docQty(r.line.quantity, r.line.unit), span: (r) => r.lineSpan },
+  { label: "Description of goods", render: (r) => docItem(r.line.description, r.line.model, r.line.descriptionZh, lang), span: (r) => r.lineSpan },
+  { label: "Qty", width: 40, wrap: true, render: (r) => docQty(r.line.quantity, r.line.unit, lang), span: (r) => r.lineSpan },
   {
     label: "Package",
     width: 70,
     wrap: true,
-    render: (r) => (r.c ? (r.c.count > 1 ? `${r.c.count} × ${r.c.packageType}` : r.c.packageType) : ""),
+    render: (r) => (r.c ? withZh(r.c.count > 1 ? `${r.c.count} × ${r.c.packageType}` : r.c.packageType, lang, () => (lang === "zh" ? zhTerm(r.c!.packageType) : null)) : ""),
   },
   size("L (mm)", (c) => c.lengthMm),
   size("W (mm)", (c) => c.widthMm),

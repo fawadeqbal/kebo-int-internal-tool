@@ -23,6 +23,7 @@ import {
 } from "../enums";
 import { amount, bool, currency, email, id, isoDate, keptEnum, keptInt, keptText, listQuery, amountOr, optionalAmount, optionalDate, optionalId, optionalRate, optionalText, optionalPercent, partShare, percentOr, phone, quantity, text } from "./common";
 import { DEFAULT_TAX_RATE } from "../workflows/tax";
+import { HS_CODE, HS_CODE_HINT } from "../workflows/hs";
 import { LEAD_FROMS, OFFER_PART_RULES, PART_RULE_DAYS, partsAddUp, QUOTE_PART_RULES, WARRANTY_FROMS, type TermsSide } from "../workflows/terms";
 import { PLAN_DUE_RULES } from "../workflows/money-route";
 import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
@@ -653,6 +654,9 @@ export const lineCasesInput = z.object({
 });
 export type LineCasesInput = z.infer<typeof lineCasesInput>;
 
+/** An HS code, or empty to clear it. */
+const hsCodeText = optionalText(20).refine((v) => v === null || HS_CODE.test(v), HS_CODE_HINT);
+
 const receivedQty = z.preprocess(
   (v) => (v === "" || v === null ? 0 : v),
   z.coerce
@@ -682,6 +686,13 @@ export const orderLineInput = z.discriminatedUnion("set", [
     netWeightKg: measure(10_000_000).optional(),
     grossWeightKg: measure(10_000_000).optional(),
     cbm: measure(100_000).optional(),
+  }),
+  z.object({
+    // The papers' customs side (Documents): the customer's and China's HS codes and the item's name in Chinese.
+    set: z.literal("customs"),
+    hsCode: hsCodeText.optional(),
+    hsCodeCn: hsCodeText.optional(),
+    descriptionZh: optionalText(4000).optional(),
   }),
   z.object({
     set: z.literal("delivered"),

@@ -132,7 +132,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       : null,
     proformaIssuedOn: fromDbDateOrNull(o.proformaIssuedOn),
     ports,
-    hsCodes: o.lines.filter((l) => l.type === "goods").map((l) => l.hsCode),
+    hsCodes: o.lines.filter((l) => l.type === "goods").map((l) => ({ customer: l.hsCode, china: l.hsCodeCn })),
   });
   const plan = o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) }));
   const paymentSentence = orderPaymentSentence({
@@ -211,6 +211,8 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       no: numbers[i],
       type: l.type,
       description: l.description,
+      /** The item in Chinese (printed under the English in English + 中文); null until written. */
+      descriptionZh: l.descriptionZh,
       model: l.model,
       quantity: l.quantity.toString(),
       unit: l.unit,

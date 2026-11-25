@@ -5,32 +5,26 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
 import { Button, buttonClass } from "@kebo/ui";
-import type { DocLang } from "./zh";
-
-/** The words on the language switch (the toolbar and the app's viewer). */
-export const LANG_WORD: Record<DocLang, string> = { en: "English", zh: "English + 中文" };
+import type { PaperChoice } from "./copies";
 
 /**
- * Above the sheet on screen, gone on paper: back to the order, the customer's or
- * the internal copy, English or English with Chinese, print, or download the PDF.
+ * Above the sheet on screen, gone on paper: back to the order, the paper's switches (which copy, the language:
+ * paperChoices), print, or download the PDF.
  */
 export function PrintToolbar({
   title,
   backHref,
   pdfHref,
   excelHref,
-  copies,
-  languages,
+  choices = [],
 }: {
   title: string;
   backHref: string;
   pdfHref: string;
   /** The same document as an Excel file (a quotation). */
   excelHref?: string;
-  /** Priced documents: switch between the customer's copy (one total) and the internal one (every price, cost and payment). */
-  copies?: { current: "customer" | "internal"; customer: string; internal: string };
-  /** The paper in English, or with Chinese beside every label (?lang=zh); English unless chosen. */
-  languages?: { current: DocLang; en: string; zh: string };
+  /** Which copy and the language (paperChoices): the same switches the app's viewer draws. */
+  choices?: PaperChoice[];
 }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -44,12 +38,13 @@ export function PrintToolbar({
         title,
         pdfHref: abs(pdfHref),
         excelHref: excelHref && abs(excelHref),
-        copies: copies && { current: copies.current, customer: abs(copies.customer), internal: abs(copies.internal) },
-        languages: languages && { current: languages.current, en: abs(languages.en), zh: abs(languages.zh) },
+        choices: choices.map((c) => ({ ...c, options: c.options.map((o) => ({ ...o, href: abs(o.href) })) })),
       },
       window.location.origin,
     );
-  }, [title, pdfHref, excelHref, copies, languages]);
+    // The switches are new objects on every render: compared by what they say.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, pdfHref, excelHref, JSON.stringify(choices)]);
   return (
     <div className="no-print sticky [html[data-embedded]_&]:hidden top-0 z-20 mb-6 border-b border-[#d0d7e2] bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-[210mm] max-w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-[#16151c]">
@@ -71,44 +66,26 @@ export function PrintToolbar({
           <span className="truncate text-sm font-medium">{title}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {copies && (
-            <div role="group" aria-label="Which copy" className="flex rounded-md border border-[#e4e4ea] bg-[#f6f6f8] p-0.5 text-sm">
-              {(["customer", "internal"] as const).map((k) => (
+          {choices.map((c) => (
+            <div key={c.label} role="group" aria-label={c.label} className="flex rounded-md border border-[#e4e4ea] bg-[#f6f6f8] p-0.5 text-sm">
+              {c.options.map((o) => (
                 <Link
-                  key={k}
-                  href={copies[k]}
-                  aria-current={copies.current === k ? "page" : undefined}
+                  key={o.key}
+                  href={o.href}
+                  aria-current={o.on ? "page" : undefined}
                   className={
-                    copies.current === k
-                      ? k === "internal"
+                    o.on
+                      ? o.tone === "internal"
                         ? "rounded px-2.5 py-1 font-medium bg-[#B91C1C] text-white"
                         : "rounded px-2.5 py-1 font-medium bg-white text-[#16151c] shadow-sm"
                       : "rounded px-2.5 py-1 text-[#4a4857] hover:text-[#16151c]"
                   }
                 >
-                  {k === "customer" ? "Customer copy" : "Internal copy"}
+                  {o.word}
                 </Link>
               ))}
             </div>
-          )}
-          {languages && (
-            <div role="group" aria-label="Language" className="flex rounded-md border border-[#e4e4ea] bg-[#f6f6f8] p-0.5 text-sm">
-              {(["en", "zh"] as const).map((k) => (
-                <Link
-                  key={k}
-                  href={languages[k]}
-                  aria-current={languages.current === k ? "page" : undefined}
-                  className={
-                    languages.current === k
-                      ? "rounded px-2.5 py-1 font-medium bg-white text-[#16151c] shadow-sm"
-                      : "rounded px-2.5 py-1 text-[#4a4857] hover:text-[#16151c]"
-                  }
-                >
-                  {LANG_WORD[k]}
-                </Link>
-              ))}
-            </div>
-          )}
+          ))}
           {excelHref && (
             <a
               href={excelHref}

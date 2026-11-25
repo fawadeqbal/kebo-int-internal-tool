@@ -6,8 +6,9 @@ import { docBrand, hasFeature, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
 import type { DocLine, RevisionDoc } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
-import { docLangOf, type DocLang } from "@/components/print/zh";
-import { backTo, companyOr, customerOr, langLinks, pdfIn } from "@/components/print/data";
+import { docLangOf } from "@/components/print/zh";
+import { backTo, companyOr, customerOr } from "@/components/print/data";
+import { copyOf, paperChoices, pdfOf } from "@/components/print/copies";
 import {
   docDate,
   docItem,
@@ -24,8 +25,6 @@ import {
 } from "@/components/print/kebo-doc";
 import { getSettings } from "@/lib/loaders";
 
-const copyHref = (id: string, back: string | undefined, internal: boolean, lang: DocLang) =>
-  `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}), ...(lang === "zh" ? { lang } : {}) })}`;
 const numberOf = (r: RevisionDoc) => `${r.quotation.refNo}-R${r.number}`;
 /** A draft is marked DRAFT across the page, except on the copy being sent to the customer (which is what sends it). */
 const draftMark = (status: string, sending: string | undefined) => (status === "draft" && sending !== "1" ? "DRAFT" : null);
@@ -66,7 +65,8 @@ export default async function QuotationPrint({
     getSettings(),
   ]).then(([company, customer, settings]) => [company, customer, settings.company, settings.sales.quoteUnitPrices] as const);
   const c = r.currency;
-  const internal = sp.copy === "internal";
+  const copy = copyOf("revisions", sp.copy);
+  const internal = copy === "internal";
   const lang = docLangOf(sp.lang);
   // Its months from a moment and what it covers (an older quotation: its words as they are).
   const warranty = warrantyLine({ warrantyMonths: r.warrantyMonths ?? null, warrantyFrom: r.warrantyFrom ?? null, warranty: r.warranty });
@@ -95,7 +95,7 @@ export default async function QuotationPrint({
     ? [
         no,
         description,
-        { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit) },
+        { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit, lang) },
         ...(costs
           ? ([
               { label: landed ? "Landed cost" : "Unit cost", width: 62, align: "right", render: (l) => (l.unitCost != null ? docMoney(l.unitCost, c) : "") },
@@ -110,11 +110,11 @@ export default async function QuotationPrint({
         [
           no,
           description,
-          { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit) },
+          { label: "Quantity", width: 58, render: (l) => docQty(l.quantity, l.unit, lang) },
           { label: "Unit price", width: 66, align: "right", render: (l) => docMoney(l.unitPrice, c) },
           { label: "Amount", width: 74, align: "right", render: (l) => docMoney(l.lineTotal, c) },
         ]
-      : [no, description, { label: "Quantity", width: 71.4, render: (l) => docQty(l.quantity, l.unit) }];
+      : [no, description, { label: "Quantity", width: 71.4, render: (l) => docQty(l.quantity, l.unit, lang) }];
 
   // Each option: its lines and its own total. Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const groups = options.map((o) => ({
@@ -137,14 +137,9 @@ export default async function QuotationPrint({
         <PrintToolbar
           title={`Quotation ${numberOf(r)}`}
           backHref={backTo(sp.back, `/inquiries/${r.quotation.inquiryId}/quotation`)}
-          pdfHref={pdfIn(`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`, lang)}
+          pdfHref={pdfOf(`/pdf/revisions/${r.id}`, copy, lang)}
           excelHref={(await hasFeature("excel")) ? `/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}` : undefined}
-          copies={{
-            current: internal ? "internal" : "customer",
-            customer: copyHref(r.id, sp.back, false, lang),
-            internal: copyHref(r.id, sp.back, true, lang),
-          }}
-          languages={langLinks(`/print/revisions/${r.id}`, sp, lang)}
+          choices={paperChoices(`/print/revisions/${r.id}`, sp, "revisions", copy, lang)}
         />
       )}
       <KeboDoc

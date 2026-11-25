@@ -739,6 +739,10 @@ export function LineTable({
       // Typing on a selected cell replaces what it holds, like a spreadsheet.
       e.preventDefault();
       edit(sel.row, sel.col, k);
+    } else if ((k === "Process" || e.nativeEvent.isComposing) && col.input && !isChoice(col)) {
+      // Typing Chinese (an input method): the cell opens for typing, so what is typed goes into it (a name in
+      // Chinese, 25 Nov 2026). Not prevented: the input method carries on in the cell's box.
+      edit(sel.row, sel.col);
     }
   };
 

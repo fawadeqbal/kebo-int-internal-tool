@@ -128,6 +128,13 @@ export const SETTING_GROUPS: SettingGroup[] = [
       { name: "nameLocal", label: "Name in Chinese", kind: "text" },
       { name: "taxNo", label: "Business license number", kind: "text" },
       { name: "address", label: "Address", kind: "textarea", wide: true },
+      {
+        name: "addressLocal",
+        label: "Address in Chinese",
+        kind: "textarea",
+        wide: true,
+        hint: "Printed under the address on papers in English + 中文 (for the supplier, shipping and China customs)",
+      },
       { name: "phone", label: "Phone", kind: "text" },
       { name: "website", label: "Website", kind: "text" },
       { name: "email", label: "Email", kind: "text" },
@@ -160,7 +167,7 @@ export const SETTING_GROUPS: SettingGroup[] = [
         key: "contact",
         title: "Contact details",
         description: "Printed under the top of every document, so customers know how to reach you.",
-        fields: ["taxNo", "address", "phone", "website", "email", "email2"],
+        fields: ["taxNo", "address", "addressLocal", "phone", "website", "email", "email2"],
       },
       {
         key: "invoices",

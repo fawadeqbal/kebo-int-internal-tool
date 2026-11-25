@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BANK_STEP_LABEL, can, dayMonth, type BankStepKind } from "@kebo/shared";
+import { BANK_STEP_LABEL, can, dayMonth, hsMismatch, type BankStepKind } from "@kebo/shared";
 import { Badge, linkClass, RULES, cn } from "@kebo/ui";
 import { getSettings } from "@/lib/loaders";
 import { orderMoneyOf, orderPapersOf, orderPaymentsOf } from "@/lib/order-data";
@@ -11,6 +11,9 @@ import { SectionFiles } from "@/components/order-sections/section-files";
 import { FieldsWindow } from "@/components/order-sections/fields-window";
 import { RecordPaymentWindow } from "@/components/order-sections/payment-windows";
 import { PapersTable, type PaperLineRow, type PapersTab } from "@/components/orders/papers-table";
+import { OrderLinesEditor, OrderLinesView } from "@/components/orders/order-lines";
+import { PanelButton } from "@/components/orders/step-view";
+import { editsOf } from "@/lib/edit-data";
 import type { BankStepView } from "@/lib/types-flow";
 import { lightAction } from "../../light-actions";
 import { addDocumentAction, updateDocumentAction } from "../../flow-actions";
@@ -41,7 +44,7 @@ export default async function OrderDocuments({
   const sp = await searchParams;
   const d = await stageData(id, "documents");
   const { me, o, flow, now } = d;
-  const papers = await optional(() => orderPapersOf(id));
+  const [papers, edits] = await Promise.all([optional(() => orderPapersOf(id)), editsOf("order", id)]);
   const route = flow?.payment.route ?? null;
   const open = d.open;
   const tab: PapersTab = TABS.includes(sp.tab as PapersTab) ? (sp.tab as PapersTab) : "all";
@@ -205,6 +208,58 @@ export default async function OrderDocuments({
     />
   );
 
+  // The papers' customs side (25 Nov 2026): each item's name in Chinese and its two HS codes, the customer's and
+  // China's (the supplier's), kept on the order's items so every paper prints the same.
+  const goodsLines = o.lines.filter((l) => l.type === "goods");
+  const named = goodsLines.filter((l) => l.customs?.descriptionZh).length;
+  const coded = goodsLines.filter((l) => l.customs?.hsCode).length;
+  const toCheck = goodsLines.filter((l) => l.customs?.zhBy === "machine").length;
+  const odd = goodsLines.filter((l) => hsMismatch(l.customs?.hsCode, l.customs?.hsCodeCn)).length;
+  const customsDone = named === goodsLines.length && coded === goodsLines.length && !toCheck && !odd;
+  const customs = goodsLines.length > 0 && (
+    <Section
+      id="customs"
+      title="Names and HS codes"
+      state={
+        customsDone
+          ? "Ready for China customs"
+          : [
+              `${named} of ${goodsLines.length} in Chinese`,
+              `${coded} of ${goodsLines.length} HS codes`,
+              toCheck ? `${toCheck} to check` : null,
+              odd ? `${odd} codes differ` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+      }
+      tone={customsDone ? "ok" : odd ? "bad" : "neutral"}
+      actions={
+        can(me, "documents.manage") &&
+        open && (
+          <PanelButton
+            edit
+            label="Edit items"
+            title="Names and HS codes"
+            description="Each item's name in Chinese (printed under the English on papers in English + 中文), its HS code, and China's when it differs. Nothing is saved until Save changes."
+            panelClassName={RULES.window.items}
+            body={
+              <OrderLinesEditor
+                set="customs"
+                orderId={o.id}
+                lines={goodsLines}
+                today={now}
+                edit={{ type: "order", id: o.id, card: "lines.customs" }}
+                card={edits.cards["lines.customs"]}
+              />
+            }
+          />
+        )
+      }
+    >
+      <OrderLinesView set="customs" lines={goodsLines} label={`${o.refNo} · names and HS codes`} />
+    </Section>
+  );
+
   return (
     <OrderPage id={id}>
       {papers && (
@@ -248,6 +303,8 @@ export default async function OrderDocuments({
           ))}
         {howPrint}
       </div>
+
+      {customs}
 
       {viaBank && bankSteps.length > 0 && (
         <Section

@@ -1,5 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf, type PaperDetails } from "@kebo/shared";
+import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf, zhCountry, zhPlace, zhTerm, zhUnit, type PaperDetails } from "@kebo/shared";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 import { zhOf, type DocLang } from "./zh";
@@ -118,9 +118,27 @@ export function docMoney(amount: string | number, currency: string) {
 /** "USD Ninety Thousand only" */
 export const docWords = (amount: string, currency: string) => paperWordsText(amount, currency);
 
-/** "1 Set", "2,000 pcs" */
-export function docQty(quantity: string | number, unit?: string | null) {
-  return countText(quantity, unit);
+/** "1 Set", "2,000 pcs"; with Chinese the unit's after it ("1 Set 套"). */
+export function docQty(quantity: string | number, unit?: string | null, lang: DocLang = "en") {
+  const t = countText(quantity, unit);
+  const zh = lang === "zh" ? (zhUnit(unit) ?? zhTerm(unit)) : null;
+  return zh ? `${t} ${zh}` : t;
+}
+
+/**
+ * What people typed or picked, with its Chinese after it when it has one ("Qingdao, China 青岛，中国",
+ * "Wooden case 木箱"): places part by part, else words with one Chinese (zh-terms). Else as typed.
+ */
+export function withZh(text: string | null | undefined, lang: DocLang, find: (t: string) => string | null = zhPlace): ReactNode {
+  if (!text) return text ?? null;
+  const zh = lang === "zh" ? find(text) : null;
+  return zh ? (
+    <>
+      {text} <span style={{ fontFamily: CJK, letterSpacing: 0 }}>{zh}</span>
+    </>
+  ) : (
+    text
+  );
 }
 
 /** Free text (terms, notes) as list items: one per line, without the "1." numbering people type. */
@@ -147,8 +165,8 @@ export function portBullets(
   const loading = p.portOfLoading;
   const discharge = p.portOfDischarge;
   return [
-    loading ? <Labelled key="pol" label="Port of loading:" value={loading} lang={lang} /> : null,
-    discharge ? <Labelled key="pod" label="Port of discharge:" value={discharge} lang={lang} /> : null,
+    loading ? <Labelled key="pol" label="Port of loading:" value={withZh(loading, lang)} lang={lang} /> : null,
+    discharge ? <Labelled key="pod" label="Port of discharge:" value={withZh(discharge, lang)} lang={lang} /> : null,
   ].filter(Boolean);
 }
 
@@ -192,14 +210,25 @@ function headed(text: string, lang: DocLang): ReactNode {
   );
 }
 
-/** An item's description cell: the first line as its name, the rest (specs) and the model under it. */
-export function docItem(description: string, model?: string | null) {
+/**
+ * An item's description cell: the first line as its name, the rest (specs) and the model under it. With Chinese
+ * (the item's own, written on the order), its Chinese name under the English name and its specs under the specs.
+ */
+export function docItem(description: string, model?: string | null, zh?: string | null, lang: DocLang = "en") {
   const [name, ...more] = description.split(/\r?\n/);
+  const [zhName, ...zhMore] = lang === "zh" && zh?.trim() ? zh.trim().split(/\r?\n/) : [];
+  const spec: CSSProperties = { color: TEXT_2, fontSize: "12px", whiteSpace: "pre-line" };
   return (
     <>
       <div style={{ fontWeight: 600 }}>{name}</div>
-      {more.length > 0 && <div style={{ color: TEXT_2, fontSize: "12px", whiteSpace: "pre-line" }}>{more.join("\n")}</div>}
-      {model && <div style={{ color: LABEL_GREY, fontSize: "12px" }}>Model: {model}</div>}
+      {zhName && <div style={{ fontFamily: CJK, fontWeight: 600, letterSpacing: 0 }}>{zhName}</div>}
+      {more.length > 0 && <div style={spec}>{more.join("\n")}</div>}
+      {zhMore.length > 0 && <div style={{ ...spec, fontFamily: CJK, letterSpacing: 0 }}>{zhMore.join("\n")}</div>}
+      {model && (
+        <div style={{ color: LABEL_GREY, fontSize: "12px" }}>
+          {said("Model:", lang)} {model}
+        </div>
+      )}
     </>
   );
 }
@@ -332,7 +361,8 @@ export function KeboDoc<T>({
     // Both emails, as Settings › Company says they print (review 24 Nov: the second never printed).
     company.email || company.email2 ? { icon: <IconMail />, text: [company.email, company.email2].filter(Boolean).join(" · ") } : null,
     company.website ? { icon: <IconGlobe />, text: company.website, href: `https://${company.website.replace(/^https?:\/\//, "")}` } : null,
-    company.address ? { icon: <IconPin />, text: company.address } : null,
+    // With Chinese, our address in Chinese under it (Settings › Company).
+    company.address ? { icon: <IconPin />, text: [company.address, lang === "zh" ? company.addressLocal : null].filter(Boolean).join("\n") } : null,
   ].filter((x) => x !== null);
   const details = [{ label: "Date", value: docDate(date) as ReactNode }, ...meta.map((m) => ({ label: noColon(m.label), value: m.value }))];
   const zh = (t: string) => (lang === "zh" ? zhOf(t) : null);
@@ -382,6 +412,8 @@ export function KeboDoc<T>({
 
   return (
     <article
+      // With Chinese the page is Chinese too: the Chinese prints in Simplified Chinese glyphs wherever it comes from.
+      lang={lang === "zh" ? "zh-Hans" : "en"}
       className="kebo-doc relative mx-auto bg-white shadow-[0_1px_3px_rgba(16,24,40,.12),0_8px_24px_rgba(16,24,40,.08)] print:shadow-none"
       style={{
         width: "794px",
@@ -531,6 +563,7 @@ ${paperZoomCss(".kebo-doc")}`}</style>
             <div style={{ ...label, color: BLUE }}>{said(customer.label ?? "Prepared for", lang)}</div>
             <div style={{ fontWeight: 700, fontSize: "14px" }}>{customer.name}</div>
             {address && <div style={{ whiteSpace: "pre-line" }}>{address}</div>}
+            {lang === "zh" && zhCountry(customer.country) && <div style={{ fontFamily: CJK, letterSpacing: 0 }}>{zhCountry(customer.country)}</div>}
           </div>
           {(customer.taxNo || customer.regNo) && (
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -740,12 +773,15 @@ function Details({ d, lang }: { d: PaperDetails; lang: DocLang }) {
       <div>
         {head("Shipper", true)}
         <div style={{ fontWeight: 700 }}>{d.shipper.name}</div>
+        {lang === "zh" && d.shipper.nameLocal && <div style={{ fontWeight: 700, fontFamily: CJK, letterSpacing: 0 }}>{d.shipper.nameLocal}</div>}
         {d.shipper.address && <div style={{ whiteSpace: "pre-line" }}>{d.shipper.address}</div>}
+        {lang === "zh" && d.shipper.addressLocal && <div style={{ whiteSpace: "pre-line", fontFamily: CJK, letterSpacing: 0 }}>{d.shipper.addressLocal}</div>}
         {line("Contact No.", d.shipper.phone)}
         {line("Licence No.", d.shipper.licenceNo)}
         {head("Buyer")}
         <div style={{ fontWeight: 700 }}>{d.buyer.name}</div>
         {buyerAddress && <div style={{ whiteSpace: "pre-line" }}>{buyerAddress}</div>}
+        {lang === "zh" && zhCountry(d.buyer.country) && <div style={{ fontFamily: CJK, letterSpacing: 0 }}>{zhCountry(d.buyer.country)}</div>}
         {line(d.buyer.taxLabel, d.buyer.taxNo)}
         {line("Reg. Number", d.buyer.regNo)}
       </div>
@@ -771,10 +807,10 @@ function Details({ d, lang }: { d: PaperDetails; lang: DocLang }) {
           </>
         )}
         {head("Shipping", !b)}
-        {line("Port of loading", d.shipping.portOfLoading)}
-        {line("Port of discharge", d.shipping.portOfDischarge)}
+        {line("Port of loading", withZh(d.shipping.portOfLoading, lang))}
+        {line("Port of discharge", withZh(d.shipping.portOfDischarge, lang))}
         {line("HS code", d.shipping.hsCode)}
-        {line("Origin", d.shipping.origin)}
+        {line("Origin", withZh(d.shipping.origin, lang))}
       </div>
     </section>
   );

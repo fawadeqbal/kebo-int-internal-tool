@@ -471,7 +471,8 @@ export type PaperSource = "app" | "upload";
 export type PaperCell =
   | string
   | null
-  | { item: string; model?: string | null }
+  /** An item: its name and specs, its model, and the same in Chinese when it has been written (printed in English + 中文). */
+  | { item: string; model?: string | null; zh?: string | null }
   | { money: string; currency: string }
   | { qty: string; unit?: string | null }
   | { date: string };
@@ -502,6 +503,7 @@ export interface PaperDoc {
     name: string;
     nameLocal?: string | null;
     address?: string | null;
+    addressLocal?: string | null;
     phone?: string | null;
     email?: string | null;
     website?: string | null;

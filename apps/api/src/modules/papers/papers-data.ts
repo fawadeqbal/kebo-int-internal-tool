@@ -37,6 +37,8 @@ import {
   type LineCondition,
   type Settings,
   paperDetailsOf,
+  hsFor,
+  hsMismatch,
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import { orderLineNumbers } from "../orders/orders.service";
@@ -307,7 +309,7 @@ function detailsOf(c: PaperCtx, withBank: boolean) {
       : null,
     proformaIssuedOn: fromDbDateOrNull(c.o.proformaIssuedOn),
     ports: { portOfLoading: pol, portOfDischarge: pod },
-    hsCodes: c.o.lines.filter((l) => l.type === "goods").map((l) => l.hsCode),
+    hsCodes: c.o.lines.filter((l) => l.type === "goods").map((l) => ({ customer: l.hsCode, china: l.hsCodeCn })),
   });
 }
 
@@ -322,8 +324,10 @@ function itemRows(c: PaperCtx, onlyGoods = false) {
       line: l,
       cells: {
         no: l.no,
-        item: { item: l.description, model: l.model },
+        item: { item: l.description, model: l.model, zh: l.descriptionZh },
         hs: l.hsCode ?? "",
+        // The China customs copy's: China's code, else the customer's.
+        hsCn: hsFor("customs", l.hsCode, l.hsCodeCn) ?? "",
         qty: qty(l.quantity, l.unit),
         price: money(l.unitPrice.toString(), c.o.currency),
         amount: money(l.lineTotal.toString(), c.o.currency),
@@ -335,19 +339,27 @@ function itemRows(c: PaperCtx, onlyGoods = false) {
 function hsOf(c: PaperCtx) {
   const goods = c.o.lines.filter((l) => l.type === "goods");
   const withHs = goods.filter((l) => l.hsCode).length;
-  // Shown when some item has one; in the preview also when none has yet, so the missing ones show where they go.
-  const show = c.options.showHs !== false && (withHs > 0 || (!!c.preview && goods.length > 0));
+  // Shown when some item has one (the customer's or China's); in the preview also when none has yet, so the
+  // missing ones show where they go.
+  const show = c.options.showHs !== false && (withHs > 0 || goods.some((l) => l.hsCodeCn) || (!!c.preview && goods.length > 0));
+  // The first six digits are the same in every country: an item whose two codes differ there has one wrong.
+  const odd = goods.filter((l) => hsMismatch(l.hsCode, l.hsCodeCn));
   const chk = check(
     "hs",
     "HS codes",
     withHs === goods.length ? "on every item" : `${withHs} of ${goods.length} items`,
     withHs === goods.length,
-    { fix: "hs" },
+    {
+      fix: "hs",
+      warn: odd.length
+        ? `${odd.map((l) => `${l.description.split(/\r?\n/)[0]!.slice(0, 40)}: ${l.hsCode} here, ${l.hsCodeCn} for China`).join("; ")}. The first six digits are the same in every country; check them under Names and HS codes.`
+        : null,
+    },
   );
   return {
     show,
     check: chk,
-    missing: goods.filter((l) => !l.hsCode).map((l) => ({ id: l.id, description: l.description.split(/\r?\n/)[0]! })),
+    missing: goods.filter((l) => !l.hsCode).map((l) => ({ id: l.id, description: l.description.split(/\r?\n/)[0]!, model: l.model })),
   };
 }
 
@@ -675,7 +687,8 @@ function purchaseOrder(c: PaperCtx): Built {
       columns: [COL.no, COL.item, COL.qty, COL.price, COL.amount],
       rows: mine.map((l) => ({
         no: l.no,
-        item: { item: l.description, model: l.model },
+        // The supplier reads Chinese: the item's Chinese prints under it on the order in English + 中文.
+        item: { item: l.description, model: l.model, zh: l.descriptionZh },
         qty: qty(l.quantity, l.unit),
         price: l.factoryUnitPrice !== null && currency ? money(l.factoryUnitPrice.toString(), currency) : "",
         // Exact: price × quantity in minor units (as what we owe is worked out), not floating point.

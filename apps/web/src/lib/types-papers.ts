@@ -63,7 +63,8 @@ export interface PaperChecks {
   state: PaperState;
   ready: boolean;
   checks: PaperCheck[];
-  hsLines: { id: string; description: string }[];
+  /** Items without an HS code; `suggest`: the code the same item had on an earlier order (to take with one click). */
+  hsLines: HsLine[];
   fixes: Partial<Record<string, { label: string; type: "text" | "date"; saves: string }>>;
   /** What shows on the paper: its own options, and the parts it has that can be hidden (field: true). */
   options: { key: PaperOption; label: string; on: boolean; field?: boolean }[];
@@ -93,3 +94,10 @@ export interface PaperDocView {
 }
 
 export type { PaperFixField };
+
+/** An item without an HS code on the Make page, with the code the same item had on the latest earlier order. */
+export interface HsLine {
+  id: string;
+  description: string;
+  suggest?: { hsCode: string; from: string } | null;
+}
