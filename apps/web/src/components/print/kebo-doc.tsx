@@ -277,7 +277,7 @@ export function KeboDoc<T>({
   internalBand = "INTERNAL COPY — FOR OUR OWN USE, NOT FOR THE CUSTOMER",
   watermark,
   brand = null,
-  after,
+  signatures = null,
   details: particulars = null,
   lang = "en",
 }: {
@@ -315,8 +315,11 @@ export function KeboDoc<T>({
   watermark?: string | null;
   /** The company's logo and wordmark; none: its name as the letterhead. */
   brand?: DocBrand | null;
-  /** A section after the terms, e.g. a contract's two signature lines. */
-  after?: ReactNode;
+  /**
+   * Who signs ("For the seller · Shandong Kebo …" and "For the buyer · …"; the left is always ours): the closing
+   * block, kept on one page with what is signed for, our seal over our signature.
+   */
+  signatures?: { left: string; right: string } | null;
   /** Under the title, in place of the customer's box: shipper, buyer, the bank by the route and the shipping. */
   details?: PaperDetails | null;
   /** English, or English with the Chinese beside each label. */
@@ -333,6 +336,26 @@ export function KeboDoc<T>({
   ].filter((x) => x !== null);
   const details = [{ label: "Date", value: docDate(date) as ReactNode }, ...meta.map((m) => ({ label: noColon(m.label), value: m.value }))];
   const zh = (t: string) => (lang === "zh" ? zhOf(t) : null);
+  // Hidden on the Make window ("Terms and notes" off): no empty heading left behind.
+  const terms = bullets.length > 0 && (
+    <div style={{ breakInside: "avoid", marginBottom: "16px" }}>
+      <div style={{ ...label, color: BLUE }}>{said(noColon(boxTitle), lang)}</div>
+      <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
+        {bullets.map((b, i) => (
+          <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
+            <span style={{ flexShrink: 0 }}>{i + 1}.</span>
+            <span style={{ minWidth: 0 }}>{b}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+  const bankBox = bank && (
+    <div style={{ breakInside: "avoid" }}>
+      <div style={{ ...label, color: BLUE }}>{said("Bank details", lang)}</div>
+      <div style={{ whiteSpace: "pre-line" }}>{bank}</div>
+    </div>
+  );
   const footLeft = company.taxNo
     ? `Business License No. ${zh("Business License No.") ? `${zh("Business License No.")} ` : ""}${company.taxNo}`
     : "";
@@ -589,37 +612,31 @@ ${paperZoomCss(".kebo-doc")}`}</style>
         </tbody>
       </table>
 
-      {/* Terms and bank details, with the stamp */}
-      <section style={{ marginTop: "26px", display: "flex", justifyContent: "space-between", gap: "24px", alignItems: "flex-end" }}>
-        <div style={{ lineHeight: 1.6, minWidth: 0, flex: 1 }}>
-          {/* Hidden on the Make window ("Terms and notes" off): no empty heading left behind. */}
-          {bullets.length > 0 && (
-            <div style={{ breakInside: "avoid", marginBottom: "16px" }}>
-              <div style={{ ...label, color: BLUE }}>{said(noColon(boxTitle), lang)}</div>
-              <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                {bullets.map((b, i) => (
-                  <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
-                    <span style={{ flexShrink: 0 }}>{i + 1}.</span>
-                    <span style={{ minWidth: 0 }}>{b}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
+      {/* Terms and bank details, with the stamp; on a signed paper the signatures close it */}
+      {signatures ? (
+        <section style={{ marginTop: "26px", lineHeight: 1.6 }}>
+          {bank && terms}
+          {/*
+           * The closing stays together on one page: the bank details (else the terms) with the signatures under
+           * them, so a signature never starts a page alone with nothing signed for above it.
+           */}
+          <div style={{ breakInside: "avoid" }}>
+            {bank ? bankBox : terms}
+            <Signatures left={signatures.left} right={signatures.right} stamp={company.stamp ?? null} lang={lang} />
+          </div>
+        </section>
+      ) : (
+        <section style={{ marginTop: "26px", display: "flex", justifyContent: "space-between", gap: "24px", alignItems: "flex-end" }}>
+          <div style={{ lineHeight: 1.6, minWidth: 0, flex: 1 }}>
+            {terms}
+            {bankBox}
+          </div>
+          {company.stamp && (
+            // eslint-disable-next-line @next/next/no-img-element -- a data URL from Settings, printed as is
+            <img src={company.stamp} alt="Company stamp" style={{ width: "124px", height: "118px", objectFit: "contain", mixBlendMode: "multiply", flexShrink: 0, breakInside: "avoid" }} />
           )}
-          {bank && (
-            <div style={{ breakInside: "avoid" }}>
-              <div style={{ ...label, color: BLUE }}>{said("Bank details", lang)}</div>
-              <div style={{ whiteSpace: "pre-line" }}>{bank}</div>
-            </div>
-          )}
-        </div>
-        {company.stamp && (
-          // eslint-disable-next-line @next/next/no-img-element -- a data URL from Settings, printed as is
-          <img src={company.stamp} alt="Company stamp" style={{ width: "124px", height: "118px", objectFit: "contain", mixBlendMode: "multiply", flexShrink: 0, breakInside: "avoid" }} />
-        )}
-      </section>
-
-      {after && <section style={{ marginTop: "30px", breakInside: "avoid" }}>{after}</section>}
+        </section>
+      )}
 
       {internal && <section style={{ marginTop: "22px", breakInside: "avoid" }}>{internal}</section>}
 
@@ -645,6 +662,46 @@ ${paperZoomCss(".kebo-doc")}`}</style>
         <div />
       </footer>
     </article>
+  );
+}
+
+/**
+ * The signature block, as contracts are signed: for each side who signs ("For the seller") and for whom (the
+ * company), room to sign, then Name, Title and Date to fill in. Our seal (Settings › Company) goes over our
+ * signature, the left one. A side with nothing written ("") is left out (a paper only we sign).
+ */
+function Signatures({ left, right, stamp, lang }: { left: string; right: string; stamp: string | null; lang: DocLang }) {
+  const side = (text: string, ours: boolean) => {
+    // "For the seller · Shandong Kebo …": who signs, then for whom.
+    const [role = "", ...party] = text.split(" · ");
+    return (
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ ...label, color: BLUE }}>{said(role, lang)}</div>
+        <div style={{ fontWeight: 700, minHeight: "21px" }}>{party.join(" · ")}</div>
+        <div style={{ position: "relative", height: "64px", borderBottom: `1px solid ${INK}` }}>
+          {ours && stamp && (
+            // eslint-disable-next-line @next/next/no-img-element -- a data URL from Settings, printed as is
+            <img
+              src={stamp}
+              alt="Company stamp"
+              style={{ position: "absolute", right: "12px", top: "-6px", width: "112px", height: "106px", objectFit: "contain", mixBlendMode: "multiply" }}
+            />
+          )}
+        </div>
+        {["Name:", "Title:", "Date:"].map((f) => (
+          <div key={f} style={{ display: "flex", alignItems: "flex-end", gap: "8px", marginTop: "8px" }}>
+            <span style={{ color: LABEL_GREY, flexShrink: 0, minWidth: "48px" }}>{said(f, lang)}</span>
+            <span style={{ flex: 1, borderBottom: `1px solid ${RULE}`, height: "16px" }} />
+          </div>
+        ))}
+      </div>
+    );
+  };
+  return (
+    <div style={{ display: "flex", gap: "48px", marginTop: "28px" }}>
+      {side(left, true)}
+      {right ? side(right, false) : <div style={{ flex: 1 }} />}
+    </div>
   );
 }
 

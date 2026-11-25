@@ -43,23 +43,6 @@ function Needed() {
   );
 }
 
-/** Two signature lines, each with who signs under it. */
-function Signatures({ left, right }: { left: string; right: string }) {
-  const one = (who: string) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ height: "42px", borderBottom: "1px solid #1A1A1A" }} />
-      <div style={{ marginTop: "6px", fontSize: "11.5px", color: "#444444" }}>{who}</div>
-      <div style={{ marginTop: "2px", fontSize: "11px", color: "#555555" }}>Name, signature and date</div>
-    </div>
-  );
-  return (
-    <div style={{ display: "flex", gap: "48px" }}>
-      {one(left)}
-      {one(right)}
-    </div>
-  );
-}
-
 type Row = PaperDoc["rows"][number];
 
 /**
@@ -128,7 +111,7 @@ export function PaperSheet({
       boxTitle={doc.boxTitle}
       bullets={doc.bullets.map((b) => (typeof b === "string" ? b : labelled(b.label, cell(b.value), lang)))}
       bank={doc.bank}
-      after={doc.signatures ? <Signatures left={doc.signatures.left} right={doc.signatures.right} /> : undefined}
+      signatures={doc.signatures}
       watermark={watermark}
       details={doc.details ?? null}
       lang={lang}

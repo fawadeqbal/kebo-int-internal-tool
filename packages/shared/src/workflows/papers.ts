@@ -531,7 +531,10 @@ export interface PaperDoc {
   boxTitle: string;
   bullets: (string | { label: string; value: PaperCell })[];
   bank: string | null;
-  /** Two signature lines (a contract, a handover). */
+  /**
+   * Who signs, "role · party" (a contract, a handover): the left is ours, with our seal; an empty right is a paper
+   * only we sign (a certificate, a bill, a letter).
+   */
   signatures: { left: string; right: string } | null;
   /**
    * Under the title, in place of the party's box: shipper and buyer, the bank by the payment route and the

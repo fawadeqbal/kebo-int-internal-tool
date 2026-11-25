@@ -1202,7 +1202,8 @@ function billOfExchange(c: PaperCtx): Built {
         `Value received, as per our commercial invoice ${ci}.`,
       ],
       bank: null,
-      signatures: { left: `For and on behalf of ${c.company.name}`, right: "Authorised signature" },
+      // Only we sign it: one signature block, ours.
+      signatures: { left: `For and on behalf of · ${c.company.name}`, right: "" },
     },
   };
 }
@@ -1243,7 +1244,8 @@ function beneficiaryCertificate(c: PaperCtx): Built {
             `The goods were shipped under LC No. ${b?.number ?? "______"}${b?.customerBank ? ` issued by ${b.customerBank}` : ""}.`,
           ],
       bank: null,
-      signatures: { left: `For and on behalf of ${c.company.name}`, right: "Authorised signature" },
+      // Only we sign it: one signature block, ours.
+      signatures: { left: `For and on behalf of · ${c.company.name}`, right: "" },
       details: detailsOf(c, true),
     },
   };
@@ -1328,7 +1330,8 @@ function coverLetter(c: PaperCtx): Built {
         `Customer: ${c.customer.name}.`,
       ],
       bank: c.settings.company.bankDetails || null,
-      signatures: { left: `For and on behalf of ${c.company.name}`, right: "Authorised signature" },
+      // Only we sign it: one signature block, ours.
+      signatures: { left: `For and on behalf of · ${c.company.name}`, right: "" },
     },
   };
 }
