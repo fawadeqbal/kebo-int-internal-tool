@@ -28,7 +28,11 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "./orders.service";
 import { DocumentsService, ORDER_DOCUMENTS, type OrderDocumentKind } from "./documents.service";
 
-const docQuery = z.object({ v: z.coerce.number().int().min(1).max(999).optional() });
+const docQuery = z.object({
+  v: z.coerce.number().int().min(1).max(999).optional(),
+  /** The packing list of one shipment (its packages only); none: the whole order's. */
+  shipment: z.uuid().optional(),
+});
 const flag = z.enum(["true", "false"]).optional().transform((v) => v === "true");
 const listQuery = z.object({
   mine: flag,
@@ -183,7 +187,7 @@ export class OrdersController {
     @Param("kind", Validate(z.enum(ORDER_DOCUMENTS))) kind: OrderDocumentKind,
     @Query(Validate(docQuery)) q: z.infer<typeof docQuery>,
   ) {
-    return this.documents.get(user, id, kind, q.v);
+    return this.documents.get(user, id, kind, q.v, q.shipment);
   }
 
   /** Make again: the next version as a draft (same number); the final one stays as it was printed. */

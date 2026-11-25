@@ -76,10 +76,24 @@ export class DocumentsService {
    * GET /orders/:id/documents/:kind?v= — the document to print: a final version as it was made (?v=, else
    * the latest), else made from the order now (not issued yet, or the next version's draft).
    */
-  async get(user: SessionUser, orderId: string, kind: OrderDocKind, v?: number) {
+  async get(user: SessionUser, orderId: string, kind: OrderDocKind, v?: number, shipmentId?: string) {
     if (!ORDER_DOCUMENTS.includes(kind)) throw new NotFoundError("Document");
     await this.orders.load(user, orderId);
     const c = await this.ctx();
+    // One shipment's packing list: printed from the order now (only the whole order's paper keeps versions).
+    if (shipmentId) {
+      const o = await this.prisma.db.order.findUniqueOrThrow({ where: { id: orderId }, include: orderDocInclude });
+      const live = buildOrderDoc(o, kind, { ...c, seeCosts: can(user, "sourcing.manage"), buyer: await buyerOf(this.prisma.db, o, c.today) }, { shipmentId });
+      const packed = live.lines.length > 0 && live.lines.every((l) => (l.packing?.packages ?? 0) > 0);
+      return {
+        ...live,
+        rebuiltOn: null,
+        watermark: o.status === "cancelled" ? "CANCELLED" : packed ? null : "DRAFT",
+        paper: null,
+        versions: [],
+        final: false,
+      };
+    }
     let o = await this.prisma.db.order.findUniqueOrThrow({ where: { id: orderId }, include: orderDocInclude });
     // Issued (or shipped) before snapshots were kept and not snapshotted yet: snapshot it now, from the data.
     if (o.papers.every((p) => p.kind !== kind) && (kind === "proforma" ? !!o.proformaNo : packingFinalNow(o))) {

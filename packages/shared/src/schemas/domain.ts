@@ -623,14 +623,14 @@ const blankTo = <T>(empty: T) => (v: unknown) => (v === "" || v === null || v ==
 const mm = z.preprocess(blankTo(null), z.coerce.number().int("Whole millimetres").min(1, "At least 1 mm").max(100_000).nullable());
 
 /**
- * One row of an item's packing, as the packing list prints it: the case number as marked, how many identical
- * cases, how they are packed, each case's size (mm) and the row's weights; the volume is worked out from the
- * size, else typed.
+ * One row of an item's packing, as the packing list prints it: the package number as marked, how many identical
+ * packages, how they are packed, each one's size (mm) and the row's weights (the volume is worked out from the
+ * size, else typed), what is in it and which shipment takes it.
  */
 export const lineCaseInput = z
   .object({
     caseNo: optionalText(20),
-    count: z.preprocess(blankTo(1), z.coerce.number().int("Whole cases only").min(1, "At least 1").max(1_000_000)),
+    count: z.preprocess(blankTo(1), z.coerce.number().int("Whole packages only").min(1, "At least 1").max(1_000_000)),
     packageType: z.string().trim().max(80).default("Carton").transform((v) => v || "Carton"),
     lengthMm: mm,
     widthMm: mm,
@@ -638,6 +638,10 @@ export const lineCaseInput = z
     netWeightKg: measure(10_000_000),
     grossWeightKg: measure(10_000_000),
     cbm: measure(100_000),
+    /** What is in it ("Main body"), when an item takes more than one package. */
+    contents: optionalText(120),
+    /** The shipment that takes it (one of the order's); empty: not given to one yet. */
+    shipmentId: optionalId,
   })
   .refine((c) => c.netWeightKg === null || c.grossWeightKg === null || c.netWeightKg <= c.grossWeightKg, {
     path: ["grossWeightKg"],

@@ -18,6 +18,7 @@ import {
   caseInput,
   caseKey,
   CasesEditor,
+  type CaseShipment,
   draftOf,
   draftVolume,
   PACKAGE_TYPES,
@@ -74,28 +75,30 @@ function packingSheet(lines: GoodsLine[], template: boolean): SheetSpec {
       ...CASE_FIELDS.map((f) => ({
         header: CASE_LABEL[f],
         kind: MODE_OF[f] === "text" ? ("text" as const) : ("number" as const),
-        width: f === "packageType" ? 22 : 10,
+        width: f === "packageType" || f === "contents" ? 22 : 10,
         choices: f === "packageType" ? PACKAGE_TYPES : undefined,
         note:
           f === "count"
-            ? "how many identical cases on this row"
+            ? "how many identical packages on this row"
             : f === "packageType"
               ? "pick one or type your own"
               : f === "cbm"
                 ? "worked out from L × W × H when they are given"
                 : f === "lengthMm"
-                  ? "each case's size, in mm"
-                  : undefined,
+                  ? "each package's size, in mm"
+                  : f === "contents"
+                    ? "when an item takes more than one package: Main body, Feeder…"
+                    : undefined,
       })),
     ],
     rows,
-    foot: template ? undefined : ["Total", null, null, null, null, null, total("packages"), null, null, null, null, total("netWeightKg"), total("grossWeightKg"), total("cbm")],
+    foot: template ? undefined : ["Total", null, null, null, null, null, total("packages"), null, null, null, null, null, total("netWeightKg"), total("grossWeightKg"), total("cbm")],
     template: template
       ? {
           help: [
-            "Packing list: fill in the packing of each item, a row per case (or per group of identical cases).",
-            "Keep the No. column: items are matched by their number. For an item in more cases, add a row under it with the same No.",
-            "Fill in Case No., Cases, Packed in, the size (L, W, H in mm), Net kg and Gross kg; the CBM is worked out from the size.",
+            "Packing list: fill in the packing of each item, a row per package (or per group of identical packages).",
+            "Keep the No. column: items are matched by their number. For an item in more packages, add a row under it with the same No.",
+            "Fill in Package No., Packages, Packed in, What is in it, the size (L, W, H in mm), Net kg and Gross kg; the CBM is worked out from the size.",
             "Upload the file with Excel › Upload a filled file. Nothing is saved until you press Save.",
           ],
         }
@@ -107,6 +110,7 @@ const MODE_OF: Record<CaseField, "text" | "number"> = {
   caseNo: "text",
   count: "number",
   packageType: "text",
+  contents: "text",
   lengthMm: "number",
   widthMm: "number",
   heightMm: "number",
@@ -120,6 +124,7 @@ const PACK_HEADINGS: Record<CaseField, string[]> = {
   caseNo: ["caseno", "case", "cno", "caseno.", "boxno", "packageno", "cartonno", "ctnno", "markno"],
   count: ["cases", "packages", "pkgs", "ctns", "cartons", "noofpackages", "qtyofpackages", "packagesqty", "noofcases"],
   packageType: ["packedin", "packagetype", "package", "packing", "packaging", "kindofpackages"],
+  contents: ["whatisinit", "contents", "content", "inside", "partname", "part"],
   lengthMm: ["lmm", "l", "length", "lengthmm"],
   widthMm: ["wmm", "w", "width", "widthmm"],
   heightMm: ["hmm", "h", "height", "heightmm"],
@@ -136,7 +141,7 @@ function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<stri
   const fill = new Map<string, CaseDraft[]>();
   const problems: string[] = [];
   if (noAt < 0) return { fill, problems, error: "No “No.” column in the file: items are matched by their number. Download the template from Excel › Download a template." };
-  if (CASE_FIELDS.every((f) => at[f] < 0)) return { fill, problems, error: "No packing columns (Cases, Packed in, sizes, Net kg, Gross kg, CBM) in the file." };
+  if (CASE_FIELDS.every((f) => at[f] < 0)) return { fill, problems, error: "No packing columns (Packages, Packed in, sizes, Net kg, Gross kg, CBM) in the file." };
   const byNo = new Map(lines.map((l) => [l.no, l]));
   read.rows.forEach((cells, r) => {
     const no = (cells[noAt] ?? "").trim().replace(/\.0+$/, "");
@@ -147,10 +152,26 @@ function packingFromSheet(read: ReadSheet, lines: GoodsLine[]): { fill: Map<stri
       problems.push(`Row ${r + 2}: no item ${no || "(empty No.)"} on this order`);
       return;
     }
-    const d: CaseDraft = { key: caseKey(), caseNo: "", count: "1", packageType: "Carton", lengthMm: "", widthMm: "", heightMm: "", netWeightKg: "", grossWeightKg: "", cbm: "" };
+    // The file says nothing of shipments: an item whose packages all went in one stays in it.
+    const was = line.packing.cases ?? [];
+    const shipmentId = was.length && was.every((c) => c.shipmentId && c.shipmentId === was[0]!.shipmentId) ? was[0]!.shipmentId! : "";
+    const d: CaseDraft = {
+      key: caseKey(),
+      caseNo: "",
+      count: "1",
+      packageType: "Carton",
+      contents: "",
+      lengthMm: "",
+      widthMm: "",
+      heightMm: "",
+      netWeightKg: "",
+      grossWeightKg: "",
+      cbm: "",
+      shipmentId,
+    };
     for (const f of given) {
       const t = cells[at[f]]!.trim();
-      if (MODE_OF[f] === "text") d[f] = t.slice(0, f === "caseNo" ? 20 : 80);
+      if (MODE_OF[f] === "text") d[f] = t.slice(0, f === "caseNo" ? 20 : f === "contents" ? 120 : 80);
       else {
         const v = sheetNumber(t);
         const whole = f === "count" || f === "lengthMm" || f === "widthMm" || f === "heightMm";
@@ -188,6 +209,7 @@ export function PackingCard({
   marksAction,
   links,
   edits,
+  shipments,
 }: {
   title: string;
   description?: string;
@@ -208,6 +230,8 @@ export function PackingCard({
   links?: { view: string; pdf: string };
   /** The order's saved edits ("Edited n×" on the lines and the marks). */
   edits?: EditsView;
+  /** The order's shipments: with more than one, each package says which takes it. */
+  shipments?: CaseShipment[];
 }) {
   // Read only, always: "Edit lines" opens them in the edit panel ("#edit-lines" too).
   const [editing, setEditing] = useState(false);
@@ -263,7 +287,7 @@ export function PackingCard({
               <p className="text-bad">{fromFile.error}</p>
             ) : (
               <p className="text-text-2">
-                {filled} item{filled === 1 ? "" : "s"} filled in from the file, case by case. Save them to the packing list?
+                {filled} item{filled === 1 ? "" : "s"} filled in from the file, package by package. Save them to the packing list?
               </p>
             )}
             {fromFile.problems.length > 0 && (
@@ -311,12 +335,13 @@ export function PackingCard({
         {editing && canEdit && (
           <SidePanel
             title="Edit packing list"
-            description="Each item's cases as the packing list prints them: case number, how packed, size (mm) and weights. Nothing is saved until Save the packing."
+            description="Each item's packages as the packing list prints them: package number, how packed, what is in it, size (mm) and weights. Nothing is saved until Save the packing."
             onClose={closeEditor}
             className={RULES.window.items}
           >
             <CasesEditor
               items={goods.map((g) => ({ id: g.id, no: g.no, description: g.description, quantity: g.quantity, unit: g.unit, cases: g.packing.cases ?? [] }))}
+              shipments={shipments}
               action={action}
               onDone={closeEditor}
             />

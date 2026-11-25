@@ -23,6 +23,10 @@ export interface CaseRow {
   grossWeightKg: number | null;
   /** Typed when the size is not known; worked out from the size when it is. */
   cbm: number | null;
+  /** What is in it, when an item takes more than one package ("Main body"). */
+  contents?: string | null;
+  /** The shipment that takes it; empty: not given to one yet. */
+  shipmentId?: string | null;
 }
 
 const round = (n: number, places: number) => Math.round(n * 10 ** places) / 10 ** places;
@@ -58,6 +62,56 @@ export function caseTotals(rows: CaseRow[]) {
     netWeightKg: sumOf(rows.map((r) => r.netWeightKg), 2),
     grossWeightKg: sumOf(rows.map((r) => r.grossWeightKg), 2),
     cbm: sumOf(rows.map(caseVolume), 3),
+  };
+}
+
+/* ---------------------------------------------------------------- packages and shipments */
+
+/**
+ * The door of a 40′ high cube container, mm: the largest package that goes in one. Bigger needs a flat rack or an
+ * open top (a press frame, a long dryer). Inside it is 12,032 mm long.
+ */
+export const CONTAINER_DOOR_MM = { width: 2340, height: 2585 } as const;
+export const CONTAINER_LENGTH_MM = 12032;
+
+/**
+ * Too big for a container: its two smaller sides do not pass the door (turned whichever way fits), or it is longer
+ * than the container. Unknown sizes are never too big.
+ */
+export function tooBigForContainer(c: Pick<CaseRow, "lengthMm" | "widthMm" | "heightMm">): boolean {
+  if (!c.lengthMm || !c.widthMm || !c.heightMm) return false;
+  const [long, mid, short] = [c.lengthMm, c.widthMm, c.heightMm].sort((a, b) => b - a) as [number, number, number];
+  return long > CONTAINER_LENGTH_MM || mid > CONTAINER_DOOR_MM.height || short > CONTAINER_DOOR_MM.width;
+}
+
+/**
+ * Which shipment takes a package: the one it was given to; with only one shipment, that one (nothing to choose).
+ * Null: not given to a shipment yet.
+ */
+export function shipmentOfCase(c: Pick<CaseRow, "shipmentId">, shipmentIds: string[]): string | null {
+  if (c.shipmentId && shipmentIds.includes(c.shipmentId)) return c.shipmentId;
+  return shipmentIds.length === 1 ? shipmentIds[0]! : null;
+}
+
+/** A shipment's packing: the totals of the packages it takes, and how many of them are too big for a container. */
+export function shipmentPacking(rows: CaseRow[], shipmentId: string, shipmentIds: string[]) {
+  const mine = rows.filter((r) => shipmentOfCase(r, shipmentIds) === shipmentId);
+  return { ...caseTotals(mine), rows: mine.length, tooBig: mine.filter(tooBigForContainer).reduce((s, r) => s + r.count, 0) };
+}
+
+/**
+ * What the Shipping tab warns about (never blocks): items with nothing packed, packages too big for a container,
+ * and, with more than one shipment, packages not given to one.
+ */
+export function packingWarnings(
+  items: { name: string; cases: CaseRow[] }[],
+  shipmentIds: string[],
+): { notPacked: string[]; tooBig: number; noShipment: number } {
+  const all = items.flatMap((i) => i.cases);
+  return {
+    notPacked: items.filter((i) => !i.cases.some((c) => c.count > 0)).map((i) => i.name),
+    tooBig: all.filter(tooBigForContainer).reduce((s, r) => s + r.count, 0),
+    noShipment: shipmentIds.length > 1 ? all.filter((c) => shipmentOfCase(c, shipmentIds) === null).reduce((s, r) => s + r.count, 0) : 0,
   };
 }
 

@@ -3,24 +3,29 @@ import Link from "next/link";
 import { Globe } from "lucide-react";
 import {
   can,
+  caseTotals,
   CURRENCIES,
   dayMonth,
   FREIGHT_TERMS,
   FREIGHT_TERMS_LABEL,
+  packingWarnings,
   portsOf,
   SHIP_MODE_LABEL,
   SHIP_MODES,
   shipByVsLc,
+  shipmentPacking,
   trackingLink,
+  type CaseRow,
   type FreightTerms,
   type OrderSection,
 } from "@kebo/shared";
-import { Badge, buttonClass, ButtonLink, cn, linkClass, Dash } from "@kebo/ui";
+import { Badge, buttonClass, ButtonLink, cn, linkClass, Dash, Notice } from "@kebo/ui";
 import { date, money } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
 import { orderPapersOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import type { ShipmentView } from "@/lib/types-flow";
+import type { LineCase } from "@/lib/types-orders";
 import type { DetailField } from "@/components/orders/step-view";
 import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
@@ -43,6 +48,16 @@ const COST_WHATS = ["Freight we pay (not “collect”) and the premium become c
 
 const has = (...v: (string | null | undefined)[]) => v.some((x) => x !== null && x !== undefined && x !== "");
 
+/** A package as the shared rules read it (numbers, not the API's strings). */
+const caseRow = (c: LineCase): CaseRow => ({
+  ...c,
+  netWeightKg: c.netWeightKg === null ? null : Number(c.netWeightKg),
+  grossWeightKg: c.grossWeightKg === null ? null : Number(c.grossWeightKg),
+  cbm: c.cbm === null ? null : Number(c.cbm),
+});
+const fmt = (n: number, places = 2) => n.toLocaleString("en-US", { maximumFractionDigits: places });
+const plural = (n: number, word: string) => `${fmt(n, 0)} ${word}${n === 1 ? "" : "s"}`;
+
 /**
  * Shipping (design "the order, final"): each shipment as small sections — booking, container and loading,
  * vessel and bill of lading, freight and insurance, arrival and customs — each with its own window and
@@ -64,6 +79,40 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
   const shipments: Partial<ShipmentView>[] = shipping?.shipments.length ? shipping.shipments : [fresh];
   const many = shipments.length > 1;
   const packGoods = goodsOf(o);
+  // Packing for machines (25 Nov 2026): each package says which shipment takes it; the Shipping tab warns, never
+  // blocks — items not packed, packages too big for a container, packages in no shipment.
+  const goodsLines = o.lines.filter((l) => l.type === "goods");
+  const shipIds = (shipping?.shipments ?? []).map((s) => s.id);
+  const packedItems = goodsLines.map((l) => ({ name: l.description.split(/\r?\n/)[0]!, no: l.no, cases: (l.packing?.cases ?? []).map(caseRow) }));
+  const allCases = packedItems.flatMap((i) => i.cases);
+  const warn = packingWarnings(packedItems, shipIds);
+  const beforeShipping = o.stage === "confirmed" || o.stage === "in_production";
+  const caseShipments = (shipping?.shipments ?? []).map((s, i) => ({ id: s.id, label: `${i + 1} · ${SHIP_MODE_LABEL[s.mode]}` }));
+  const editPacking = canEdit ? (
+    <Link href="#edit-lines" scroll={false}>
+      Edit the packing
+    </Link>
+  ) : undefined;
+  const packingNotice = d.open && allCases.length > 0 && (
+    <>
+      {beforeShipping && warn.notPacked.length > 0 && (
+        <Notice tone="todo" title={`${plural(warn.notPacked.length, "item")} not packed yet`} action={editPacking}>
+          {warn.notPacked.join(", ")}.
+        </Notice>
+      )}
+      {warn.tooBig > 0 && (
+        <Notice tone="todo" title={`${plural(warn.tooBig, "package")} too big for a container`}>
+          Wider or taller than a 40′ HC door ({fmt(2340)} × {fmt(2585)} mm) or longer than it: book a flat rack or an open top for{" "}
+          {warn.tooBig === 1 ? "it" : "them"}.
+        </Notice>
+      )}
+      {warn.noShipment > 0 && (
+        <Notice tone="todo" title={`${plural(warn.noShipment, "package")} in no shipment yet`} action={editPacking}>
+          Say which shipment takes {warn.noShipment === 1 ? "it" : "them"}.
+        </Notice>
+      )}
+    </>
+  );
   const advice = papers?.papers.find((p) => p.kind === "shipping-advice") ?? null;
   // As agreed; with nothing agreed, the booking's "To" (Shipment 1), so a booked port never shows as a dash.
   const agreedPort = o.agreed?.portOfDischarge ?? o.portOfDischarge;
@@ -192,6 +241,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
 
   return (
     <OrderPage id={id}>
+      {packingNotice}
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {instructions}
         {adviceBox}
@@ -302,8 +352,48 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
 
         const vesselTitle = air ? "Flight and air waybill" : "Vessel and bill of lading";
         const loadTitle = air ? "Handing over" : "Container and loading";
+        // What this shipment takes (packing for machines): its packages, volume and weight, and the ones too big
+        // for a container. A shipment not saved yet (the first, before anything is booked) takes them all.
+        const packed = s.id ? shipmentPacking(allCases, s.id, shipIds) : { ...caseTotals(allCases), tooBig: warn.tooBig };
+        const packedNames = packedItems
+          .filter((it) => (s.id ? !!shipmentPacking(it.cases, s.id, shipIds).packages : it.cases.length > 0))
+          .map((it) => `${it.no} ${it.name}`);
+        const packing: BoxPart = {
+          key: "packing",
+          title: "Packing",
+          word: packed.packages
+            ? packed.tooBig
+              ? { text: `${plural(packed.tooBig, "package")} for a flat rack`, tone: "warn" }
+              : { text: plural(packed.packages, "package"), tone: "ok" }
+            : null,
+          facts: packed.packages
+            ? [
+                ["Packages", plural(packed.packages, "package")],
+                ["Volume", packed.cbm !== null ? `${fmt(packed.cbm, 3)} m³` : null],
+                ["Gross", packed.grossWeightKg !== null ? `${fmt(packed.grossWeightKg)} kg` : null],
+                ["Net", packed.netWeightKg !== null ? `${fmt(packed.netWeightKg)} kg` : null],
+                ["Items", packedNames.join(" · ")],
+              ]
+            : [],
+          empty: many ? "No packages given to it yet." : "Nothing packed yet.",
+          action: (
+            <>
+              {many && s.id && packed.packages ? (
+                <ButtonLink href={`/print/orders/${o.id}/packing-list?shipment=${s.id}&back=/orders/${o.id}/shipping`} size="sm" variant="secondary">
+                  Packing list
+                </ButtonLink>
+              ) : null}
+              {canEdit && packGoods.length > 0 && (
+                <ButtonLink href="#edit-lines" size="sm" variant="secondary" scroll={false}>
+                  {packed.packages ? "Edit" : "Add"}
+                </ButtonLink>
+              )}
+            </>
+          ),
+        };
         // One box per shipment, a line per part, each with its own button (canvas board "Shipping", PartsBox).
         const parts: BoxPart[] = [
+          ...(packGoods.length > 0 ? [packing] : []),
           {
             key: "booking",
             title: "Booking",
@@ -457,6 +547,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           marksAction={packingMarksAction.bind(null, o.id)}
           links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
           edits={edits}
+          shipments={caseShipments}
         />
       )}
 

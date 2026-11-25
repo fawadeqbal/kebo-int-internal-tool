@@ -1398,9 +1398,16 @@ model OrderLineCase {
   netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
   grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
   cbm           Decimal?  @db.Decimal(10, 3)
+  /// What is in it, when an item takes more than one package ("Main body", "Feeder and hopper").
+  contents      String?   @db.VarChar(120)
+  /// The shipment that takes it (packing for machines, 25 Nov 2026): an order sent in more than one lot packs each
+  /// lot apart. Empty: not given to a shipment yet (with one shipment, it goes in that one).
+  shipmentId    String?   @map("shipment_id") @db.Uuid
+  shipment      Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
 
   @@index([lineId])
   @@index([companyId])
+  @@index([shipmentId])
   @@map("order_line_cases")
 }
 
@@ -1678,6 +1685,8 @@ model Shipment {
   clearedOn            DateTime?      @map("cleared_on") @db.Date
   createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  /// The packages it takes.
+  cases                OrderLineCase[]
 
   documents OrderDocument[]
 

@@ -14,6 +14,8 @@ type Stored = {
   netWeightKg: { toString(): string } | null;
   grossWeightKg: { toString(): string } | null;
   cbm: { toString(): string } | null;
+  contents?: string | null;
+  shipmentId?: string | null;
 };
 
 const num = (d: { toString(): string } | null) => (d === null ? null : Number(d.toString()));
@@ -29,6 +31,8 @@ export const caseRowOf = (r: Stored): CaseRow => ({
   netWeightKg: num(r.netWeightKg),
   grossWeightKg: num(r.grossWeightKg),
   cbm: num(r.cbm),
+  contents: r.contents ?? null,
+  shipmentId: r.shipmentId ?? null,
 });
 
 /** A row for the screens and papers: weights to 2 places, volume to 3, as the line's own packing. */
@@ -44,6 +48,8 @@ export const caseView = (r: Stored) => {
     netWeightKg: c.netWeightKg === null ? null : c.netWeightKg.toFixed(2),
     grossWeightKg: c.grossWeightKg === null ? null : c.grossWeightKg.toFixed(2),
     cbm: c.cbm === null ? null : c.cbm.toFixed(3),
+    contents: c.contents ?? null,
+    shipmentId: c.shipmentId ?? null,
   };
 };
 export type CaseView = ReturnType<typeof caseView>;
@@ -68,6 +74,8 @@ export async function setLineCases(tx: Tx, lineId: string, rows: CaseRow[]) {
         netWeightKg: r.netWeightKg,
         grossWeightKg: r.grossWeightKg,
         cbm: caseVolume(r),
+        contents: r.contents ?? null,
+        shipmentId: r.shipmentId ?? null,
       })),
     });
   const t = caseTotals(rows);
@@ -108,6 +116,9 @@ export function rowsFromTotals(
       netWeightKg: p.netWeightKg,
       grossWeightKg: p.grossWeightKg,
       cbm: p.cbm,
+      // One row in place of several: it stays in the shipment they all went in, if they went in one.
+      contents: null,
+      shipmentId: current.length > 0 && current.every((c) => c.shipmentId && c.shipmentId === current[0]!.shipmentId) ? current[0]!.shipmentId! : null,
     },
   ];
 }

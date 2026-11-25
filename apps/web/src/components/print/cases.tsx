@@ -71,7 +71,17 @@ export const caseColumns = (lang: DocLang): DocColumn<CaseLine>[] => [
       if (!r.c) return "";
       const zh = lang === "zh" ? zhTerm(r.c.packageType) : null;
       const many = r.c.count > 1 ? `${r.c.count} × ` : "";
-      return overZh(`${many}${r.c.packageType}`, zh && `${many}${zh}`);
+      const packed = overZh(`${many}${r.c.packageType}`, zh && `${many}${zh}`);
+      // What is in it, under the package ("Compression unit").
+      return r.c.contents ? (
+        <>
+          {packed}
+          <br />
+          {r.c.contents}
+        </>
+      ) : (
+        packed
+      );
     },
   },
   size("L (mm)", (c) => c.lengthMm),

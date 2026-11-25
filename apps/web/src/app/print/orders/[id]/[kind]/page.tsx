@@ -38,7 +38,7 @@ const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE"
 const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
 
 /** A paper the app makes: ?v= a version, ?opts= options to preview, ?ref= which payment, plan item or factory. */
-type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string; lang?: string };
+type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string; lang?: string; shipment?: string };
 const paperQuery = (sp: PaperQuery) =>
   Object.fromEntries(
     (["v", "opts", "ref", "now"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,200}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
@@ -49,9 +49,11 @@ async function getPaper(id: string, kind: PaperKind, sp: PaperQuery) {
   return load(() => api.get<PaperDocView>(`/orders/${id}/papers/${kind}/doc`, paperQuery(sp)));
 }
 
-async function getDoc(id: string, kind: string, v?: string) {
+/** ?v= a version; ?shipment= one shipment's packing list (its packages only). */
+async function getDoc(id: string, kind: string, v?: string, shipment?: string) {
   if (!KINDS.includes(kind as OrderDocumentKind) || !UUID.test(id)) notFound();
-  return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`, v && /^\d{1,3}$/.test(v) ? { v } : undefined));
+  const q = shipment && UUID.test(shipment) ? { shipment } : v && /^\d{1,3}$/.test(v) ? { v } : undefined;
+  return load(() => api.get<OrderDocument>(`/orders/${id}/documents/${kind}`, q));
 }
 
 /** "Proforma invoice KEB… · version 2", "(draft)", and a snapshot rebuilt from the data says so (the toolbar only, never the paper). */
@@ -74,7 +76,7 @@ export async function generateMetadata({
     const p = await getPaper(id, kind, sp);
     return { title: `${p.label} ${p.doc.number}${p.final ? "" : " (draft)"}` };
   }
-  const d = await getDoc(id, kind, sp.v);
+  const d = await getDoc(id, kind, sp.v, sp.shipment);
   const copy = copyOf(d.kind, sp.copy);
   return {
     title: `${d.title} ${d.number ?? "(draft)"}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${copy === "internal" ? " (internal)" : copy === "customs" ? " (China customs)" : ""}`,
@@ -102,7 +104,7 @@ export default async function OrderDocumentPrint({
 }) {
   const [{ id, kind }, sp] = await Promise.all([params, searchParams]);
   if (isPaperKind(kind)) return <PaperPrint id={id} kind={kind} sp={sp} />;
-  const d = await getDoc(id, kind, sp.v);
+  const d = await getDoc(id, kind, sp.v, sp.shipment);
   // The buyer as on the order (frozen when it was made; a final version keeps the one it was printed with).
   const customer = d.customer;
   const o = d.order;

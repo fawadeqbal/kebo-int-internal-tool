@@ -211,6 +211,10 @@ export interface LineCase {
   netWeightKg: string | null;
   grossWeightKg: string | null;
   cbm: string | null;
+  /** What is in it ("Main body"); none on papers made before 25 Nov 2026. */
+  contents?: string | null;
+  /** The shipment that takes it; empty: not given to one yet. */
+  shipmentId?: string | null;
 }
 
 export interface LinePacking {

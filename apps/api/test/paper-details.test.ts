@@ -178,4 +178,43 @@ describe("papers in the customer's format", () => {
     await api(app, sana).put(`/orders/${orderId}/cases`, { lines: [{ lineId, cases: [] }] }).expect(200);
     expect((await order()).lines.find((l: { id: string }) => l.id === lineId).packing).toMatchObject({ packages: null, cbm: null, cases: [] });
   });
+  it("packing for machines: each package says what is in it and which shipment takes it", async () => {
+    const flow = async () => (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
+    await api(app, sana).post(`/orders/${orderId}/shipments`, { mode: "air", status: "planned" }).expect(201);
+    const [sea, air] = (await flow()).shipping.shipments.map((s: { id: string }) => s.id);
+    const press = { count: 1, packageType: "Crate", lengthMm: 6100, widthMm: 2650, heightMm: 3100, netWeightKg: 5100, grossWeightKg: 5600 };
+    const parts = { count: 4, packageType: "Carton", lengthMm: 600, widthMm: 400, heightMm: 400, netWeightKg: 72, grossWeightKg: 88 };
+    await api(app, sana)
+      .put(`/orders/${orderId}/cases`, {
+        lines: [{ lineId, cases: [{ ...press, caseNo: "1", contents: "Compression unit", shipmentId: sea }, { ...parts, caseNo: "2-5", contents: "Punches and dies", shipmentId: air }] }],
+      })
+      .expect(200);
+    const cases = (await order()).lines.find((l: { id: string }) => l.id === lineId).packing.cases;
+    expect(cases).toEqual([
+      expect.objectContaining({ contents: "Compression unit", shipmentId: sea }),
+      expect.objectContaining({ contents: "Punches and dies", shipmentId: air }),
+    ]);
+
+    // Each shipment's packing list prints only its packages, numbered after the order's.
+    const whole = await packingList();
+    const one = (await api(app, sana).get(`/orders/${orderId}/documents/packing-list?shipment=${air}`).expect(200)).body;
+    expect(one.number).toBe(`${whole.number}-2`);
+    expect(one.lines).toHaveLength(1);
+    expect(one.lines[0].packing).toMatchObject({ packages: 4, grossWeightKg: "88.00", cbm: "0.384" });
+    expect(one.lines[0].packing.cases).toEqual([expect.objectContaining({ caseNo: "2-5", contents: "Punches and dies" })]);
+    expect(one.packing.totals).toMatchObject({ packages: 4, grossWeightKg: "88.00" });
+    expect(one.shipment.mode).toBe("air");
+    expect(whole.packing.totals.packages).toBe(5);
+
+    // A shipment of another order, or one that is not there, is refused.
+    await api(app, sana)
+      .put(`/orders/${orderId}/cases`, { lines: [{ lineId, cases: [{ ...parts, shipmentId: "00000000-0000-4000-8000-000000000000" }] }] })
+      .expect(400);
+    await api(app, sana).get(`/orders/${orderId}/documents/packing-list?shipment=00000000-0000-4000-8000-000000000000`).expect(404);
+
+    // A shipment taken away: its packages are in none (they stay on the packing list).
+    await api(app, sana).delete(`/shipments/${air}`).expect(200);
+    const after = (await order()).lines.find((l: { id: string }) => l.id === lineId).packing.cases;
+    expect(after[1]).toMatchObject({ contents: "Punches and dies", shipmentId: null });
+  });
 });
