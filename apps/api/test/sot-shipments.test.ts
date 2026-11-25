@@ -173,7 +173,8 @@ describe("the shipment is the shipment", () => {
     expect(ci.doc.date).toBe(day(-40));
     const advice = await paperDoc(o.id, "shipping-advice");
     expect(advice.doc.meta).toContainEqual({ label: "B/L No.", value: "MEDU124" });
-    expect(advice.doc.bullets).toContainEqual({ label: "Port of loading:", value: "Ningbo" });
+    // The ports print in the details under the title (papers in the customer's format, 25 Nov 2026).
+    expect(advice.doc.details.shipping).toMatchObject({ portOfLoading: "Ningbo" });
     // The document set's B/L row prints the shipment's number.
     const list = (await api(app, sana).get(`/orders/${o.id}/papers`).expect(200)).body.papers as { kind: string; number: string | null }[];
     expect(list.find((p) => p.kind === "bill_of_lading")).toMatchObject({ number: "MEDU124" });

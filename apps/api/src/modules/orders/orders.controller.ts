@@ -13,6 +13,8 @@ import {
   orderDetailsInput,
   orderLineInput,
   packingInput,
+  lineCasesInput,
+  type LineCasesInput,
   receiptInput,
   type MoveStageInput,
   type OrderDetailsInput,
@@ -127,7 +129,17 @@ export class OrdersController {
     return this.orders.recordReceipt(user, id, body);
   }
 
-  /** { containerNo?, shippingMarks?, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } — the packing list. */
+  /**
+   * { lines: [{ lineId, cases: [{ caseNo, count, packageType, lengthMm, widthMm, heightMm, netWeightKg, grossWeightKg, cbm }] }] }
+   * — the packing case by case (the items' totals follow).
+   */
+  @SignedIn("checked inside: orders.update")
+  @Put(":id/cases")
+  cases(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(lineCasesInput)) body: LineCasesInput) {
+    return this.orders.saveCases(user, id, body);
+  }
+
+  /** { containerNo?, shippingMarks?, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } — the packing list as totals. */
   @SignedIn("checked inside: orders.update, sourcing.manage")
   @Put(":id/packing")
   packing(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(packingInput)) body: PackingInput) {

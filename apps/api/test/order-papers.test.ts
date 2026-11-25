@@ -236,14 +236,16 @@ describe("order documents", () => {
     await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/fix`, { field: "blNo", value: "COSU-NEW-1" }).expect(200);
     const after = await doc("commercial-invoice");
     expect(after.doc).toEqual(before.doc);
-    expect(after.doc.meta[1]).toEqual({ label: "B/L No.", value: "COSU6281734510" });
+    // The LC number, once known, prints in the details under the title: beside the date only the B/L.
+    expect(after.doc.meta).toEqual([{ label: "B/L No.", value: "COSU6281734510" }]);
+    expect(after.doc.details.bank).toMatchObject({ kind: "lc", number: "LC/HBL/2026/118" });
 
     const again = (await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/again`, {}).expect(201)).body as Checks;
     expect(again.paper).toMatchObject({ version: 2, status: "draft", number: before.doc.number });
     expect(again.versions.map((v) => v.status)).toEqual(["final", "draft"]);
     const v2 = await doc("commercial-invoice");
     expect(v2).toMatchObject({ final: false, watermark: "DRAFT" });
-    expect(v2.doc.meta[1]).toEqual({ label: "B/L No.", value: "COSU-NEW-1" });
+    expect(v2.doc.meta).toEqual([{ label: "B/L No.", value: "COSU-NEW-1" }]);
     expect((await doc("commercial-invoice", "?v=1")).doc).toEqual(before.doc);
     await api(app, sana).get(`/orders/${orderId}/papers/commercial-invoice/doc?v=9`).expect(404);
     await api(app, sana).post(`/orders/${orderId}/papers/commercial-invoice/again`, {}).expect(400);

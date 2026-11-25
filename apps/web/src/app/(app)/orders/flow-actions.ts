@@ -1,5 +1,6 @@
 "use server";
 
+import { BANK_CONTRACT_FIELDS } from "@kebo/shared";
 import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { attempt, formBody, formValues, type ActionState } from "@/lib/actions";
@@ -40,7 +41,7 @@ export async function routeAction(orderId: string, _prev: ActionState, form: For
   return run(orderId, form, () => api.patch(`/orders/${orderId}/route`, body), "Payment route saved. The plan follows it.");
 }
 
-const CONTRACT = ["number", "status", "customerBank", "ourBank", "amount", "currency", "openedOn", "latestShipOn", "expiresOn", "note"];
+const CONTRACT: string[] = [...BANK_CONTRACT_FIELDS];
 export async function bankContractAction(orderId: string, _prev: ActionState, form: FormData) {
   return run(orderId, form, () => api.put(`/orders/${orderId}/bank-contract`, pick(form, CONTRACT)), "Saved.");
 }

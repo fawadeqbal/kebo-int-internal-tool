@@ -1178,94 +1178,94 @@ model QuoteLine {
 // ============================================================================
 
 model Order {
-  id               String            @id @default(uuid()) @db.Uuid
+  id                 String            @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId        String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company          Company           @relation(fields: [companyId], references: [id])
+  companyId          String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company            Company           @relation(fields: [companyId], references: [id])
   /// SO-2026-0001
-  refNo            String            @map("ref_no") @db.VarChar(30)
-  inquiryId        String            @map("inquiry_id") @db.Uuid
-  inquiry          Inquiry           @relation(fields: [inquiryId], references: [id])
-  revisionId       String            @unique @map("revision_id") @db.Uuid
-  revision         QuotationRevision @relation(fields: [revisionId], references: [id])
-  customerId       String            @map("customer_id") @db.Uuid
-  customer         Party             @relation("OrderCustomer", fields: [customerId], references: [id])
-  status           OrderStatus       @default(open)
-  stage            OrderStage        @default(confirmed)
+  refNo              String            @map("ref_no") @db.VarChar(30)
+  inquiryId          String            @map("inquiry_id") @db.Uuid
+  inquiry            Inquiry           @relation(fields: [inquiryId], references: [id])
+  revisionId         String            @unique @map("revision_id") @db.Uuid
+  revision           QuotationRevision @relation(fields: [revisionId], references: [id])
+  customerId         String            @map("customer_id") @db.Uuid
+  customer           Party             @relation("OrderCustomer", fields: [customerId], references: [id])
+  status             OrderStatus       @default(open)
+  stage              OrderStage        @default(confirmed)
   /// When the order entered its current stage.
-  stageSince       DateTime          @default(now()) @map("stage_since") @db.Timestamptz
-  orderedOn        DateTime          @map("ordered_on") @db.Date
+  stageSince         DateTime          @default(now()) @map("stage_since") @db.Timestamptz
+  orderedOn          DateTime          @map("ordered_on") @db.Date
   /// The proforma invoice's number once issued, e.g. KEB260916TN07 (prefix, issue date, customer letters, the handler's count this year).
   /// An index only: the proforma itself is its OrderPaper rows (kind "proforma"), final with a snapshot; only issuing writes these.
-  proformaNo       String?           @map("proforma_no") @db.VarChar(40)
+  proformaNo         String?           @map("proforma_no") @db.VarChar(40)
   /// The customer's own PO number or reference for this order (given when they accepted the quotation).
-  customerRef      String?           @map("customer_ref") @db.VarChar(80)
+  customerRef        String?           @map("customer_ref") @db.VarChar(80)
   /// The day of the customer's own purchase order.
-  customerPoOn     DateTime?         @map("customer_po_on") @db.Date
+  customerPoOn       DateTime?         @map("customer_po_on") @db.Date
   /// Who the goods are consigned to, who is told on arrival, and where they are delivered (as printed).
-  consignee        String?
-  notifyParty      String?           @map("notify_party")
-  deliveryAddress  String?           @map("delivery_address")
-  proformaIssuedOn DateTime?         @map("proforma_issued_on") @db.Date
+  consignee          String?
+  notifyParty        String?           @map("notify_party")
+  deliveryAddress    String?           @map("delivery_address")
+  proformaIssuedOn   DateTime?         @map("proforma_issued_on") @db.Date
   /// The buyer as on the order (@kebo/shared BuyerSnapshot): taken when the order is made, printed on every paper of the
   /// order; "Refresh from customer" (with a reason) takes it again. Final papers keep the buyer they were printed with.
-  buyerSnapshot    Json?             @map("buyer_snapshot")
+  buyerSnapshot      Json?             @map("buyer_snapshot")
   /// The quotation's own payment text is printed on the papers even though the route now differs from what it said.
-  printQuotedTerms Boolean           @default(false) @map("print_quoted_terms")
+  printQuotedTerms   Boolean           @default(false) @map("print_quoted_terms")
   /// The last receipt and payment-request numbers given (RC-…-n, PR-…-n): numbers are given once and never reused.
-  lastReceiptNo    Int               @default(0) @map("last_receipt_no")
-  lastRequestNo    Int               @default(0) @map("last_request_no")
+  lastReceiptNo      Int               @default(0) @map("last_receipt_no")
+  lastRequestNo      Int               @default(0) @map("last_request_no")
   /// Ship date promised to the customer (ours: with an LC its latest shipment date is shown beside it, and a
   /// ship-by later than that is warned about). Worked out from the lead time agreed (leadDays from its moment)
   /// unless typed by hand (shipByTyped).
-  shipBy           DateTime?         @map("ship_by") @db.Date
+  shipBy             DateTime?         @map("ship_by") @db.Date
   /// The ship-by date was typed by hand: the lead time no longer moves it.
-  shipByTyped      Boolean           @default(false) @map("ship_by_typed")
+  shipByTyped        Boolean           @default(false) @map("ship_by_typed")
   // Agreed with the customer (design "terms that travel"): copied from the accepted quotation, changed here after.
   /// The quotation's terms were copied into the order when it was accepted: its papers print the order's copy
   /// (an older order has none: its papers read its quotation, as before).
-  termsCopied      Boolean           @default(false) @map("terms_copied")
+  termsCopied        Boolean           @default(false) @map("terms_copied")
   /// The lead time promised, as days from a moment: after_payment (the deposit) | after_order | after_drawings.
-  leadDays         Int?              @map("lead_days")
-  leadFrom         String?           @map("lead_from")
+  leadDays           Int?              @map("lead_days")
+  leadFrom           String?           @map("lead_from")
   /// The warranty given: months from a moment (shipment | delivery | sat), and the words of what it covers.
-  warrantyMonths   Int?              @map("warranty_months")
-  warrantyFrom     String?           @map("warranty_from")
-  warrantyWords    String?           @map("warranty_words") @db.VarChar(300)
+  warrantyMonths     Int?              @map("warranty_months")
+  warrantyFrom       String?           @map("warranty_from")
+  warrantyWords      String?           @map("warranty_words") @db.VarChar(300)
   /// The conditions printed with the delivery and with the payment, and the notes printed last.
-  deliveryConditions String?         @map("delivery_conditions")
-  paymentConditions  String?         @map("payment_conditions")
-  conditionsNotes    String?         @map("conditions_notes")
+  deliveryConditions String?           @map("delivery_conditions")
+  paymentConditions  String?           @map("payment_conditions")
+  conditionsNotes    String?           @map("conditions_notes")
   // The ready date is each factory's (OrderFactory.readyOn); the order's is the latest of them (worked out).
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
-  documentTitle    String?           @map("document_title") @db.VarChar(200)
+  documentTitle      String?           @map("document_title") @db.VarChar(200)
   /// The contract destination, e.g. "Hairatan, Afghanistan": printed on the proforma and the contract, and the
   /// default port of discharge of a new shipment. Shipped on, the B/L and the container are the shipments'
   /// (Shipment 1 for the papers; shipped on = the earliest day one left), never the order's.
-  portOfDischarge  String?           @map("port_of_discharge") @db.VarChar(120)
+  portOfDischarge    String?           @map("port_of_discharge") @db.VarChar(120)
   /// When the packing list was filled in (null: not yet).
-  packedAt         DateTime?         @map("packed_at") @db.Timestamptz
-  shippingMarks    String?           @map("shipping_marks")
-  currency         String            @db.Char(3)
-  total            Decimal           @db.Decimal(14, 2)
-  depositPercent   Decimal           @map("deposit_percent") @db.Decimal(5, 2)
-  balanceTerms     BalanceTerms      @map("balance_terms")
-  incoterm         Incoterm
-  incotermPlace    String?           @map("incoterm_place") @db.VarChar(80)
+  packedAt           DateTime?         @map("packed_at") @db.Timestamptz
+  shippingMarks      String?           @map("shipping_marks")
+  currency           String            @db.Char(3)
+  total              Decimal           @db.Decimal(14, 2)
+  depositPercent     Decimal           @map("deposit_percent") @db.Decimal(5, 2)
+  balanceTerms       BalanceTerms      @map("balance_terms")
+  incoterm           Incoterm
+  incotermPlace      String?           @map("incoterm_place") @db.VarChar(80)
   /// The main currency when the order was made, and how many of the order's currency one unit of it bought
   /// (USD order, USD main: 1; CNY order: 7.1). Revenue and costs are turned into the main currency at this rate,
   /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
-  mainCurrency     String?           @map("main_currency") @db.Char(3)
-  mainRate         Decimal?          @map("main_rate") @db.Decimal(24, 14)
+  mainCurrency       String?           @map("main_currency") @db.Char(3)
+  mainRate           Decimal?          @map("main_rate") @db.Decimal(24, 14)
   /// When we placed the order with the factory.
-  factoryOrderedOn DateTime?         @map("factory_ordered_on") @db.Date
+  factoryOrderedOn   DateTime?         @map("factory_ordered_on") @db.Date
   /// The factory's own number for our order ("their order no.").
-  factoryOrderNo   String?           @map("factory_order_no") @db.VarChar(60)
-  closedAt         DateTime?         @map("closed_at") @db.Timestamptz
-  createdById      String            @map("created_by") @db.Uuid
-  createdBy        User              @relation("OrderCreator", fields: [createdById], references: [id])
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  factoryOrderNo     String?           @map("factory_order_no") @db.VarChar(60)
+  closedAt           DateTime?         @map("closed_at") @db.Timestamptz
+  createdById        String            @map("created_by") @db.Uuid
+  createdBy          User              @relation("OrderCreator", fields: [createdById], references: [id])
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   lines        OrderLine[]
   stageChanges OrderStageChange[]
@@ -1348,9 +1348,10 @@ model OrderLine {
   /// How many have come in from the factory so far (goods lines), and when last.
   receivedQty        Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
   receivedOn         DateTime? @map("received_on") @db.Date
-  /// The packing list, filled in before shipping (goods lines).
+  /// The packing list, filled in before shipping (goods lines): the totals of its cases (OrderLineCase), kept
+  /// here so every screen that adds up packages, weights and volume reads one place.
   packages           Int?
-  packageType        String?   @map("package_type") @db.VarChar(40)
+  packageType        String?   @map("package_type") @db.VarChar(80)
   netWeightKg        Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
   grossWeightKg      Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
   cbm                Decimal?  @db.Decimal(10, 3)
@@ -1360,11 +1361,41 @@ model OrderLine {
   deliveredCondition String?   @map("delivered_condition")
   deliveryNote       String?   @map("delivery_note") @db.VarChar(200)
 
+  /// How it is packed, case by case (the packing list's rows).
+  cases OrderLineCase[]
+
   @@index([orderId])
   @@index([factoryId])
   @@index([companyId])
   @@index([quoteLineId])
   @@map("order_lines")
+}
+
+/// One row of a goods line's packing (the packing list prints a row each): the case number as marked on it, how
+/// it is packed, its size and its weights. `count` identical cases can share a row: the size is each case's, the
+/// weights and volume the row's total. The volume is worked out from the size when it is given (L × W × H).
+model OrderLineCase {
+  id            String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId     String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company   @relation(fields: [companyId], references: [id])
+  lineId        String    @map("line_id") @db.Uuid
+  line          OrderLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  sortOrder     Int       @default(0) @map("sort_order")
+  /// As marked on the case ("1", "3-4", "A1"); empty: the item's number is printed.
+  caseNo        String?   @map("case_no") @db.VarChar(20)
+  count         Int       @default(1)
+  packageType   String    @default("Carton") @map("package_type") @db.VarChar(80)
+  lengthMm      Int?      @map("length_mm")
+  widthMm       Int?      @map("width_mm")
+  heightMm      Int?      @map("height_mm")
+  netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
+  grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
+  cbm           Decimal?  @db.Decimal(10, 3)
+
+  @@index([lineId])
+  @@index([companyId])
+  @@map("order_line_cases")
 }
 
 /// A cost between the factory's price basis and the one we sold on (EXW → CFR: to the port, sea freight…),
@@ -1528,27 +1559,31 @@ model OrderCancellation {
 }
 
 model OrderBankContract {
-  id           String             @id @default(uuid()) @db.Uuid
+  id                  String             @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId    String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company      Company            @relation(fields: [companyId], references: [id])
-  orderId      String             @unique @map("order_id") @db.Uuid
-  order        Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  companyId           String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company             Company            @relation(fields: [companyId], references: [id])
+  orderId             String             @unique @map("order_id") @db.Uuid
+  order               Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   /// The contract or LC number.
-  number       String?            @db.VarChar(60)
-  status       BankContractStatus @default(draft)
+  number              String?            @db.VarChar(60)
+  status              BankContractStatus @default(draft)
   /// The customer's bank (where the documents go) and ours (where they start).
-  customerBank String?            @map("customer_bank") @db.VarChar(160)
-  ourBank      String?            @map("our_bank") @db.VarChar(160)
-  amount       Decimal?           @db.Decimal(14, 2)
-  currency     String?            @db.Char(3)
-  openedOn     DateTime?          @map("opened_on") @db.Date
+  customerBank        String?            @map("customer_bank") @db.VarChar(160)
+  /// The customer's bank's address: the papers' "Notify bank" prints it under the bank's name.
+  customerBankAddress String?            @map("customer_bank_address") @db.VarChar(300)
+  ourBank             String?            @map("our_bank") @db.VarChar(160)
+  /// The bank's own reference for the LC or contract (e.g. AD1090926000595), printed beside its number.
+  reference           String?            @db.VarChar(60)
+  amount              Decimal?           @db.Decimal(14, 2)
+  currency            String?            @db.Char(3)
+  openedOn            DateTime?          @map("opened_on") @db.Date
   /// LC: the last day to ship, and when it expires.
-  latestShipOn DateTime?          @map("latest_ship_on") @db.Date
-  expiresOn    DateTime?          @map("expires_on") @db.Date
-  note         String?
-  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  latestShipOn        DateTime?          @map("latest_ship_on") @db.Date
+  expiresOn           DateTime?          @map("expires_on") @db.Date
+  note                String?
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
   @@index([companyId])
   @@map("order_bank_contracts")
@@ -2305,6 +2340,7 @@ model Company {
   orderDocuments      OrderDocument[]
   orderBankSteps      OrderBankStep[]
   satChecks           SatCheck[]
+  orderLineCases      OrderLineCase[]
   orderClaims         OrderClaim[]
   moneyMovements      MoneyMovement[]
   orderFactories      OrderFactory[]

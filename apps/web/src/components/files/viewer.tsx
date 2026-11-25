@@ -25,6 +25,8 @@ import { Button, buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
 import { useIsPhone, FloatingMenu } from "@/components/common/floating";
 import { useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
+import { LANG_WORD } from "@/components/print/toolbar";
+import type { DocLang } from "@/components/print/zh";
 import { toast } from "@kebo/ui/client";
 
 /* ---------------------------------------------------------------- what is shown */
@@ -232,6 +234,7 @@ interface PaperInfo {
   pdfHref: string;
   excelHref?: string;
   copies?: { current: "customer" | "internal"; customer: string; internal: string };
+  languages?: { current: DocLang; en: string; zh: string };
 }
 
 function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; onMove: (at: number) => void; onClose: () => void }) {
@@ -297,7 +300,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
         setPaperOf((p) => ({
           ...(p?.key === key ? p : null),
           key,
-          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, copies: d.copies },
+          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, copies: d.copies, languages: d.languages },
         }));
     };
     const key = given.key;
@@ -402,6 +405,27 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
                 })}
               </div>
             )}
+            {paper?.languages && (
+              <div role="group" aria-label="Language" className="flex rounded-[10px] bg-surface-2 p-0.5">
+                {(["en", "zh"] as const).map((k) => {
+                  const on = paperHref ? paperHref === paper.languages![k] : paper.languages!.current === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setPaperHref(paper.languages![k])}
+                      className={cn(
+                        "h-8 rounded-lg px-2.5 text-md",
+                        on ? "bg-surface font-semibold shadow-card" : "text-text-2 hover:text-text",
+                      )}
+                    >
+                      {LANG_WORD[k]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {download && (
               <a href={download} download={kind === "paper" ? undefined : file.name} className={buttonClass("secondary", "md")}>
                 <Download aria-hidden /> {kind === "paper" ? "Download PDF" : "Download"}
@@ -458,6 +482,11 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
                     onClick={() => setPaperHref(paper.copies![k])}
                     close={() => setMore(false)}
                   />
+                ))}
+              {phone &&
+                paper?.languages &&
+                (["en", "zh"] as const).map((k) => (
+                  <MenuItem key={k} label={LANG_WORD[k]} onClick={() => setPaperHref(paper.languages![k])} close={() => setMore(false)} />
                 ))}
               {actions.map((x) => (
                 <MenuItem key={x.label} label={x.label} danger={x.danger} onClick={x.onClick} close={() => setMore(false)} />

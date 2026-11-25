@@ -7,7 +7,9 @@ import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
 import type { PaperDocView } from "@/lib/types-papers";
 import { PaperSheet } from "@/components/print/paper";
 import { PrintToolbar } from "@/components/print/toolbar";
-import { backTo } from "@/components/print/data";
+import { backTo, langLinks, pdfIn } from "@/components/print/data";
+import { docLangOf, type DocLang } from "@/components/print/zh";
+import { CASE_COLUMNS, CaseTotals, casesOf, kg, m3 } from "@/components/print/cases";
 import { getSettings } from "@/lib/loaders";
 import {
   docDate,
@@ -28,22 +30,16 @@ import {
 import { UUID } from "@/lib/ids";
 
 /** The print page for the customer's or the internal copy, keeping where Back goes. */
-const copyHref = (path: string, back: string | undefined, internal: boolean, v?: string | null) =>
-  `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}) })}`;
+const copyHref = (path: string, back: string | undefined, internal: boolean, v: string | null | undefined, lang: DocLang) =>
+  `${path}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}), ...(lang === "zh" ? { lang } : {}) })}`;
 
 const KINDS: readonly OrderDocumentKind[] = ["proforma", "packing-list"];
-
-/** Weights with up to 2 decimals and volume with up to 3; blank when not recorded. */
-const kg = (v: string | null | undefined) =>
-  v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const m3 = (v: string | null | undefined) =>
-  v === null || v === undefined ? "" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 
 const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", "packing-list": "PACKING  LIST" };
 const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
 
 /** A paper the app makes: ?v= a version, ?opts= options to preview, ?ref= which payment, plan item or factory. */
-type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string };
+type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string; lang?: string };
 const paperQuery = (sp: PaperQuery) =>
   Object.fromEntries(
     (["v", "opts", "ref", "now"] as const).flatMap((k) => (sp[k] && /^[\w,.-]{1,200}$/.test(sp[k]!) ? [[k, sp[k]!]] : [])),
@@ -114,21 +110,26 @@ export default async function OrderDocumentPrint({
   const internal = !packing && sp.copy === "internal";
   const costs = internal && d.lines.some((l) => l.unitCost != null);
   const unitPrices = !packing && (await getSettings()).sales.quoteUnitPrices;
+  const lang = docLangOf(sp.lang);
 
   const toolbar = (
     <PrintToolbar
       title={docTitle(d)}
       backHref={backTo(sp.back, `/orders/${o.id}`)}
-      pdfHref={`/pdf/${d.kind}/${o.id}${internal || v ? `?${new URLSearchParams({ ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}) })}` : ""}`}
+      pdfHref={pdfIn(
+        `/pdf/${d.kind}/${o.id}${internal || v ? `?${new URLSearchParams({ ...(internal ? { copy: "internal" } : {}), ...(v ? { v } : {}) })}` : ""}`,
+        lang,
+      )}
       copies={
         packing
           ? undefined
           : {
               current: internal ? "internal" : "customer",
-              customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false, v),
-              internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true, v),
+              customer: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, false, v, lang),
+              internal: copyHref(`/print/orders/${o.id}/${d.kind}`, sp.back, true, v, lang),
             }
       }
+      languages={langLinks(`/print/orders/${o.id}/${d.kind}`, sp, lang)}
     />
   );
 
@@ -189,19 +190,25 @@ export default async function OrderDocumentPrint({
       : [];
 
   // The packing list prints its shipment's ports (versions made before that print what they printed: from the terms).
-  const ports = portBullets(o.incoterm, o.incotermPlace, o.portOfDischarge, packing ? d.shipment : null);
+  // The ports and origin are in the details under the title; versions made before them print them here.
+  const details = d.details ?? null;
+  const ports = details ? [] : portBullets(o.incoterm, o.incotermPlace, o.portOfDischarge, packing ? d.shipment : null, lang);
   const pk = d.packing;
+  const tradeTerm = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
   const bullets = packing
     ? [
-        pk?.containerNo ? labelled("Container No.:", pk.containerNo) : null,
-        pk?.shippingMarks ? labelled("Shipping marks:", `\n${pk.shippingMarks}`) : null,
-        o.blNo ? labelled("B/L No.:", o.blNo) : null,
-        o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null,
+        // As the customer's own packing list ends: the payment and the trade term.
+        d.paymentLine ? labelled("Payment:", d.paymentLine, lang) : null,
+        details ? labelled("Trade term:", tradeTerm, lang) : null,
+        pk?.containerNo ? labelled("Container No.:", pk.containerNo, lang) : null,
+        pk?.shippingMarks ? labelled("Shipping marks:", `\n${pk.shippingMarks}`, lang) : null,
+        o.blNo ? labelled("B/L No.:", o.blNo, lang) : null,
+        o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn), lang) : null,
         ...ports,
-        "Country of origin: China",
+        details ? null : "Country of origin: China",
       ]
     : [
-        o.customerRef ? labelled("Your order No.:", o.customerRef) : null,
+        o.customerRef ? labelled("Your order No.:", o.customerRef, lang) : null,
         d.paymentSentence,
         ...textBullets(d.paymentTermsText),
         o.leadTime ? `Delivery: ${o.leadTime}` : null,
@@ -209,16 +216,20 @@ export default async function OrderDocumentPrint({
         ...textBullets(d.deliveryTermsText),
         ...textBullets(d.notes),
         ...ports,
-        o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn)) : null,
-        o.blNo ? labelled("B/L No.:", o.blNo) : null,
+        o.shippedOn ? labelled("Shipped on:", docDate(o.shippedOn), lang) : null,
+        o.blNo ? labelled("B/L No.:", o.blNo, lang) : null,
       ];
+
+  // The packing list case by case, in the customer's format (25 Nov 2026): a row per case, each item over its
+  // cases. Versions made before the cases print as they were (a row per item).
+  const caseRows = packing && pk && d.lines.every((l) => l.packing?.cases) ? casesOf(d.lines) : null;
+  const caseTotal = caseRows && pk ? <CaseTotals rows={caseRows} totals={pk.totals} lang={lang} /> : null;
 
   const packingTotals =
     packing && pk ? (
       <tr style={{ breakInside: "avoid" }}>
         <td colSpan={3} style={{ ...docFootCell(), paddingLeft: 0 }}>
-          Total:{" "}
-          {d.lines.length} item{d.lines.length === 1 ? "" : "s"}
+          Total: {d.lines.length} item{d.lines.length === 1 ? "" : "s"}
           {pk.totals.packages > 0 ? `, ${pk.totals.packages} packages` : ""}
         </td>
         <td style={docFootCell()}>{pk.totals.packages || ""}</td>
@@ -283,31 +294,39 @@ export default async function OrderDocumentPrint({
       </>
     ) : null;
 
+  const doc = {
+    brand: await docBrand(),
+    company: d.company,
+    customer,
+    title: TITLE[d.kind],
+    numberLabel: NUMBER_LABEL[d.kind],
+    number: d.number ?? "DRAFT",
+    date: d.date,
+    // The packing list names its invoice, as the customer's own does.
+    meta:
+      d.kind === "proforma"
+        ? []
+        : [{ label: "Order NO.", value: o.refNo }, ...(o.proformaNo ? [{ label: "Invoice No.", value: o.proformaNo }] : [])],
+    heading: o.documentTitle,
+    sums,
+    total: t ? { label: totalPriceLabel(o.incoterm, d.lines), words: docWords(t.total, c), amount: docMoney(t.total, c) } : null,
+    // Payment, delivery, warranty and packing words: "Terms", not all under "Payment terms" (O-29).
+    boxTitle: packing ? "Shipping details:" : "Terms:",
+    bullets: bullets.filter(Boolean),
+    bank: packing ? null : d.bankDetails,
+    internal: internalPart,
+    watermark: d.watermark,
+    details,
+    lang,
+  };
   return (
     <>
       {toolbar}
-      <KeboDoc
-        brand={await docBrand()}
-        company={d.company}
-        customer={customer}
-        title={TITLE[d.kind]}
-        numberLabel={NUMBER_LABEL[d.kind]}
-        number={d.number ?? "DRAFT"}
-        date={d.date}
-        meta={d.kind === "proforma" ? [] : [{ label: "Order NO.", value: o.refNo }]}
-        heading={o.documentTitle}
-        columns={columns}
-        rows={d.lines}
-        sums={sums}
-        total={t ? { label: totalPriceLabel(o.incoterm, d.lines), words: docWords(t.total, c), amount: docMoney(t.total, c) } : null}
-        foot={packingTotals}
-        // Payment, delivery, warranty and packing words: "Terms", not all under "Payment terms" (O-29).
-        boxTitle={packing ? "Shipping details:" : "Terms:"}
-        bullets={bullets.filter(Boolean)}
-        bank={packing ? null : d.bankDetails}
-        internal={internalPart}
-        watermark={d.watermark}
-      />
+      {caseRows ? (
+        <KeboDoc {...doc} columns={CASE_COLUMNS} rows={caseRows} foot={caseTotal} />
+      ) : (
+        <KeboDoc {...doc} columns={columns} rows={d.lines} foot={packingTotals} />
+      )}
     </>
   );
 }
@@ -322,7 +341,8 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
   const p = await getPaper(id, kind, sp);
   const q = new URLSearchParams(paperQuery(sp));
   q.delete("opts");
-  const pdf = `/pdf/${kind}/${id}${q.size ? `?${q}` : ""}`;
+  const lang = docLangOf(sp.lang);
+  const pdf = pdfIn(`/pdf/${kind}/${id}${q.size ? `?${q}` : ""}`, lang);
   return (
     <>
       {sp.embed !== "1" && (
@@ -339,10 +359,11 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
                 : `/orders/${id}/papers/${kind}${sp.ref ? `?ref=${encodeURIComponent(sp.ref)}` : ""}`,
           )}
           pdfHref={pdf}
+          languages={langLinks(`/print/orders/${id}/${kind}`, sp, lang)}
         />
       )}
       <div className={sp.embed === "1" ? "pt-4" : undefined}>
-        <PaperSheet doc={p.doc} brand={await docBrand()} watermark={p.watermark} />
+        <PaperSheet doc={p.doc} brand={await docBrand()} watermark={p.watermark} lang={lang} />
       </div>
     </>
   );

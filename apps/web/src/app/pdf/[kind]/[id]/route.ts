@@ -146,6 +146,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     if ((kind === "revisions" || kind === "proforma") && new URL(req.url).searchParams.get("copy") === "internal") {
       target = { name: `${target.name} (internal)`, path: `${target.path}${target.path.includes("?") ? "&" : "?"}copy=internal` };
     }
+    // In English with Chinese beside the labels when asked for (English unless chosen).
+    if (new URL(req.url).searchParams.get("lang") === "zh")
+      target = { ...target, path: `${target.path}${target.path.includes("?") ? "&" : "?"}lang=zh` };
   } catch (e) {
     if (e instanceof ApiError)
       return new Response(e.status === 404 ? "Not found" : e.message, { status: e.status === 422 ? 404 : e.status });

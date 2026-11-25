@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { BankStepKind, ShipmentStatus } from "@kebo/shared";
+import { BANK_CONTRACT_FIELDS, type BankStepKind, type ShipmentStatus } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { attempt, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { OrderFlow, ShipmentView } from "@/lib/types-flow";
@@ -53,7 +53,7 @@ const SHIPMENT = [
   "customsDeclarationNo",
   "clearedOn",
 ];
-const CONTRACT = ["number", "status", "customerBank", "ourBank", "amount", "currency", "openedOn", "latestShipOn", "expiresOn", "note"];
+const CONTRACT: string[] = [...BANK_CONTRACT_FIELDS];
 const DELIVERY = ["deliveredOn", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy", "installedOn", "warrantyMonths"];
 const DETAILS = ["shipBy", "readyOn", "shippedOn", "blNo", "portOfDischarge", "containerNo", "shippingMarks", "documentTitle", "customerRef", "customerPoOn", "consignee", "notifyParty", "deliveryAddress"];
 

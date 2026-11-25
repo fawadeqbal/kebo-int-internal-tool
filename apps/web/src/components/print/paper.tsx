@@ -1,6 +1,19 @@
 import type { ReactNode } from "react";
 import type { PaperCell, PaperDoc } from "@kebo/shared";
-import { docDate, docFootCell, docItem, docMoney, docQty, docWords, KeboDoc, labelled, type DocBrand, type DocColumn } from "./kebo-doc";
+import {
+  docDate,
+  docFootCell,
+  docItem,
+  docMoney,
+  docQty,
+  docWords,
+  KeboDoc,
+  labelled,
+  said,
+  type DocBrand,
+  type DocColumn,
+} from "./kebo-doc";
+import type { DocLang } from "./zh";
 
 /** A table cell or a detail beside the title, as Kebo's documents print it. */
 function cell(v: PaperCell | undefined): ReactNode {
@@ -54,7 +67,17 @@ type Row = PaperDoc["rows"][number];
  * document template: the API sends the title, details, party, columns, rows,
  * total, terms and signatures; this only prints them.
  */
-export function PaperSheet({ doc, brand, watermark }: { doc: PaperDoc; brand: DocBrand | null; watermark: string | null }) {
+export function PaperSheet({
+  doc,
+  brand,
+  watermark,
+  lang = "en",
+}: {
+  doc: PaperDoc;
+  brand: DocBrand | null;
+  watermark: string | null;
+  lang?: DocLang;
+}) {
   const columns: DocColumn<Row>[] = doc.columns.map((c) => ({
     label: c.label,
     width: c.width,
@@ -68,7 +91,7 @@ export function PaperSheet({ doc, brand, watermark }: { doc: PaperDoc; brand: Do
     doc.foot && first > 0 ? (
       <tr style={{ breakInside: "avoid" }}>
         <td colSpan={first} style={{ ...docFootCell(), paddingLeft: 0 }}>
-          {doc.foot.label}
+          {said(doc.foot.label, lang)}
         </td>
         {doc.columns.slice(first).map((c, i, all) => (
           <td key={c.key} style={{ ...docFootCell(c.align), ...(i === all.length - 1 ? { paddingRight: 0 } : null) }}>
@@ -103,10 +126,12 @@ export function PaperSheet({ doc, brand, watermark }: { doc: PaperDoc; brand: Do
       }
       foot={foot}
       boxTitle={doc.boxTitle}
-      bullets={doc.bullets.map((b) => (typeof b === "string" ? b : labelled(b.label, cell(b.value))))}
+      bullets={doc.bullets.map((b) => (typeof b === "string" ? b : labelled(b.label, cell(b.value), lang)))}
       bank={doc.bank}
       after={doc.signatures ? <Signatures left={doc.signatures.left} right={doc.signatures.right} /> : undefined}
       watermark={watermark}
+      details={doc.details ?? null}
+      lang={lang}
     />
   );
 }

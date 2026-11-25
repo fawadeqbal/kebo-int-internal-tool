@@ -8,6 +8,8 @@ import {
   portsOf,
   routeAsAccepted,
   orderPaymentSentence,
+  paperDetailsOf,
+  paymentLineOf,
   warrantyLine,
   type BalanceTerms,
   type BuyerSnapshot,
@@ -21,6 +23,7 @@ import { buyerOf } from "./buyer";
 import { makeFinal } from "../documents/api";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
+import { caseRowsSelect, caseView } from "./line-cases";
 import { readyOnOf, readySelect } from "@kebo/database";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
@@ -58,8 +61,12 @@ export const orderDocInclude = {
           factoryQuoteLine: { select: { parentId: true } },
         },
       },
+      // The packing list prints each case (case number, package, size, weights).
+      cases: caseRowsSelect,
     },
   },
+  // The LC or bank contract: the packing list's "Notify bank".
+  bankContract: true,
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
   allocations: livePartsWithEntry,
@@ -111,6 +118,33 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
   const terms = termsOf(o);
   const quoted = quotedTermsPrinted(o);
   const b = c.buyer;
+  const bc = o.bankContract;
+  const ports = portsOf(o, ship.primary);
+  // Under the title (design "papers in the customer's format", 25 Nov 2026): shipper, buyer, the bank by the
+  // route (the packing list; the proforma is what the LC is opened against) and the shipping.
+  const details = paperDetailsOf({
+    company: c.settings.company,
+    buyer: b,
+    route: terms.route,
+    withBank: goodsOnly,
+    contract: bc
+      ? { number: bc.number, reference: bc.reference, customerBank: bc.customerBank, customerBankAddress: bc.customerBankAddress, openedOn: fromDbDateOrNull(bc.openedOn) }
+      : null,
+    proformaIssuedOn: fromDbDateOrNull(o.proformaIssuedOn),
+    ports,
+    hsCodes: o.lines.filter((l) => l.type === "goods").map((l) => l.hsCode),
+  });
+  const plan = o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) }));
+  const paymentSentence = orderPaymentSentence({
+    depositPercent,
+    terms,
+    accepted: o.balanceTerms,
+    quote: rev,
+    plan,
+    totalMinor: decimalToMinor(o.total),
+  });
+  const parts = plan.filter((r) => r.amountMinor > 0);
+  const paymentTerms = paymentTermsOf(depositPercent, balanceTermsOf(terms, o.balanceTerms));
 
   return {
     kind,
@@ -145,24 +179,30 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       warranty: warrantyLine({ warrantyMonths: o.warrantyMonths ?? null, warrantyFrom: o.warrantyFrom ?? null, warranty: o.warrantyWords ?? null }),
       /** The customer's own order number, when they gave one. */
       customerRef: o.customerRef ?? null,
+      /** The proforma's number once issued: the packing list names it as its invoice. */
+      proformaNo: o.proformaNo,
     },
     /**
      * The packing list: the shipment it goes with (Shipment 1), its ports as the papers print them (its own,
      * else from the terms). Versions made before this was so have none (they printed the order's).
      */
-    shipment: goodsOnly
-      ? { mode: ship.primary?.mode ?? "sea", ...portsOf(o, ship.primary) }
-      : null,
-    paymentTerms: paymentTermsOf(depositPercent, balanceTermsOf(terms, o.balanceTerms)),
+    shipment: goodsOnly ? { mode: ship.primary?.mode ?? "sea", ...ports } : null,
+    paymentTerms,
     /** The payment terms from the route, e.g. "Our usual payment is made by 30% Advance deposit and 70% before shipment." */
-    paymentSentence: orderPaymentSentence({
-      depositPercent,
-      terms,
-      accepted: o.balanceTerms,
-      quote: rev,
-      plan: o.receivables.map((r) => ({ amountMinor: decimalToMinor(r.amount), part: r.part, dueRule: r.dueRule, dueDays: r.dueDays, dueOn: fromDbDateOrNull(r.dueOn) })),
-      totalMinor: decimalToMinor(o.total),
-    }),
+    paymentSentence,
+    /** Shipper, buyer, the bank by the route and the shipping, under the title (versions made before 25 Nov 2026 have none). */
+    details,
+    /** The packing list's "Payment:" line: "100% irrevocable LC at sight (LC No. …) Ref. No. …". */
+    paymentLine: goodsOnly
+      ? paymentLineOf({
+          depositPercent,
+          terms,
+          plainPlan: parts.length <= 1 || (parts.length === 2 && parts[0]!.part === "deposit" && parts[1]!.part === "balance"),
+          termsText: paymentTerms,
+          sentence: paymentSentence,
+          contract: bc ? { number: bc.number, reference: bc.reference } : null,
+        })
+      : null,
     currency: o.currency,
     showPrices: !goodsOnly,
     lines: lines.map((l, i) => ({
@@ -186,6 +226,8 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
             netWeightKg: l.netWeightKg?.toFixed(2) ?? null,
             grossWeightKg: l.grossWeightKg?.toFixed(2) ?? null,
             cbm: l.cbm?.toFixed(3) ?? null,
+            /** Case by case, as the packing list prints them (what the totals above add up). */
+            cases: l.cases.map(caseView),
           }
         : null,
     })),

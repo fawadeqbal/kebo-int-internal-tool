@@ -28,7 +28,7 @@ import { PartsBox, type BoxPart } from "@/components/records/parts-box";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { FieldsWindow } from "@/components/order-sections/fields-window";
 import { fieldsAction } from "../../light-actions";
-import { packingAction, packingMarksAction } from "../../actions";
+import { casesAction, packingMarksAction } from "../../actions";
 import { docHref, goodsOf } from "../shared";
 import { PackingCard } from "../goods";
 import { RemoveButton } from "@/components/orders/flow-forms";
@@ -453,10 +453,9 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
           shippingMarks={o.goods.shippingMarks}
           canEdit={canEdit}
           canUpload={canEdit && (o.stage === "confirmed" || o.stage === "in_production")}
-          action={packingAction.bind(null, o.id)}
+          action={casesAction.bind(null, o.id)}
           marksAction={packingMarksAction.bind(null, o.id)}
           links={o.goods.packed || o.goods.totals.packages > 0 ? docHref(o, { kind: "packing-list", label: "Packing list" }) : undefined}
-          today={now}
           edits={edits}
         />
       )}

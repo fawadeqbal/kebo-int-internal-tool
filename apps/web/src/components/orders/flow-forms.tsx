@@ -161,6 +161,9 @@ export function BankContractForm({ action, contract, lc, currency, onDone }: { a
               <Field label={lc ? "LC number" : "Contract number"} htmlFor="bc-number" optional error={s.errors?.number}>
                 <Input id="bc-number" name="number" maxLength={60} defaultValue={v("number")} />
               </Field>
+              <Field label="Bank reference" htmlFor="bc-ref" optional hint="Ref. No. on the papers" error={s.errors?.reference}>
+                <Input id="bc-ref" name="reference" maxLength={60} defaultValue={v("reference")} />
+              </Field>
               <Field label="Status" htmlFor="bc-status" error={s.errors?.status}>
                 <Select id="bc-status" name="status" defaultValue={v("status", "draft")}>
                   {BANK_CONTRACT_STATUSES.map((x) => (
@@ -182,6 +185,9 @@ export function BankContractForm({ action, contract, lc, currency, onDone }: { a
               </Field>
               <Field label="Customer's bank" htmlFor="bc-cbank" optional error={s.errors?.customerBank}>
                 <Input id="bc-cbank" name="customerBank" maxLength={160} defaultValue={v("customerBank")} />
+              </Field>
+              <Field label="Customer's bank address" htmlFor="bc-caddr" optional hint="Under the bank on the papers" error={s.errors?.customerBankAddress} className="sm:col-span-2">
+                <Input id="bc-caddr" name="customerBankAddress" maxLength={300} defaultValue={v("customerBankAddress")} />
               </Field>
               <Field label="Our bank" htmlFor="bc-obank" optional error={s.errors?.ourBank}>
                 <Input id="bc-obank" name="ourBank" maxLength={160} defaultValue={v("ourBank")} />

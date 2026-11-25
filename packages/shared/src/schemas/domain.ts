@@ -618,6 +618,41 @@ export const packingInput = z.object({
 });
 export type PackingInput = z.infer<typeof packingInput>;
 
+const blankTo = <T>(empty: T) => (v: unknown) => (v === "" || v === null || v === undefined ? empty : v);
+const mm = z.preprocess(blankTo(null), z.coerce.number().int("Whole millimetres").min(1, "At least 1 mm").max(100_000).nullable());
+
+/**
+ * One row of an item's packing, as the packing list prints it: the case number as marked, how many identical
+ * cases, how they are packed, each case's size (mm) and the row's weights; the volume is worked out from the
+ * size, else typed.
+ */
+export const lineCaseInput = z
+  .object({
+    caseNo: optionalText(20),
+    count: z.preprocess(blankTo(1), z.coerce.number().int("Whole cases only").min(1, "At least 1").max(1_000_000)),
+    packageType: z.string().trim().max(80).default("Carton").transform((v) => v || "Carton"),
+    lengthMm: mm,
+    widthMm: mm,
+    heightMm: mm,
+    netWeightKg: measure(10_000_000),
+    grossWeightKg: measure(10_000_000),
+    cbm: measure(100_000),
+  })
+  .refine((c) => c.netWeightKg === null || c.grossWeightKg === null || c.netWeightKg <= c.grossWeightKg, {
+    path: ["grossWeightKg"],
+    message: "The gross weight is less than the net",
+  });
+export type LineCaseInput = z.infer<typeof lineCaseInput>;
+
+/** The packing case by case: for each item sent, its rows (none: not packed yet); the other items stay as they are. */
+export const lineCasesInput = z.object({
+  lines: z
+    .array(z.object({ lineId: id("Each item must come from the order"), cases: z.array(lineCaseInput).max(500) }))
+    .min(1)
+    .max(300),
+});
+export type LineCasesInput = z.infer<typeof lineCasesInput>;
+
 const receivedQty = z.preprocess(
   (v) => (v === "" || v === null ? 0 : v),
   z.coerce

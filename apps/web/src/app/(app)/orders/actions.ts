@@ -131,9 +131,9 @@ export async function agreedAction(orderId: string, _prev: ActionState, form: Fo
   return r;
 }
 
-/** The packing list: payload { shippingMarks, lines: [{ lineId, packages, packageType, netWeightKg, grossWeightKg, cbm }] } (the container is the shipment's). */
-export async function packingAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/packing`, formBody(form)), "Packing list saved.");
+/** The packing case by case: payload { lines: [{ lineId, cases: [{ caseNo, count, packageType, lengthMm, widthMm, heightMm, netWeightKg, grossWeightKg, cbm }] }] }. */
+export async function casesAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/cases`, formBody(form)), "Packing list saved.");
   if (r.ok) refresh(orderId);
   return r;
 }

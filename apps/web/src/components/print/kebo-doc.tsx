@@ -1,7 +1,8 @@
 import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf } from "@kebo/shared";
+import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf, type PaperDetails } from "@kebo/shared";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
+import { zhOf, type DocLang } from "./zh";
 
 /**
  * Every Kebo document — quotation, proforma invoice and packing list — in one
@@ -140,26 +141,56 @@ export function portBullets(
   place: string | null,
   portOfDischarge?: string | null,
   shipment?: { portOfLoading: string | null; portOfDischarge: string | null } | null,
+  lang: DocLang = "en",
 ): ReactNode[] {
   const p = shipment ?? portsOf({ incoterm, incotermPlace: place, portOfDischarge: portOfDischarge ?? null });
   const loading = p.portOfLoading;
   const discharge = p.portOfDischarge;
   return [
-    loading ? <Labelled key="pol" label="Port of loading:" value={loading} /> : null,
-    discharge ? <Labelled key="pod" label="Port of discharge:" value={discharge} /> : null,
+    loading ? <Labelled key="pol" label="Port of loading:" value={loading} lang={lang} /> : null,
+    discharge ? <Labelled key="pod" label="Port of discharge:" value={discharge} lang={lang} /> : null,
   ].filter(Boolean);
 }
 
-function Labelled({ label: l, value }: { label: string; value: ReactNode; gap?: string }) {
+function Labelled({ label: l, value, lang }: { label: string; value: ReactNode; lang: DocLang }) {
   return (
     <>
-      {l} {value}
+      {said(l, lang)} {value}
     </>
   );
 }
 
-/** A list item with a label, e.g. "B/L No.: QDLOS-77". */
-export const labelled = (l: string, value: ReactNode, gap?: string) => <Labelled label={l} value={value} gap={gap} />;
+/** A list item with a label, e.g. "B/L No.: QDLOS-77" ("B/L No. 提单号: QDLOS-77" with Chinese). */
+export const labelled = (l: string, value: ReactNode, lang: DocLang = "en") => <Labelled label={l} value={value} lang={lang} />;
+
+/**
+ * A label in the paper's language: "Port of loading:", or with Chinese "Port of loading 装运港:". A label the
+ * dictionary does not have prints in English only.
+ */
+export function said(text: string, lang: DocLang): ReactNode {
+  const zh = lang === "zh" ? zhOf(text) : null;
+  if (!zh) return text;
+  const colon = /:\s*$/.test(text);
+  return (
+    <>
+      {text.replace(/\s*:\s*$/, "")} <span style={{ fontFamily: CJK, letterSpacing: 0 }}>{zh}</span>
+      {colon ? ":" : ""}
+    </>
+  );
+}
+
+/** A column's heading: with Chinese, the Chinese over the English ("箱号" over "Case No."), as the customer's own papers. */
+function headed(text: string, lang: DocLang): ReactNode {
+  const zh = lang === "zh" ? zhOf(text) : null;
+  return zh ? (
+    <>
+      <div style={{ fontFamily: CJK, letterSpacing: 0, textTransform: "none" }}>{zh}</div>
+      {text}
+    </>
+  ) : (
+    text
+  );
+}
 
 /** An item's description cell: the first line as its name, the rest (specs) and the model under it. */
 export function docItem(description: string, model?: string | null) {
@@ -213,6 +244,11 @@ export interface DocColumn<T> {
   /** Let a fixed-width column wrap (e.g. "2 Wooden boxes"). */
   wrap?: boolean;
   render: (row: T, index: number) => ReactNode;
+  /**
+   * How many rows this cell covers (the packing list's item over its cases): 1 by default; 0 for a row whose
+   * cell is covered by one above.
+   */
+  span?: (row: T, index: number) => number;
 }
 
 type Sum = { label: string; value: string };
@@ -242,6 +278,8 @@ export function KeboDoc<T>({
   watermark,
   brand = null,
   after,
+  details: particulars = null,
+  lang = "en",
 }: {
   company: CompanySnapshot;
   customer: CustomerSnapshot;
@@ -279,6 +317,10 @@ export function KeboDoc<T>({
   brand?: DocBrand | null;
   /** A section after the terms, e.g. a contract's two signature lines. */
   after?: ReactNode;
+  /** Under the title, in place of the customer's box: shipper, buyer, the bank by the route and the shipping. */
+  details?: PaperDetails | null;
+  /** English, or English with the Chinese beside each label. */
+  lang?: DocLang;
 }) {
   const address = customer.address?.trim() || (isUnknownCountry(customer.country) ? "" : countryName(customer.country));
   const width = (c: DocColumn<T>) => (c.width ? `${c.width}pt` : undefined);
@@ -290,15 +332,21 @@ export function KeboDoc<T>({
     company.address ? { icon: <IconPin />, text: company.address } : null,
   ].filter((x) => x !== null);
   const details = [{ label: "Date", value: docDate(date) as ReactNode }, ...meta.map((m) => ({ label: noColon(m.label), value: m.value }))];
-  const footLeft = company.taxNo ? `Business License No. ${company.taxNo}` : "";
+  const zh = (t: string) => (lang === "zh" ? zhOf(t) : null);
+  const footLeft = company.taxNo
+    ? `Business License No. ${zh("Business License No.") ? `${zh("Business License No.")} ` : ""}${company.taxNo}`
+    : "";
   // The company's own line at the bottom (Settings › Company › Invoice footer), else the usual thanks.
-  const thanks = company.invoiceFooter?.trim().replace(/\s*\n\s*/g, " · ") || "Thank you for your business";
+  const thanks =
+    company.invoiceFooter?.trim().replace(/\s*\n\s*/g, " · ") ||
+    `Thank you for your business${zh("Thank you for your business") ? ` · ${zh("Thank you for your business")}` : ""}`;
   const th = (c: DocColumn<T>, i: number): CSSProperties => ({
     ...label,
     color: TEXT_2,
     padding: i === 0 ? "8px 6px 8px 0" : i === columns.length - 1 ? "8px 0 8px 6px" : "8px 6px",
     textAlign: c.align ?? "left",
-    whiteSpace: "nowrap",
+    // A narrow column that wraps its cells wraps its heading too ("N.W. (kg)" over two lines).
+    whiteSpace: c.wrap ? "normal" : "nowrap",
   });
   const td = (c: DocColumn<T>, i: number): CSSProperties => ({
     padding: i === 0 ? "11px 6px 11px 0" : i === columns.length - 1 ? "11px 0 11px 6px" : "11px 6px",
@@ -418,58 +466,67 @@ ${paperZoomCss(".kebo-doc")}`}</style>
       {/* The title and number, with the date and details beside them */}
       <section style={{ marginTop: "30px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "24px" }}>
         <div>
-          <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "34px", color: NAVY, lineHeight: 1 }}>{titleCase(title)}</h1>
+          <h1 style={{ margin: 0, fontFamily: DISPLAY, fontWeight: 800, fontSize: "34px", color: NAVY, lineHeight: 1 }}>
+            {titleCase(title)}
+            {zh(titleCase(title)) && (
+              <span style={{ fontFamily: CJK, fontWeight: 700, fontSize: "24px", marginLeft: "12px" }}>{zh(titleCase(title))}</span>
+            )}
+          </h1>
           <div style={{ marginTop: "8px", fontSize: "13px", color: TEXT_2 }}>
-            {numberText(numberLabel)} <span style={{ color: INK, fontWeight: 600 }}>{number}</span>
+            {said(numberText(numberLabel), lang)} <span style={{ color: INK, fontWeight: 600 }}>{number}</span>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${details.length}, auto)`, gap: "22px", lineHeight: 1.45 }}>
           {details.map((d) => (
             <div key={d.label}>
-              <div style={{ ...label, color: LABEL_GREY }}>{d.label}</div>
+              <div style={{ ...label, color: LABEL_GREY }}>{said(d.label, lang)}</div>
               <div style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{d.value}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* The customer */}
-      <section
-        style={{
-          ...exact,
-          marginTop: "24px",
-          background: TINT,
-          borderRadius: "8px",
-          padding: "14px 18px",
-          display: "grid",
-          gridTemplateColumns: customer.taxNo || customer.regNo ? "repeat(2, minmax(0, 1fr))" : "1fr",
-          gap: "20px",
-          lineHeight: 1.5,
-          breakInside: "avoid",
-        }}
-      >
-        <div>
-          <div style={{ ...label, color: BLUE }}>{customer.label ?? "Prepared for"}</div>
-          <div style={{ fontWeight: 700, fontSize: "14px" }}>{customer.name}</div>
-          {address && <div style={{ whiteSpace: "pre-line" }}>{address}</div>}
-        </div>
-        {(customer.taxNo || customer.regNo) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {customer.taxNo && (
-              <div>
-                <div style={{ ...label, color: BLUE }}>Tax No.</div>
-                <div>{customer.taxNo}</div>
-              </div>
-            )}
-            {customer.regNo && (
-              <div>
-                <div style={{ ...label, color: BLUE }}>Reg. Number</div>
-                <div>{customer.regNo}</div>
-              </div>
-            )}
+      {/* The details (shipper, buyer, bank, shipping) on the trade papers; else the customer */}
+      {particulars ? (
+        <Details d={particulars} lang={lang} />
+      ) : (
+        <section
+          style={{
+            ...exact,
+            marginTop: "24px",
+            background: TINT,
+            borderRadius: "8px",
+            padding: "14px 18px",
+            display: "grid",
+            gridTemplateColumns: customer.taxNo || customer.regNo ? "repeat(2, minmax(0, 1fr))" : "1fr",
+            gap: "20px",
+            lineHeight: 1.5,
+            breakInside: "avoid",
+          }}
+        >
+          <div>
+            <div style={{ ...label, color: BLUE }}>{said(customer.label ?? "Prepared for", lang)}</div>
+            <div style={{ fontWeight: 700, fontSize: "14px" }}>{customer.name}</div>
+            {address && <div style={{ whiteSpace: "pre-line" }}>{address}</div>}
           </div>
-        )}
-      </section>
+          {(customer.taxNo || customer.regNo) && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {customer.taxNo && (
+                <div>
+                  <div style={{ ...label, color: BLUE }}>{said("Tax No.", lang)}</div>
+                  <div>{customer.taxNo}</div>
+                </div>
+              )}
+              {customer.regNo && (
+                <div>
+                  <div style={{ ...label, color: BLUE }}>{said("Reg. Number", lang)}</div>
+                  <div>{customer.regNo}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* The items */}
       <table style={{ marginTop: "24px", width: "100%", borderCollapse: "collapse", tableLayout: "fixed", lineHeight: 1.35 }}>
@@ -482,7 +539,7 @@ ${paperZoomCss(".kebo-doc")}`}</style>
           <tr style={{ borderBottom: `1.5px solid ${INK}` }}>
             {columns.map((c, i) => (
               <th key={c.label} style={th(c, i)}>
-                {c.label}
+                {headed(c.label, lang)}
               </th>
             ))}
           </tr>
@@ -509,17 +566,20 @@ ${paperZoomCss(".kebo-doc")}`}</style>
               )}
               {g.rows.map((r, i) => (
                 <tr key={i} style={{ breakInside: "avoid", borderBottom: `1px solid ${RULE}` }}>
-                  {columns.map((c, ci) => (
-                    <td key={c.label} style={td(c, ci)}>
-                      {c.render(r, i)}
-                    </td>
-                  ))}
+                  {columns.map((c, ci) => {
+                    const n = c.span ? c.span(r, i) : 1;
+                    return n === 0 ? null : (
+                      <td key={c.label} rowSpan={n > 1 ? n : undefined} style={td(c, ci)}>
+                        {c.render(r, i)}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
               {((g.sums ?? []).length > 0 || g.total) && (
                 <tr style={{ breakInside: "avoid" }}>
                   <td colSpan={columns.length} style={{ padding: "16px 0 0" }}>
-                    <Totals sums={g.sums ?? []} total={g.total ?? null} />
+                    <Totals sums={g.sums ?? []} total={g.total ?? null} lang={lang} />
                   </td>
                 </tr>
               )}
@@ -535,7 +595,7 @@ ${paperZoomCss(".kebo-doc")}`}</style>
           {/* Hidden on the Make window ("Terms and notes" off): no empty heading left behind. */}
           {bullets.length > 0 && (
             <div style={{ breakInside: "avoid", marginBottom: "16px" }}>
-              <div style={{ ...label, color: BLUE }}>{noColon(boxTitle)}</div>
+              <div style={{ ...label, color: BLUE }}>{said(noColon(boxTitle), lang)}</div>
               <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
                 {bullets.map((b, i) => (
                   <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
@@ -548,7 +608,7 @@ ${paperZoomCss(".kebo-doc")}`}</style>
           )}
           {bank && (
             <div style={{ breakInside: "avoid" }}>
-              <div style={{ ...label, color: BLUE }}>Bank details</div>
+              <div style={{ ...label, color: BLUE }}>{said("Bank details", lang)}</div>
               <div style={{ whiteSpace: "pre-line" }}>{bank}</div>
             </div>
           )}
@@ -588,15 +648,90 @@ ${paperZoomCss(".kebo-doc")}`}</style>
   );
 }
 
+/**
+ * Under the title on the trade papers (design "papers in the customer's format", 25 Nov 2026), in the light-blue
+ * box: who ships and who buys on the left; on the right the bank as the payment route has it (an LC's "Notify
+ * bank" with its number, reference, the proforma's date and the day it was issued; a bank contract's number and
+ * bank; nothing on an informal order) and the shipping (ports, HS code, origin). Empty lines are left out.
+ */
+function Details({ d, lang }: { d: PaperDetails; lang: DocLang }) {
+  const head = (t: string, first = false) => <div style={{ ...label, color: BLUE, marginTop: first ? 0 : "12px" }}>{said(t, lang)}</div>;
+  const line = (l: string, v: ReactNode) =>
+    v ? (
+      <div style={{ display: "flex", gap: "6px" }}>
+        <span style={{ color: LABEL_GREY, flexShrink: 0 }}>{said(l, lang)}</span>
+        <span style={{ minWidth: 0 }}>{v}</span>
+      </div>
+    ) : null;
+  const buyerAddress = d.buyer.address?.trim() || (isUnknownCountry(d.buyer.country) ? "" : countryName(d.buyer.country));
+  const b = d.bank;
+  return (
+    <section
+      style={{
+        ...exact,
+        marginTop: "24px",
+        background: TINT,
+        borderRadius: "8px",
+        padding: "14px 18px",
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gap: "24px",
+        lineHeight: 1.5,
+        breakInside: "avoid",
+      }}
+    >
+      <div>
+        {head("Shipper", true)}
+        <div style={{ fontWeight: 700 }}>{d.shipper.name}</div>
+        {d.shipper.address && <div style={{ whiteSpace: "pre-line" }}>{d.shipper.address}</div>}
+        {line("Contact No.", d.shipper.phone)}
+        {line("Licence No.", d.shipper.licenceNo)}
+        {head("Buyer")}
+        <div style={{ fontWeight: 700 }}>{d.buyer.name}</div>
+        {buyerAddress && <div style={{ whiteSpace: "pre-line" }}>{buyerAddress}</div>}
+        {line(d.buyer.taxLabel, d.buyer.taxNo)}
+        {line("Reg. Number", d.buyer.regNo)}
+      </div>
+      <div>
+        {b?.kind === "lc" && (
+          <>
+            {head("Notify bank", true)}
+            {line("LC No.", b.number && <strong>{b.number}</strong>)}
+            {line("Ref. No.", b.refNo && <strong>{b.refNo}</strong>)}
+            {line("Invoice date", b.invoiceDate && docDate(b.invoiceDate))}
+            {line("Date of issuance", b.issuedOn && docDate(b.issuedOn))}
+            {b.name && <div style={{ fontWeight: 700 }}>{b.name}</div>}
+            {b.address && <div style={{ whiteSpace: "pre-line" }}>{b.address}</div>}
+          </>
+        )}
+        {b?.kind === "contract" && (
+          <>
+            {head("Bank", true)}
+            {line("Contract No.", b.number && <strong>{b.number}</strong>)}
+            {line("Ref. No.", b.refNo)}
+            {b.name && <div style={{ fontWeight: 700 }}>{b.name}</div>}
+            {b.address && <div style={{ whiteSpace: "pre-line" }}>{b.address}</div>}
+          </>
+        )}
+        {head("Shipping", !b)}
+        {line("Port of loading", d.shipping.portOfLoading)}
+        {line("Port of discharge", d.shipping.portOfDischarge)}
+        {line("HS code", d.shipping.hsCode)}
+        {line("Origin", d.shipping.origin)}
+      </div>
+    </section>
+  );
+}
+
 /** The amount in words on the left; the sums and the total (in a navy bar) on the right. */
-function Totals({ sums, total }: { sums: Sum[]; total: Total | null }) {
+function Totals({ sums, total, lang }: { sums: Sum[]; total: Total | null; lang: DocLang }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: "24px", alignItems: "flex-start" }}>
       <div style={{ fontSize: "12px", color: TEXT_2, maxWidth: "340px", paddingTop: "6px" }}>{total?.words}</div>
       <div style={{ width: "290px", flexShrink: 0, fontSize: "13px" }}>
         {sums.map((s) => (
           <div key={s.label} style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "5px 0" }}>
-            <span style={{ color: TEXT_2 }}>{s.label}</span>
+            <span style={{ color: TEXT_2 }}>{said(s.label, lang)}</span>
             <span style={{ whiteSpace: "nowrap" }}>{s.value}</span>
           </div>
         ))}
@@ -615,7 +750,7 @@ function Totals({ sums, total }: { sums: Sum[]; total: Total | null }) {
               borderRadius: "6px",
             }}
           >
-            <span style={{ fontWeight: 600 }}>{noColon(total.label)}</span>
+            <span style={{ fontWeight: 600 }}>{said(noColon(total.label), lang)}</span>
             <span style={{ fontFamily: DISPLAY, fontWeight: 800, fontSize: "18px", whiteSpace: "nowrap" }}>{total.amount}</span>
           </div>
         )}
@@ -630,7 +765,7 @@ function Totals({ sums, total }: { sums: Sum[]; total: Total | null }) {
               ...(i === all.length - 1 ? { fontWeight: 700, borderTop: `1px solid ${RULE}`, marginTop: "4px", paddingTop: "8px" } : null),
             }}
           >
-            <span style={{ color: i === all.length - 1 ? undefined : TEXT_2 }}>{s.label}</span>
+            <span style={{ color: i === all.length - 1 ? undefined : TEXT_2 }}>{said(s.label, lang)}</span>
             <span style={{ whiteSpace: "nowrap" }}>{s.value}</span>
           </div>
         ))}

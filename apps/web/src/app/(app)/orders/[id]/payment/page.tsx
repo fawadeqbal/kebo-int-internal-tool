@@ -140,7 +140,8 @@ export default async function OrderPayment({ params }: { params: Promise<{ id: s
               cols={4}
               rows={[
                 { label: lc ? "LC no." : "Contract no.", value: contract.number },
-                { label: "Their bank", value: contract.customerBank },
+                { label: "Bank reference", value: contract.reference },
+                { label: "Their bank", value: [contract.customerBank, contract.customerBankAddress].filter(Boolean).join(", ") || null },
                 { label: "Our bank", value: contract.ourBank },
                 { label: "Amount", value: contract.amount !== null ? money(String(contract.amount), contract.currency ?? c) : null },
                 { label: "Opened on", value: contract.openedOn ? date(contract.openedOn) : null },

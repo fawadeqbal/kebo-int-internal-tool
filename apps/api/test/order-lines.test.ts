@@ -132,7 +132,15 @@ describe("order items, one at a time", () => {
 
   it("fills in the packing line by item; the list is made once every item has its packages", async () => {
     const one = (await patch(machine.id, { set: "packing", packages: "2", grossWeightKg: "4320", netWeightKg: "3900", cbm: "18.4" }).expect(200)).body;
-    expect(one.line.packing).toEqual({ packages: 2, packageType: "Carton", netWeightKg: "3900.00", grossWeightKg: "4320.00", cbm: "18.400" });
+    // Kept as one case row of those totals (no size yet): the packing list prints a row per case.
+    expect(one.line.packing).toEqual({
+      packages: 2,
+      packageType: "Carton",
+      netWeightKg: "3900.00",
+      grossWeightKg: "4320.00",
+      cbm: "18.400",
+      cases: [expect.objectContaining({ count: 2, packageType: "Carton", lengthMm: null, netWeightKg: "3900.00", cbm: "18.400" })],
+    });
     expect(one.goods.packed).toBe(false);
     const typed = (await patch(machine.id, { set: "packing", packageType: "Wooden case" }).expect(200)).body;
     expect(typed.line.packing.packageType).toBe("Wooden case");

@@ -6,7 +6,8 @@ import { docBrand, hasFeature, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
 import type { DocLine, RevisionDoc } from "@/lib/types-orders";
 import { PrintToolbar } from "@/components/print/toolbar";
-import { backTo, companyOr, customerOr } from "@/components/print/data";
+import { docLangOf, type DocLang } from "@/components/print/zh";
+import { backTo, companyOr, customerOr, langLinks, pdfIn } from "@/components/print/data";
 import {
   docDate,
   docItem,
@@ -23,8 +24,8 @@ import {
 } from "@/components/print/kebo-doc";
 import { getSettings } from "@/lib/loaders";
 
-const copyHref = (id: string, back: string | undefined, internal: boolean) =>
-  `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}) })}`;
+const copyHref = (id: string, back: string | undefined, internal: boolean, lang: DocLang) =>
+  `/print/revisions/${id}?${new URLSearchParams({ ...(back ? { back } : {}), ...(internal ? { copy: "internal" } : {}), ...(lang === "zh" ? { lang } : {}) })}`;
 const numberOf = (r: RevisionDoc) => `${r.quotation.refNo}-R${r.number}`;
 /** A draft is marked DRAFT across the page, except on the copy being sent to the customer (which is what sends it). */
 const draftMark = (status: string, sending: string | undefined) => (status === "draft" && sending !== "1" ? "DRAFT" : null);
@@ -51,7 +52,7 @@ export default async function QuotationPrint({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ back?: string; copy?: string; embed?: string; sending?: string }>;
+  searchParams: Promise<{ back?: string; copy?: string; embed?: string; sending?: string; lang?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const r = await load(() => api.get<RevisionDoc>(`/revisions/${id}`));
@@ -66,6 +67,7 @@ export default async function QuotationPrint({
   ]).then(([company, customer, settings]) => [company, customer, settings.company, settings.sales.quoteUnitPrices] as const);
   const c = r.currency;
   const internal = sp.copy === "internal";
+  const lang = docLangOf(sp.lang);
   // Its months from a moment and what it covers (an older quotation: its words as they are).
   const warranty = warrantyLine({ warrantyMonths: r.warrantyMonths ?? null, warrantyFrom: r.warrantyFrom ?? null, warranty: r.warranty });
   // Once the customer accepted one option, the quotation shows that one; before, every option.
@@ -135,13 +137,14 @@ export default async function QuotationPrint({
         <PrintToolbar
           title={`Quotation ${numberOf(r)}`}
           backHref={backTo(sp.back, `/inquiries/${r.quotation.inquiryId}/quotation`)}
-          pdfHref={`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`}
+          pdfHref={pdfIn(`/pdf/revisions/${r.id}${internal ? "?copy=internal" : ""}`, lang)}
           excelHref={(await hasFeature("excel")) ? `/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}` : undefined}
           copies={{
             current: internal ? "internal" : "customer",
-            customer: copyHref(r.id, sp.back, false),
-            internal: copyHref(r.id, sp.back, true),
+            customer: copyHref(r.id, sp.back, false, lang),
+            internal: copyHref(r.id, sp.back, true, lang),
           }}
+          languages={langLinks(`/print/revisions/${r.id}`, sp, lang)}
         />
       )}
       <KeboDoc
@@ -165,7 +168,7 @@ export default async function QuotationPrint({
           warranty ? (/^warranty/i.test(warranty) ? warranty : `Warranty: ${warranty}`) : null,
           single ? null : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
           ...textBullets(r.notes),
-          ...portBullets(r.incoterm, r.incotermPlace, r.portOfDischarge),
+          ...portBullets(r.incoterm, r.incotermPlace, r.portOfDischarge, null, lang),
           `This quotation is valid until ${docDate(r.validUntil)}.`,
         ].filter(Boolean)}
         internal={
@@ -195,6 +198,7 @@ export default async function QuotationPrint({
         }
         // ?sending=1: the copy attached to the email that sends a draft; it reaches the customer as the sent quotation.
         watermark={draftMark(r.status, sp.sending)}
+        lang={lang}
       />
     </>
   );
