@@ -14,8 +14,11 @@ const translateEnv = z.object({
   TRANSLATE_TIMEOUT_SECONDS: z.coerce.number().int().min(5).max(600).default(120),
 });
 
-/** The model's own settings for translating (its model card: 1.8B). */
-const SAMPLING = { temperature: 0.7, top_p: 0.6, top_k: 20, repeat_penalty: 1.05 };
+/**
+ * The model card's settings, with less chance in it (25 Nov 2026): the same kind of text comes out the same way,
+ * and the glossary's words are kept (tried on the client's packing list: 0.1 kept them, 0.7 sometimes did not).
+ */
+const SAMPLING = { temperature: 0.1, top_p: 0.6, top_k: 20, repeat_penalty: 1.05 };
 
 export type TranslatorState = "off" | "ready" | "starting" | "unreachable";
 

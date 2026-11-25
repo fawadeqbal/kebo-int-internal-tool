@@ -109,8 +109,11 @@ describe("papers in Chinese and the China customs copy (25 Nov 2026)", () => {
     expect(screen.getByTestId("zh").textContent).toContain("泡罩包装机");
     expect(screen.getByTestId("zh").textContent).toContain("速度 60次/分钟");
     expect(screen.getByTestId("zh").textContent).toContain("型号");
-    expect(docQty("2", "sets", "zh")).toBe("2 sets 套");
     expect(docQty("2", "sets")).toBe("2 sets");
+    // As the client's packing list: "1套" over "1 set", the item's Chinese over its English.
+    render(<div data-testid="qty">{docQty("1", "set", "zh")}</div>);
+    expect(screen.getByTestId("qty").textContent).toBe("1套1 set");
+    expect(screen.getByTestId("zh").textContent!.indexOf("泡罩包装机")).toBeLessThan(screen.getByTestId("zh").textContent!.indexOf("Blister machine"));
   });
 
   it("the details: ports and origin in Chinese, our Chinese name and address; China's HS codes on the customs copy", () => {

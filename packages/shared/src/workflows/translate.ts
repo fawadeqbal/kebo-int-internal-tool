@@ -46,24 +46,34 @@ export function glossaryOf(text: string | null | undefined): { en: string; zh: s
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * The glossary's words this text has (the company's first, then ours; longer words first, so "blister packing
- * machine" before "machine"), at most `max`.
+ * The glossary's words this text has, at most `max`: the company's first (its words win over ours), then ours;
+ * longer words first, so "vial capping machine" before "machine", and a word only where it stands outside one
+ * already taken.
  */
 export function termsFor(text: string, company: { en: string; zh: string }[] = [], max = 30): { en: string; zh: string }[] {
   const ours = Object.entries(ZH_GLOSSARY).map(([en, zh]) => ({ en, zh }));
   const seen = new Set<string>();
+  const taken: [number, number][] = [];
   const hits: { en: string; zh: string }[] = [];
-  for (const t of [...company, ...ours].sort((a, b) => b.en.length - a.en.length)) {
+  const longest = (list: { en: string; zh: string }[]) => [...list].sort((a, b) => b.en.length - a.en.length);
+  for (const t of [...longest(company), ...longest(ours)]) {
     const k = t.en.toLowerCase();
-    if (seen.has(k) || t.en.length < 2) continue;
+    // A word written the same in Chinese ("FFU") tells the translator nothing.
+    if (seen.has(k) || t.en.length < 2 || t.zh.toLowerCase() === k) continue;
     seen.add(k);
-    // As the text writes it ("Blister packing machine"), so the translator sees the same words.
-    const m = new RegExp(`(?:^|[^A-Za-z])(${escape(t.en)})(?:$|[^A-Za-z])`, "i").exec(text);
-    if (m) hits.push({ en: m[1]!, zh: t.zh });
+    const re = new RegExp(`(?:^|[^A-Za-z])(${escape(t.en)})(?=$|[^A-Za-z])`, "gi");
+    let found: string | null = null;
+    for (const m of text.matchAll(re)) {
+      const at = m.index! + m[0].length - m[1]!.length;
+      const span: [number, number] = [at, at + m[1]!.length];
+      if (taken.some(([a, b]) => span[0] < b && a < span[1])) continue;
+      taken.push(span);
+      // As the text writes it ("Vial capping machine"), so the translator sees the same words.
+      found ??= m[1]!;
+    }
+    if (found) hits.push({ en: found, zh: t.zh });
   }
-  // The company's own first when the list is cut.
-  const mine = new Set(company.map((t) => t.en.toLowerCase()));
-  return hits.sort((a, b) => Number(mine.has(b.en.toLowerCase())) - Number(mine.has(a.en.toLowerCase()))).slice(0, max);
+  return hits.slice(0, max);
 }
 
 /** What the translation model is asked (its own Chinese template, with the glossary's words first). */

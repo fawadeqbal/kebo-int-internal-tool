@@ -1,6 +1,6 @@
 import type { LineCase, OrderDocument } from "@/lib/types-orders";
 import { zhTerm } from "@kebo/shared";
-import { docFootCell, docItem, docQty, said, withZh, type DocColumn } from "./kebo-doc";
+import { docFootCell, docItem, docQty, overZh, type DocColumn } from "./kebo-doc";
 import type { DocLang } from "./zh";
 
 /**
@@ -67,7 +67,12 @@ export const caseColumns = (lang: DocLang): DocColumn<CaseLine>[] => [
     label: "Package",
     width: 70,
     wrap: true,
-    render: (r) => (r.c ? withZh(r.c.count > 1 ? `${r.c.count} × ${r.c.packageType}` : r.c.packageType, lang, () => (lang === "zh" ? zhTerm(r.c!.packageType) : null)) : ""),
+    render: (r) => {
+      if (!r.c) return "";
+      const zh = lang === "zh" ? zhTerm(r.c.packageType) : null;
+      const many = r.c.count > 1 ? `${r.c.count} × ` : "";
+      return overZh(`${many}${r.c.packageType}`, zh && `${many}${zh}`);
+    },
   },
   size("L (mm)", (c) => c.lengthMm),
   size("W (mm)", (c) => c.widthMm),
@@ -93,12 +98,9 @@ export function CaseTotals({
   return (
     <tr style={{ breakInside: "avoid" }}>
       <td colSpan={3} style={{ ...docFootCell(), paddingLeft: 0 }}>
-        {said("Total", lang)}
+        {overZh("Total", lang === "zh" ? "合计" : null)}
       </td>
-      <td style={docFootCell()}>
-        {n > 0 ? `${n} ${word}` : ""}
-        {n > 0 && lang === "zh" ? ` · ${n} ${cases ? "箱" : "件"}` : ""}
-      </td>
+      <td style={docFootCell()}>{n > 0 ? overZh(`${n} ${word}`, lang === "zh" ? `${n}${cases ? "箱" : "件"}` : null) : ""}</td>
       <td colSpan={3} style={docFootCell()} />
       <td style={docFootCell("right")}>{Number(totals.cbm) ? m3(totals.cbm) : ""}</td>
       <td style={docFootCell("right")}>{Number(totals.netWeightKg) ? kg(totals.netWeightKg) : ""}</td>
