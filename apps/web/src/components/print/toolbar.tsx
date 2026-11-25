@@ -17,6 +17,7 @@ export function PrintToolbar({
   pdfHref,
   excelHref,
   choices = [],
+  note,
 }: {
   title: string;
   backHref: string;
@@ -25,6 +26,8 @@ export function PrintToolbar({
   excelHref?: string;
   /** Which copy and the language (paperChoices): the same switches the app's viewer draws. */
   choices?: PaperChoice[];
+  /** A word on screen only (e.g. the translator still writing some of the Chinese). */
+  note?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -39,12 +42,13 @@ export function PrintToolbar({
         pdfHref: abs(pdfHref),
         excelHref: excelHref && abs(excelHref),
         choices: choices.map((c) => ({ ...c, options: c.options.map((o) => ({ ...o, href: abs(o.href) })) })),
+        note,
       },
       window.location.origin,
     );
     // The switches are new objects on every render: compared by what they say.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, pdfHref, excelHref, JSON.stringify(choices)]);
+  }, [title, pdfHref, excelHref, JSON.stringify(choices), note]);
   return (
     <div className="no-print sticky [html[data-embedded]_&]:hidden top-0 z-20 mb-6 border-b border-[#d0d7e2] bg-white/90 backdrop-blur">
       <div className="mx-auto flex w-[210mm] max-w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-[#16151c]">
@@ -111,6 +115,11 @@ export function PrintToolbar({
           </Button>
         </div>
       </div>
+      {note && (
+        <p role="status" className="mx-auto w-[210mm] max-w-full px-3 pb-2 text-sm text-[#7a5a00]">
+          {note}
+        </p>
+      )}
     </div>
   );
 }

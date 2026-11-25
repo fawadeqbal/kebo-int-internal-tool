@@ -1404,6 +1404,36 @@ model OrderLineCase {
   @@map("order_line_cases")
 }
 
+/// The translator's memory (25 Nov 2026): each English text the papers print once, with its Chinese and who wrote
+/// it (the translator, to be checked, or a person: a person's always wins). Waiting texts are translated by the
+/// worker, one by one, on the server's own translator (docker-compose: translate).
+model Translation {
+  id          String    @id @default(uuid()) @db.Uuid
+  /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
+  companyId   String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company     Company   @relation(fields: [companyId], references: [id])
+  /// sha256 of the text as kept (textKey): one row per text.
+  hash        String    @db.VarChar(64)
+  source      String
+  zh          String?
+  /// machine | staff (null while waiting).
+  by          String?   @db.VarChar(10)
+  /// waiting | done | failed
+  status      String    @default("waiting") @db.VarChar(10)
+  tries       Int       @default(0)
+  error       String?   @db.VarChar(300)
+  /// After a failure: not tried again before this.
+  nextTryAt   DateTime? @map("next_try_at") @db.Timestamptz
+  /// Who typed or checked the Chinese (staff).
+  checkedById String?   @map("checked_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([companyId, hash])
+  @@index([status, nextTryAt])
+  @@map("translations")
+}
+
 /// A cost between the factory's price basis and the one we sold on (EXW → CFR: to the port, sea freight…),
 /// copied from the accepted option when the order was made: part of the order's cost.
 model OrderCost {
@@ -2347,6 +2377,7 @@ model Company {
   orderBankSteps      OrderBankStep[]
   satChecks           SatCheck[]
   orderLineCases      OrderLineCase[]
+  translations        Translation[]
   orderClaims         OrderClaim[]
   moneyMovements      MoneyMovement[]
   orderFactories      OrderFactory[]

@@ -233,6 +233,8 @@ interface PaperInfo {
   pdfHref: string;
   excelHref?: string;
   choices?: PaperChoice[];
+  /** A word on screen (the translator still writing some of the Chinese). */
+  note?: string;
 }
 
 function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; onMove: (at: number) => void; onClose: () => void }) {
@@ -298,7 +300,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
         setPaperOf((p) => ({
           ...(p?.key === key ? p : null),
           key,
-          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, choices: d.choices },
+          info: { title: d.title, pdfHref: d.pdfHref, excelHref: d.excelHref, choices: d.choices, note: d.note },
         }));
     };
     const key = given.key;
@@ -312,6 +314,7 @@ function FileViewer({ set, at, onMove, onClose }: { set: ViewFile[]; at: number;
     set.length > 1 ? `${at + 1} of ${set.length}` : null,
     file.where,
     kind !== "paper" && file.size ? `${fileSize(file.size)} · ${KIND_WORD[kind]}` : null,
+    kind === "paper" ? paper?.note : null,
   ]
     .filter(Boolean)
     .join(" · ");

@@ -51,6 +51,9 @@ x-server-env: &server-env
   COMPANY_POOLS_MAX: ${COMPANY_POOLS_MAX:-20}
   # Empty: company connections log in as kebo_app with a password made from AUTH_SECRET (set up by the API).
   COMPANY_DATABASE_URL: ${COMPANY_DATABASE_URL:-}
+  # The translator (papers in English + 中文): the translate service below. Empty: no translator (papers print the
+  # labels' Chinese and the names people type).
+  TRANSLATE_URL: ${TRANSLATE_URL-http://translate:8080}
 
 services:
   db:
@@ -184,7 +187,43 @@ services:
     volumes: [clamav:/var/lib/clamav]
     logging: *logging
 
+  # The translator for papers in English + 中文 (docs/translator.md): Tencent's Hy-MT2 1.8B translation model
+  # (Apache-2.0) on llama.cpp's server, on this server only: nothing is sent out. Its model (about 1.1 GB) is
+  # downloaded once into the translate volume the first time it starts. One CPU and 2 GB at most, so the app keeps
+  # the rest; the worker gives it one text at a time. Off with TRANSLATE_REPLICAS=0 (and TRANSLATE_URL= ).
+  # Deploys never wait for it (it has no health check here): texts wait until it is ready.
+  translate:
+    image: ${TRANSLATE_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b12723}
+    restart: unless-stopped
+    command:
+      # The model's file by its address (not the Hugging Face API, which limits anonymous use); kept in the volume,
+      # so a restart works without the internet.
+      - "--model-url"
+      - "${TRANSLATE_MODEL_URL:-https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q4_K_M.gguf}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--ctx-size"
+      - "4096"
+      - "--parallel"
+      - "1"
+      - "--threads"
+      - "${TRANSLATE_THREADS:-1}"
+      - "--jinja"
+    environment:
+      LLAMA_CACHE: /models
+    volumes: [translate:/models]
+    expose: ["8080"]
+    deploy:
+      replicas: ${TRANSLATE_REPLICAS:-1}
+    cpus: ${TRANSLATE_CPUS:-1.0}
+    mem_limit: ${TRANSLATE_MEMORY:-2g}
+    healthcheck: { disable: true }
+    logging: *logging
+
 volumes:
   pgdata:
   files:
   clamav:
+  translate:

@@ -25,6 +25,9 @@ import { Clock } from "./common/time/clock.service";
 import { LedgerPostingModule } from "./modules/ledger/posting.service";
 import { LedgerJobsModule } from "./modules/ledger/ledger.module";
 import { LedgerService } from "./modules/ledger/ledger.service";
+import { TranslationsCoreModule } from "./modules/translations/translations.module";
+import { TranslationsService } from "./modules/translations/translations.service";
+import { Translator } from "./modules/translations/translator";
 
 /**
  * The background worker, on a schedule (REMINDER_INTERVAL_MINUTES, default 60):
@@ -56,6 +59,8 @@ import { LedgerService } from "./modules/ledger/ledger.service";
     PlatformJobsModule,
     // The ledger's nightly run: post what a save did not, then check it against today's figures.
     LedgerJobsModule,
+    // The translator: what the papers asked for in Chinese, and the order items' Chinese names.
+    TranslationsCoreModule,
   ],
 })
 class WorkerModule {}
@@ -71,6 +76,8 @@ async function main() {
   const clock = app.get(Clock);
   const ledger = app.get(LedgerService);
   const domains = app.get(OwnDomainService);
+  const translations = app.get(TranslationsService);
+  const translator = app.get(Translator);
   // Each job's run is written down for Dev tools (Jobs and emails); a failure is logged there and never stops the others.
   const jobs = app.get(JobRuns);
   let checkedOn: string | null = null;
@@ -117,7 +124,12 @@ async function main() {
         "follow-ups",
         async () => {
           const companies = await prisma.platform.company.findMany({ where: { status: "active" }, orderBy: { createdAt: "asc" } });
-          for (const c of companies) await CompanyContext.run(toInfo(c), () => reminders.followUps());
+          for (const c of companies)
+            await CompanyContext.run(toInfo(c), async () => {
+              await reminders.followUps();
+              // New order items: their Chinese names from the translator's memory, else asked for (papers in English + 中文).
+              await translations.nameItems().catch((e) => log.error(`naming items for ${c.slug} failed: ${(e as Error).message}`));
+            });
           return companies.length;
         },
         (n) => `${n} companies`,
@@ -133,10 +145,37 @@ async function main() {
       followingUp = false;
     }
   };
-  log.log(`company rules and reminders every ${minutes} minute(s), follow-ups every ${followUpMinutes}`);
+  // The translator (TRANSLATE_URL): each company's waiting texts, a few at a time, on a short beat (one text takes
+  // a few seconds on one CPU). Written down for Dev tools only when something was translated.
+  const translateSeconds = Math.max(Number(process.env.TRANSLATE_INTERVAL_SECONDS) || 20, 5);
+  let translating = false;
+  const translateTick = async () => {
+    if (translating || !translator.url) return;
+    translating = true;
+    try {
+      // Only the companies with something waiting (one query), and only while the translator is ready.
+      const due = await translations.dueCompanyIds();
+      if (!due.length || (await translator.state()) !== "ready") return;
+      const companies = await prisma.platform.company.findMany({ where: { id: { in: due } }, orderBy: { createdAt: "asc" } });
+      let done = 0;
+      for (const c of companies)
+        done += await CompanyContext.run(toInfo(c), () => translations.work()).catch((e) => {
+          log.error(`translating for ${c.slug} failed: ${(e as Error).stack ?? e}`);
+          return 0;
+        });
+      if (done) await jobs.track("translations", async () => done, (n) => `${n} text${n === 1 ? "" : "s"} into Chinese`);
+    } finally {
+      translating = false;
+    }
+  };
+  log.log(
+    `company rules and reminders every ${minutes} minute(s), follow-ups every ${followUpMinutes}` +
+      (translator.url ? `, translations every ${translateSeconds} s (${translator.url})` : ", no translator (TRANSLATE_URL empty)"),
+  );
   await tick();
   setInterval(() => void tick(), minutes * 60_000);
   setInterval(() => void followUpTick(), followUpMinutes * 60_000);
+  setInterval(() => void translateTick(), translateSeconds * 1000);
 }
 
 void main();

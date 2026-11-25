@@ -323,6 +323,31 @@ export const SETTING_GROUPS: SettingGroup[] = [
       },
     ],
   },
+  {
+    // Settings › Chinese on papers (25 Nov 2026): the words the translator always writes the same.
+    key: "translation",
+    title: "Chinese on papers",
+    description: "The translator on this server writes the papers' Chinese; these are the company's own words for it.",
+    save: "Save the words",
+    fields: [
+      {
+        name: "glossary",
+        label: "Our words",
+        kind: "textarea",
+        wide: true,
+        placeholder: "Blister packing machine = 泡罩包装机\nVision Pharmaceuticals = 维森制药",
+        hint: "One a line: English = 中文. Given to the translator with every text that has them (common machine, packing and shipping words are already in).",
+      },
+    ],
+    cards: [
+      {
+        key: "glossary",
+        title: "Our words",
+        description: "Names the translator always writes the same: your products, your customers, their places.",
+        fields: ["glossary"],
+      },
+    ],
+  },
 ];
 
 /** Stored value → what the form box shows. */

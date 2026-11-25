@@ -75,7 +75,7 @@ describe("the groups", () => {
     expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Spending", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
     expect(m.filter(isSingle)).toEqual([]);
     // Settings is two groups: the company's own (managers too), and the admin's.
-    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails", "Website form"]);
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Chinese on papers", "Reminders", "Emails", "Website form"]);
     expect(pages(m, "admin")).toEqual(["Staff", "Roles", "Login history", "Active sessions", "Email sending", "Audit log"]);
   });
 
@@ -116,6 +116,7 @@ describe("the groups", () => {
         "/settings/sales",
         "/settings/books",
         "/settings/papers",
+        "/settings/translations",
         "/settings/reminders",
         "/settings/emails",
         "/settings/website-form",
@@ -161,9 +162,12 @@ describe("the groups", () => {
     expect(titles(m)).toEqual(["Sales", "Purchasing", "Finance", "Reports", "Company settings", "Admin settings"]);
     expect(pages(m, "reports")).toEqual(["Overview", "Profit & loss", "Cash flow", "Spending", "Customers", "Suppliers", "Sales team", "Sales funnel"]);
     // The company's web address and its website form are the admin's too: a manager does not see them.
-    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails"]);
+    expect(pages(m, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Chinese on papers", "Reminders", "Emails"]);
     const withAddresses = buildModules({ can: (p) => MANAGER.has(p), feature: () => true, approvals: 0, approves: true, companyAddresses: true });
-    expect(pages(withAddresses, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Reminders", "Emails"]);
+    expect(pages(withAddresses, "company")).toEqual(["Company", "Sales & quotations", "Closed months", "Document templates", "Chinese on papers", "Reminders", "Emails"]);
+    // Chinese on papers is also for whoever makes the papers (they check the translator's texts).
+    const papers = buildModules({ can: (p) => p === "documents.manage", feature: () => true, approvals: null, approves: false, companyAddresses: false });
+    expect(pages(papers, "company")).toEqual(["Chinese on papers"]);
     // No people, roles, sign-ins, sessions or email sending: those are the admin's.
     expect(pages(m, "admin")).toEqual(["Audit log"]);
     // Someone who only manages people sees Admin settings alone.

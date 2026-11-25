@@ -36,14 +36,14 @@ import { OwnDomainModule } from "./common/company/own-domain.service";
 import { LimitsModule } from "./common/company/limits.service";
 import { CompanyModule } from "./modules/company/company.module";
 import { PlatformModule } from "./platform/platform.module";
+import { TranslationsModule } from "./modules/translations/translations.module";
 
 /**
  * Feature modules (one per business area) sit on four global ones:
  * Env (validated settings), Prisma (database), Common (audit, clock) and
  * AuthCore (the guard every route passes through).
  */import { InsightsModule } from "./modules/insights/insights.module";
-
 @Module({
-  imports: [EnvModule, PrismaModule, CompaniesModule, OwnDomainModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, SectionsModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, TreasuryModule, CancellationModule, OperationsModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, SearchModule, PapersModule, OrderFilesModule, CompanyModule, PlatformModule],
+  imports: [EnvModule, PrismaModule, CompaniesModule, OwnDomainModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, SectionsModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, TreasuryModule, CancellationModule, OperationsModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, SearchModule, PapersModule, TranslationsModule, OrderFilesModule, CompanyModule, PlatformModule],
 })
 export class AppModule {}

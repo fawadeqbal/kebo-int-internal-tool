@@ -250,12 +250,21 @@ export interface PlatformMailView extends MailSettingsView {
   inboxFrom: "here" | "server" | "admins";
 }
 
+/**
+ * Settings › Chinese on papers: the company's own words for the translator, one "English = 中文" a line (the
+ * names it uses for its products, its customers' places): given to the translator with every text that has them.
+ */
+export const translationSettings = z.object({
+  glossary: z.string().trim().max(20_000, "Keep the list under 20,000 characters").default(""),
+});
+
 export const SETTINGS = {
   company: companySettings,
   sales: salesSettings,
   reminders: reminderSettings,
   notifications: notificationSettings,
   papers: papersSettings,
+  translation: translationSettings,
 } as const;
 
 export type SettingsKey = keyof typeof SETTINGS;
