@@ -118,11 +118,26 @@ export function docMoney(amount: string | number, currency: string) {
 /** "USD Ninety Thousand only" */
 export const docWords = (amount: string, currency: string) => paperWordsText(amount, currency);
 
-/** "1 Set", "2,000 pcs"; with Chinese the unit's after it ("1 Set 套"). */
-export function docQty(quantity: string | number, unit?: string | null, lang: DocLang = "en") {
+/** "1 Set", "2,000 pcs"; with Chinese, "1套" over it (as the customer's own packing list writes it). */
+export function docQty(quantity: string | number, unit?: string | null, lang: DocLang = "en"): ReactNode {
   const t = countText(quantity, unit);
   const zh = lang === "zh" ? (zhUnit(unit) ?? zhTerm(unit)) : null;
-  return zh ? `${t} ${zh}` : t;
+  return zh ? overZh(t, `${countText(quantity)}${zh}`) : t;
+}
+
+/**
+ * A table cell's words with their Chinese over them, as the column headings and the customer's own papers
+ * write it ("熏蒸实木箱（IPPC）" over "Fumigated solid wooden case (IPPC)", "合计" over "Total").
+ */
+export function overZh(text: ReactNode, zh: string | null | undefined, style?: CSSProperties): ReactNode {
+  return zh ? (
+    <>
+      <div style={{ fontFamily: CJK, letterSpacing: 0, ...style }}>{zh}</div>
+      {text}
+    </>
+  ) : (
+    text
+  );
 }
 
 /**
@@ -219,20 +234,13 @@ export function said(text: string, lang: DocLang): ReactNode {
 
 /** A column's heading: with Chinese, the Chinese over the English ("箱号" over "Case No."), as the customer's own papers. */
 function headed(text: string, lang: DocLang): ReactNode {
-  const zh = lang === "zh" ? zhOf(text) : null;
-  return zh ? (
-    <>
-      <div style={{ fontFamily: CJK, letterSpacing: 0, textTransform: "none" }}>{zh}</div>
-      {text}
-    </>
-  ) : (
-    text
-  );
+  return overZh(text, lang === "zh" ? zhOf(text) : null, { textTransform: "none" });
 }
 
 /**
  * An item's description cell: the first line as its name, the rest (specs) and the model under it. With Chinese
- * (the item's own, written on the order), its Chinese name under the English name and its specs under the specs.
+ * (the item's own, else the translator's), the Chinese first and the English under it, as the customer's own
+ * packing list writes it ("小瓶封盖机 RHZ-8型，全套配备FFU单元及附件" over "Vial capping machine RHZ-8 type…").
  */
 export function docItem(description: string, model?: string | null, zh?: string | null, lang: DocLang = "en") {
   const [name, ...more] = description.split(/\r?\n/);
@@ -240,10 +248,14 @@ export function docItem(description: string, model?: string | null, zh?: string 
   const spec: CSSProperties = { color: TEXT_2, fontSize: "12px", whiteSpace: "pre-line" };
   return (
     <>
+      {zhName && (
+        <div style={{ fontFamily: CJK, letterSpacing: 0, marginBottom: "2px" }}>
+          <div style={{ fontWeight: 600 }}>{zhName}</div>
+          {zhMore.length > 0 && <div style={spec}>{zhMore.join("\n")}</div>}
+        </div>
+      )}
       <div style={{ fontWeight: 600 }}>{name}</div>
-      {zhName && <div style={{ fontFamily: CJK, fontWeight: 600, letterSpacing: 0 }}>{zhName}</div>}
       {more.length > 0 && <div style={spec}>{more.join("\n")}</div>}
-      {zhMore.length > 0 && <div style={{ ...spec, fontFamily: CJK, letterSpacing: 0 }}>{zhMore.join("\n")}</div>}
       {model && (
         <div style={{ color: LABEL_GREY, fontSize: "12px" }}>
           {said("Model:", lang)} {model}

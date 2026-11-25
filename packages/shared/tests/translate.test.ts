@@ -21,9 +21,15 @@ describe("the translator's texts", () => {
     ]);
     const terms = termsFor("Sterilizing tunnel for VISION PHARMACEUTICALS, 4 heads", mine);
     expect(terms[0]).toEqual({ en: "VISION PHARMACEUTICALS", zh: "维森制药" });
-    // The longer word first, and the company's "tunnel" over ours.
-    expect(terms.map((t) => t.en)).toEqual(["VISION PHARMACEUTICALS", "tunnel", "Sterilizing tunnel", "heads"]);
+    // The company's "tunnel" wins over ours ("Sterilizing tunnel", which has it inside).
+    expect(terms.map((t) => t.en)).toEqual(["VISION PHARMACEUTICALS", "tunnel", "heads"]);
     expect(terms.find((t) => t.en === "tunnel")!.zh).toBe("隧道烘箱");
+    // A word inside a longer one is not given again; nor one written the same in Chinese.
+    expect(termsFor("Vial capping machine RHZ-8 type\ncomplete set with FFU unit and accessories").map((t) => t.en)).toEqual([
+      "Vial capping machine",
+      "unit and accessories",
+      "complete set",
+    ]);
     // A word inside another word is not it.
     expect(termsFor("Remillsheads")).toEqual([]);
   });

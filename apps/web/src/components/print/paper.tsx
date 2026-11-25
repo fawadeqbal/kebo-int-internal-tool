@@ -10,11 +10,11 @@ import {
   KeboDoc,
   keptAsTyped,
   labelled,
-  said,
+  overZh,
   type DocBrand,
   type DocColumn,
 } from "./kebo-doc";
-import type { DocLang } from "./zh";
+import { zhOf, type DocLang } from "./zh";
 import { detailsFor, type PaperCopy } from "./copies";
 
 /**
@@ -89,7 +89,7 @@ export function PaperSheet({
     doc.foot && first > 0 ? (
       <tr style={{ breakInside: "avoid" }}>
         <td colSpan={first} style={{ ...docFootCell(), paddingLeft: 0 }}>
-          {said(doc.foot.label, lang)}
+          {overZh(doc.foot.label, lang === "zh" ? zhOf(doc.foot.label) : null)}
         </td>
         {doc.columns.slice(first).map((c, i, all) => (
           <td key={c.key} style={{ ...docFootCell(c.align), ...(i === all.length - 1 ? { paddingRight: 0 } : null) }}>
