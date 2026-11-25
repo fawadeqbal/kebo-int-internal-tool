@@ -99,6 +99,7 @@ export const MODULE_PAGES: { key: ModuleKey; title: string; icon: NavIcon; pages
       { href: "/settings/sales", label: "Sales & quotations" },
       { href: "/settings/books", label: "Closed months" },
       { href: "/settings/papers", label: "Document templates" },
+      { href: "/settings/translations", label: "Chinese on papers" },
       { href: "/settings/reminders", label: "Reminders" },
       { href: "/settings/emails", label: "Emails" },
       { href: "/settings/website-form", label: "Website form" },
@@ -230,6 +231,8 @@ export function buildModules({
     "/settings/reminders": settings,
     "/settings/emails": settings,
     "/settings/papers": settings,
+    // The translator's texts are checked by whoever makes the papers; its words are the settings managers'.
+    "/settings/translations": settings || can("documents.manage"),
     "/settings/address": settings && security && companyAddresses,
     "/users": can("users.manage"),
     "/access/roles": security,

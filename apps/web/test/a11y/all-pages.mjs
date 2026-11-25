@@ -574,6 +574,7 @@ async function run(page, list, title) {
     "/settings/reminders",
     "/settings/emails",
     "/settings/papers",
+    "/settings/translations",
     "/settings/website-form",
     "/access/roles",
     "/access/sessions",

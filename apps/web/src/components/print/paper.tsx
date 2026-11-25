@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { PaperCell, PaperDoc } from "@kebo/shared";
+import { textKey, type PaperCell, type PaperDoc } from "@kebo/shared";
 import {
   docDate,
   docFootCell,
@@ -8,6 +8,7 @@ import {
   docQty,
   docWords,
   KeboDoc,
+  keptAsTyped,
   labelled,
   said,
   type DocBrand,
@@ -16,11 +17,14 @@ import {
 import type { DocLang } from "./zh";
 import { detailsFor, type PaperCopy } from "./copies";
 
-/** A table cell or a detail beside the title, as Kebo's documents print it (with Chinese: the item's and the unit's). */
-function cell(v: PaperCell | undefined, lang: DocLang = "en"): ReactNode {
+/**
+ * A table cell or a detail beside the title, as Kebo's documents print it (with Chinese: the item's own, else
+ * the translator's memory's; the unit's).
+ */
+function cell(v: PaperCell | undefined, lang: DocLang = "en", tr: Record<string, string> = {}): ReactNode {
   if (v === null || v === undefined) return "";
   if (typeof v === "string") return v;
-  if ("item" in v) return docItem(v.item, v.model, v.zh, lang);
+  if ("item" in v) return docItem(v.item, v.model, v.zh ?? tr[textKey(v.item)] ?? null, lang);
   if ("money" in v) return docMoney(v.money, v.currency);
   if ("qty" in v) return docQty(v.qty, v.unit, lang);
   return docDate(v.date);
@@ -57,6 +61,7 @@ export function PaperSheet({
   watermark,
   lang = "en",
   copy = "customer",
+  tr = {},
 }: {
   doc: PaperDoc;
   brand: DocBrand | null;
@@ -64,6 +69,8 @@ export function PaperSheet({
   lang?: DocLang;
   /** The China customs copy prints China's HS codes (else the customer's: versions made before 25 Nov have only those). */
   copy?: PaperCopy;
+  /** In English + 中文: typed texts' Chinese from the translator's memory (chineseOf). */
+  tr?: Record<string, string>;
 }) {
   const key = (k: string) => (k === "hs" && copy === "customs" ? "hsCn" : k);
   const columns: DocColumn<Row>[] = doc.columns.map((c) => ({
@@ -74,7 +81,7 @@ export function PaperSheet({
     // A draft shows an HS code still missing as "needed", where it will print (the Make window's amber).
     render: (r) => {
       const v = r[key(c.key)] ?? r[c.key];
-      return c.key === "hs" && !v && watermark === "DRAFT" ? <Needed /> : cell(v, lang);
+      return c.key === "hs" && !v && watermark === "DRAFT" ? <Needed /> : cell(v, lang, tr);
     },
   }));
   const first = doc.foot ? doc.columns.findIndex((c) => c.key in doc.foot!.cells) : -1;
@@ -123,6 +130,19 @@ export function PaperSheet({
       watermark={watermark}
       details={detailsFor(doc.details ?? null, copy)}
       lang={lang}
+      tr={tr}
     />
   );
+}
+
+/** A paper's typed texts to ask the translator's memory for: its terms, its heading, the items without their own Chinese. */
+export function paperTexts(doc: PaperDoc): string[] {
+  return [
+    ...doc.bullets.map((b) => (typeof b === "string" ? b : typeof b.value === "string" && !keptAsTyped(b.label) ? b.value : null)),
+    doc.heading,
+    ...doc.rows.map((r) => {
+      const v = r.item;
+      return v && typeof v === "object" && "item" in v && !v.zh ? v.item : null;
+    }),
+  ].filter((t): t is string => !!t);
 }

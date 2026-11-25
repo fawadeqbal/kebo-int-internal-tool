@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Banknote, Building, CalendarClock, ChartLine, ClipboardCheck, Contact, CreditCard, Factory, FileStack, FileText, Filter, Globe, History, KeyRound, LockKeyhole, Mail, MonitorSmartphone, Package, Receipt, ScrollText, Send, Target, Users, UserCog, Wallet, BellRing, Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Banknote, Building, CalendarClock, ChartLine, ClipboardCheck, Contact, CreditCard, Factory, FileStack, FileText, Languages, Filter, Globe, History, KeyRound, LockKeyhole, Mail, MonitorSmartphone, Package, Receipt, ScrollText, Send, Target, Users, UserCog, Wallet, BellRing, Bell, BriefcaseBusiness, Building2, ChartColumn, ChevronRight, Inbox, Landmark, LayoutDashboard, LogOut, Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, Plus, ShoppingCart, User, X, ShieldCheck, type LucideIcon, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { Avatar, buttonClass, cn, RULES, Badge, CountDot } from "@kebo/ui";
 import { NavMemoryKeeper, SegmentedChoice } from "@kebo/ui/client";
 import { logoutAction } from "@/app/login/actions";
@@ -40,6 +40,7 @@ const PAGE_ICONS: Record<string, LucideIcon> = {
   "/settings/sales": FileText,
   "/settings/books": LockKeyhole,
   "/settings/papers": FileStack,
+  "/settings/translations": Languages,
   "/settings/reminders": BellRing,
   "/settings/emails": Mail,
   "/settings/website-form": Send,

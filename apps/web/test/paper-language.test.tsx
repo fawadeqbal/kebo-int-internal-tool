@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { paperDetailsOf } from "@kebo/shared";
-import { docItem, docQty, KeboDoc } from "@/components/print/kebo-doc";
+import { bulletTexts, docItem, docQty, KeboDoc, labelled } from "@/components/print/kebo-doc";
 import { copyOf, detailsFor, langFor, paperChoices, pdfOf } from "@/components/print/copies";
 import { casesOf } from "@/components/print/cases";
 import { docLangOf, zhOf } from "@/components/print/zh";
@@ -147,5 +147,46 @@ describe("papers in Chinese and the China customs copy (25 Nov 2026)", () => {
     expect(pdfOf("/pdf/packing-list/1?v=2", "customs", "zh")).toBe("/pdf/packing-list/1?v=2&copy=customs");
     expect(pdfOf("/pdf/proforma/1", "internal", "zh")).toBe("/pdf/proforma/1?copy=internal&lang=zh");
     expect(pdfOf("/pdf/proforma/1", "customer", "en")).toBe("/pdf/proforma/1");
+  });
+});
+
+describe("typed texts in Chinese, from the translator's memory (25 Nov 2026)", () => {
+  const bullets = [
+    "Goods of Chinese origin.",
+    labelled("Payment:", "30% deposit, balance before shipment", "zh"),
+    labelled("Shipping marks:", "VISION PHARMA\nKARACHI", "zh"),
+    labelled("B/L No.:", "QDLOS-77", "zh"),
+  ];
+  it("asks for sentences and terms, never for marks, numbers or codes", () => {
+    expect(bulletTexts(bullets)).toEqual(["Goods of Chinese origin.", "30% deposit, balance before shipment"]);
+  });
+
+  it("prints the Chinese it has under each, only in English + 中文", () => {
+    const tr = { "Goods of Chinese origin.": "货物原产于中国。", "30% deposit, balance before shipment": "30%定金，余款发货前支付", "LIQUID FILLING LINE": "液体灌装线" };
+    const sheet = (lang: "en" | "zh") =>
+      render(
+        <div data-testid={lang}>
+          <KeboDoc
+            company={{ name: "Kebo" } as never}
+            customer={{ name: "Vision" } as never}
+            title="PACKING  LIST"
+            number="PL-1"
+            date="2026-11-25"
+            heading="LIQUID FILLING LINE"
+            columns={[{ label: "No.", render: () => "1" }]}
+            rows={[{}]}
+            bullets={bullets}
+            lang={lang}
+            tr={tr}
+          />
+        </div>,
+      );
+    sheet("zh");
+    const zh = screen.getByTestId("zh").textContent!;
+    expect(zh).toContain("货物原产于中国。");
+    expect(zh).toContain("30%定金，余款发货前支付");
+    expect(zh).toContain("液体灌装线");
+    sheet("en");
+    expect(screen.getByTestId("en").textContent).not.toContain("货物原产于中国。");
   });
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PAPER_FIX_FIELDS, PAPER_KINDS, type PAPER_OPTIONS } from "../workflows/papers";
-import { optionalId } from "./common";
+import { listQuery, optionalId } from "./common";
 
 /** Inputs for the papers the app makes (see workflows/papers). */
 
@@ -49,3 +49,49 @@ export const sendRequestInput = z.object({
   reason: z.string().trim().max(500).nullish(),
 });
 export type SendRequestInput = z.infer<typeof sendRequestInput>;
+
+/* ---------------------------------------------------------------- the translator (25 Nov 2026) */
+
+/** POST /translations/lookup: a paper's texts; answers the Chinese of those that have one, and asks for the rest. */
+export const translationLookupInput = z.object({
+  texts: z.array(z.string().max(4000)).max(300),
+});
+export type TranslationLookupInput = z.infer<typeof translationLookupInput>;
+
+/** PATCH /translations/:id: a person's Chinese for the text (it wins over the translator's). */
+export const translationFixInput = z.object({
+  zh: z
+    .string()
+    .trim()
+    .min(1, "Type the Chinese")
+    .max(8000)
+    .refine((v) => /[一-鿿]/.test(v), "Type it in Chinese"),
+});
+export type TranslationFixInput = z.infer<typeof translationFixInput>;
+
+/** GET /translations: to check (the translator's, not checked yet), waiting, failed, or all. */
+export const TRANSLATION_SHOWS = ["check", "waiting", "failed", "all"] as const;
+export type TranslationShow = (typeof TRANSLATION_SHOWS)[number];
+export const translationListQuery = listQuery.extend({
+  show: z.enum(TRANSLATION_SHOWS).default("check"),
+});
+export type TranslationListQuery = z.infer<typeof translationListQuery>;
+
+/** One text of the translator's memory, as the review page shows it. */
+export interface TranslationView {
+  id: string;
+  source: string;
+  zh: string | null;
+  by: "machine" | "staff" | null;
+  status: "waiting" | "done" | "failed";
+  error: string | null;
+  tries: number;
+  checkedBy: string | null;
+  updatedAt: string;
+}
+
+/** The translator now: off (not set up), ready, starting (loading its model), unreachable; and its texts. */
+export interface TranslatorStatus {
+  state: "off" | "ready" | "starting" | "unreachable";
+  counts: { check: number; waiting: number; failed: number; done: number };
+}

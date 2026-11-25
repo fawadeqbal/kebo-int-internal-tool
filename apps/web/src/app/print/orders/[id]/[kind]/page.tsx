@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isPaperKind, PAYMENT_KIND_LABEL, type PaperKind, type PaymentKind } from "@kebo/shared";
+import { isPaperKind, PAYMENT_KIND_LABEL, textKey, type PaperKind, type PaymentKind } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { docBrand, load } from "@/lib/session";
 import type { OrderDocument, OrderDocumentKind } from "@/lib/types-orders";
 import type { PaperDocView } from "@/lib/types-papers";
-import { PaperSheet } from "@/components/print/paper";
+import { PaperSheet, paperTexts } from "@/components/print/paper";
+import { chineseOf, waitingNote } from "@/components/print/chinese";
 import { PrintToolbar } from "@/components/print/toolbar";
 import { backTo } from "@/components/print/data";
 import { docLangOf } from "@/components/print/zh";
@@ -19,6 +20,7 @@ import {
   docMoney,
   docQty,
   docWords,
+  bulletTexts,
   InternalTable,
   KeboDoc,
   labelled,
@@ -114,15 +116,6 @@ export default async function OrderDocumentPrint({
   const unitPrices = !packing && (await getSettings()).sales.quoteUnitPrices;
   const lang = langFor(copy, docLangOf(sp.lang));
 
-  const toolbar = (
-    <PrintToolbar
-      title={docTitle(d)}
-      backHref={backTo(sp.back, `/orders/${o.id}`)}
-      pdfHref={pdfOf(`/pdf/${d.kind}/${o.id}${v ? `?v=${v}` : ""}`, copy, lang)}
-      choices={paperChoices(`/print/orders/${o.id}/${d.kind}`, sp, d.kind, copy, lang)}
-    />
-  );
-
   const no: DocColumn<Line> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<Line> = {
     label: packing ? "Description of goods" : "Equipment Description",
@@ -210,9 +203,29 @@ export default async function OrderDocumentPrint({
         o.blNo ? labelled("B/L No.:", o.blNo, lang) : null,
       ];
 
+  // In English + 中文: the typed texts' Chinese from the translator's memory (the terms, the heading, the items
+  // without their own Chinese); what it does not have yet prints in English, and the toolbar says so.
+  const asked = await chineseOf(
+    [...bulletTexts(bullets.filter(Boolean)), o.documentTitle, ...d.lines.filter((l) => !l.descriptionZh).map((l) => l.description)],
+    lang,
+  );
+  const tr = asked.tr;
+  // The items with their Chinese: their own, else the memory's.
+  const lines = d.lines.map((l) => ({ ...l, descriptionZh: l.descriptionZh ?? tr[textKey(l.description)] ?? null }));
+
+  const toolbar = (
+    <PrintToolbar
+      title={docTitle(d)}
+      backHref={backTo(sp.back, `/orders/${o.id}`)}
+      pdfHref={pdfOf(`/pdf/${d.kind}/${o.id}${v ? `?v=${v}` : ""}`, copy, lang)}
+      choices={paperChoices(`/print/orders/${o.id}/${d.kind}`, sp, d.kind, copy, lang)}
+      note={waitingNote(asked.waiting)}
+    />
+  );
+
   // The packing list case by case, in the customer's format (25 Nov 2026): a row per case, each item over its
   // cases. Versions made before the cases print as they were (a row per item).
-  const caseRows = packing && pk && d.lines.every((l) => l.packing?.cases) ? casesOf(d.lines) : null;
+  const caseRows = packing && pk && lines.every((l) => l.packing?.cases) ? casesOf(lines) : null;
   const caseTotal = caseRows && pk ? <CaseTotals rows={caseRows} totals={pk.totals} lang={lang} /> : null;
 
   const packingTotals =
@@ -308,6 +321,7 @@ export default async function OrderDocumentPrint({
     watermark: d.watermark,
     details,
     lang,
+    tr,
   };
   return (
     <>
@@ -315,7 +329,7 @@ export default async function OrderDocumentPrint({
       {caseRows ? (
         <KeboDoc {...doc} columns={caseColumns(lang)} rows={caseRows} foot={caseTotal} />
       ) : (
-        <KeboDoc {...doc} columns={columns} rows={d.lines} foot={packingTotals} />
+        <KeboDoc {...doc} columns={columns} rows={lines} foot={packingTotals} />
       )}
     </>
   );
@@ -334,6 +348,7 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
   const copy = copyOf(kind, sp.copy);
   const lang = langFor(copy, docLangOf(sp.lang));
   const pdf = pdfOf(`/pdf/${kind}/${id}${q.size ? `?${q}` : ""}`, copy, lang);
+  const asked = await chineseOf(paperTexts(p.doc), lang);
   return (
     <>
       {sp.embed !== "1" && (
@@ -351,10 +366,11 @@ async function PaperPrint({ id, kind, sp }: { id: string; kind: PaperKind; sp: P
           )}
           pdfHref={pdf}
           choices={paperChoices(`/print/orders/${id}/${kind}`, sp, kind, copy, lang)}
+          note={waitingNote(asked.waiting)}
         />
       )}
       <div className={sp.embed === "1" ? "pt-4" : undefined}>
-        <PaperSheet doc={p.doc} brand={await docBrand()} watermark={p.watermark} lang={lang} copy={copy} />
+        <PaperSheet doc={p.doc} brand={await docBrand()} watermark={p.watermark} lang={lang} copy={copy} tr={asked.tr} />
       </div>
     </>
   );

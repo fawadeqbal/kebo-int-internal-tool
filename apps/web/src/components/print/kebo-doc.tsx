@@ -1,5 +1,5 @@
-import { Fragment, type CSSProperties, type ReactNode } from "react";
-import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf, zhCountry, zhPlace, zhTerm, zhUnit, type PaperDetails } from "@kebo/shared";
+import { cloneElement, Fragment, isValidElement, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { countText, paperDateText, paperMoneyText, paperWordsText, portsOf, textKey, zhCountry, zhPlace, zhTerm, zhUnit, type PaperDetails } from "@kebo/shared";
 import type { CompanySnapshot, CustomerSnapshot } from "@/lib/types-orders";
 import { countryName, isUnknownCountry } from "@/lib/countries";
 import { zhOf, type DocLang } from "./zh";
@@ -170,12 +170,32 @@ export function portBullets(
   ].filter(Boolean);
 }
 
-function Labelled({ label: l, value, lang }: { label: string; value: ReactNode; lang: DocLang }) {
+function Labelled({ label: l, value, lang, zh }: { label: string; value: ReactNode; lang: DocLang; zh?: string | null }) {
   return (
     <>
       {said(l, lang)} {value}
+      {zh && <Zh text={zh} />}
     </>
   );
+}
+
+/** Typed words' Chinese (from the translator's memory), under the English. */
+function Zh({ text }: { text: string }) {
+  return <span style={{ display: "block", fontFamily: CJK, letterSpacing: 0, color: TEXT_2 }}>{text}</span>;
+}
+
+/** Labels whose values are numbers, codes, marks or dates: never translated (shipping marks are as painted on the cases). */
+const AS_TYPED = /^(b\/l no|awb no|container no|shipping marks|shipped on|lc no|ref\. no|invoice no|order no|your order no|trade term|vessel|flight)/i;
+export const keptAsTyped = (label: string) => AS_TYPED.test(label.trim());
+
+/** The typed texts of a paper's bullets (sentences, and the values after a label), to ask the translator's memory for. */
+export function bulletTexts(bullets: ReactNode[]): string[] {
+  return bullets.flatMap((b) => {
+    if (typeof b === "string") return [b];
+    if (!isValidElement(b) || b.type !== Labelled) return [];
+    const p = b.props as { label: string; value: unknown };
+    return typeof p.value === "string" && !keptAsTyped(p.label) ? [p.value] : [];
+  });
 }
 
 /** A list item with a label, e.g. "B/L No.: QDLOS-77" ("B/L No. 提单号: QDLOS-77" with Chinese). */
@@ -309,6 +329,7 @@ export function KeboDoc<T>({
   signatures = null,
   details: particulars = null,
   lang = "en",
+  tr = {},
 }: {
   company: CompanySnapshot;
   customer: CustomerSnapshot;
@@ -353,6 +374,11 @@ export function KeboDoc<T>({
   details?: PaperDetails | null;
   /** English, or English with the Chinese beside each label. */
   lang?: DocLang;
+  /**
+   * In English + 中文: the typed texts' Chinese from the translator's memory (chineseOf), by the text as kept:
+   * printed under each term and sentence and under the heading.
+   */
+  tr?: Record<string, string>;
 }) {
   const address = customer.address?.trim() || (isUnknownCountry(customer.country) ? "" : countryName(customer.country));
   const width = (c: DocColumn<T>) => (c.width ? `${c.width}pt` : undefined);
@@ -366,6 +392,8 @@ export function KeboDoc<T>({
   ].filter((x) => x !== null);
   const details = [{ label: "Date", value: docDate(date) as ReactNode }, ...meta.map((m) => ({ label: noColon(m.label), value: m.value }))];
   const zh = (t: string) => (lang === "zh" ? zhOf(t) : null);
+  /** A typed text's Chinese, when the translator's memory has it. */
+  const typed = (t: string | null | undefined) => (lang === "zh" && t ? (tr[textKey(t)] ?? null) : null);
   // Hidden on the Make window ("Terms and notes" off): no empty heading left behind.
   const terms = bullets.length > 0 && (
     <div style={{ breakInside: "avoid", marginBottom: "16px" }}>
@@ -374,7 +402,18 @@ export function KeboDoc<T>({
         {bullets.map((b, i) => (
           <li key={i} style={{ display: "flex", gap: "4px", whiteSpace: "pre-line" }}>
             <span style={{ flexShrink: 0 }}>{i + 1}.</span>
-            <span style={{ minWidth: 0 }}>{b}</span>
+            <span style={{ minWidth: 0 }}>
+              {typeof b === "string" ? (
+                <>
+                  {b}
+                  {typed(b) && <Zh text={typed(b)!} />}
+                </>
+              ) : isValidElement(b) && b.type === Labelled && typeof (b.props as { value: unknown }).value === "string" ? (
+                cloneElement(b as ReactElement<{ zh?: string | null }>, { zh: typed((b.props as { value: string }).value) })
+              ) : (
+                b
+              )}
+            </span>
           </li>
         ))}
       </ol>
@@ -608,6 +647,7 @@ ${paperZoomCss(".kebo-doc")}`}</style>
                 style={{ padding: "10px 0 6px", textAlign: "center", fontFamily: DISPLAY, fontWeight: 700, fontSize: "13px", letterSpacing: "0.06em", color: NAVY, textTransform: "uppercase" }}
               >
                 {heading}
+                {typed(heading) && <div style={{ fontFamily: CJK, letterSpacing: 0, textTransform: "none" }}>{typed(heading)}</div>}
               </td>
             </tr>
           )}

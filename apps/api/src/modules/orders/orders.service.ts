@@ -49,6 +49,7 @@ import {
   routeAsAccepted,
   hsDigits,
 } from "@kebo/shared";
+import { rememberZh } from "../translations/translations.service";
 import { addDays, dateIn, DomainError, ForbiddenError, GateError, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -1669,6 +1670,8 @@ export class OrdersService {
         // Chinese typed or changed here is staff's (checked); cleared, nobody's.
         const zhBy = changed.includes("descriptionZh") ? (next.descriptionZh ? "staff" : null) : undefined;
         await tx.orderLine.update({ where: { id: line.id }, data: { ...next, ...(zhBy !== undefined ? { zhBy } : {}) } });
+        // Kept for the translator too: the same item on the next order gets this Chinese.
+        if (zhBy === "staff" && next.descriptionZh) await rememberZh(tx, line.description, next.descriptionZh, user.id);
         const label: Record<keyof typeof next, string> = { hsCode: "HS code", hsCodeCn: "China's HS code", descriptionZh: "Chinese name" };
         const said = (k: keyof typeof next, v: string | null) => (k === "descriptionZh" ? (v ? `"${v.split("\n")[0]!.slice(0, 40)}"` : "—") : (v ?? "—"));
         await record(

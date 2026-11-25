@@ -21,6 +21,7 @@ export * from "./workflows/papers";
 export * from "./workflows/packing";
 export * from "./workflows/hs";
 export * from "./workflows/zh-terms";
+export * from "./workflows/translate";
 export * from "./workflows/files";
 export * from "./workflows/ledger";
 export * from "./schemas/common";

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { fromMinor, landedUnitCosts, toMinor } from "@kebo/money";
-import { basisText, paymentSentenceOf, quotePaymentSentence, warrantyLine } from "@kebo/shared";
+import { basisText, paymentSentenceOf, quotePaymentSentence, textKey, warrantyLine } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { docBrand, hasFeature, load } from "@/lib/session";
 import type { DealDetail } from "@/lib/types";
@@ -9,7 +9,9 @@ import { PrintToolbar } from "@/components/print/toolbar";
 import { docLangOf } from "@/components/print/zh";
 import { backTo, companyOr, customerOr } from "@/components/print/data";
 import { copyOf, paperChoices, pdfOf } from "@/components/print/copies";
+import { chineseOf, waitingNote } from "@/components/print/chinese";
 import {
+  bulletTexts,
   docDate,
   docItem,
   docMoney,
@@ -89,7 +91,8 @@ export default async function QuotationPrint({
   const no: DocColumn<DocLine> = { label: "No.", width: 28.5, render: (l, i) => l.no ?? i + 1 };
   const description: DocColumn<DocLine> = {
     label: "Equipment Description",
-    render: (l) => docItem(l.description, l.model),
+    // With Chinese: the item's from the translator's memory (asked for below, with the terms).
+    render: (l) => docItem(l.description, l.model, asked.tr[textKey(l.description)] ?? null, lang),
   };
   const columns: DocColumn<DocLine>[] = internal
     ? [
@@ -130,6 +133,21 @@ export default async function QuotationPrint({
     total: { label: totalPriceLabel(r.incoterm, o.lines, single ? "" : `Option ${o.letter} `), words: docWords(o.total, c), amount: docMoney(o.total, c) },
   }));
 
+  const bullets = [
+    // The payment's parts (an older quotation's deposit and balance print Kebo's sentence as they always did).
+    r.paymentParts?.length ? quotePaymentSentence(r.paymentParts) : paymentSentenceOf(r.depositPercent, r.balanceTerms),
+    ...textBullets(r.paymentTerms),
+    single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : null,
+    ...textBullets(r.deliveryTerms),
+    warranty ? (/^warranty/i.test(warranty) ? warranty : `Warranty: ${warranty}`) : null,
+    single ? null : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
+    ...textBullets(r.notes),
+    ...portBullets(r.incoterm, r.incotermPlace, r.portOfDischarge, null, lang),
+    `This quotation is valid until ${docDate(r.validUntil)}.`,
+  ].filter(Boolean);
+  // In English + 中文: the typed texts' Chinese from the translator's memory (the terms, the items).
+  const asked = await chineseOf([...bulletTexts(bullets), ...options.flatMap((o) => o.lines.map((l) => l.description))], lang);
+
   return (
     <>
       {/* ?embed=1: shown inside the app (the Send page's preview), without the toolbar. */}
@@ -140,6 +158,7 @@ export default async function QuotationPrint({
           pdfHref={pdfOf(`/pdf/revisions/${r.id}`, copy, lang)}
           excelHref={(await hasFeature("excel")) ? `/sheets/export/quotation?id=${r.id}${internal ? "&copy=internal" : ""}` : undefined}
           choices={paperChoices(`/print/revisions/${r.id}`, sp, "revisions", copy, lang)}
+          note={waitingNote(asked.waiting)}
         />
       )}
       <KeboDoc
@@ -154,18 +173,7 @@ export default async function QuotationPrint({
         columns={columns}
         rows={[]}
         groups={groups}
-        bullets={[
-          // The payment's parts (an older quotation's deposit and balance print Kebo's sentence as they always did).
-          r.paymentParts?.length ? quotePaymentSentence(r.paymentParts) : paymentSentenceOf(r.depositPercent, r.balanceTerms),
-          ...textBullets(r.paymentTerms),
-          single ? (options[0]!.leadTime ? `Delivery: ${options[0]!.leadTime}` : null) : null,
-          ...textBullets(r.deliveryTerms),
-          warranty ? (/^warranty/i.test(warranty) ? warranty : `Warranty: ${warranty}`) : null,
-          single ? null : `Please choose one of the ${options.length} options above (${options.map((o) => o.letter).join(", ")}); each is priced on its own.`,
-          ...textBullets(r.notes),
-          ...portBullets(r.incoterm, r.incotermPlace, r.portOfDischarge, null, lang),
-          `This quotation is valid until ${docDate(r.validUntil)}.`,
-        ].filter(Boolean)}
+        bullets={bullets}
         internal={
           internal && options.some((o) => o.costing) ? (
             <InternalTable
@@ -194,6 +202,7 @@ export default async function QuotationPrint({
         // ?sending=1: the copy attached to the email that sends a draft; it reaches the customer as the sent quotation.
         watermark={draftMark(r.status, sp.sending)}
         lang={lang}
+        tr={asked.tr}
       />
     </>
   );
