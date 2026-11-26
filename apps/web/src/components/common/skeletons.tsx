@@ -301,10 +301,11 @@ function Board({ n }: { n: number }) {
   );
 }
 
-/** Settings: boxes of labelled fields in the one 720 column. */
+/** Settings: boxes of labelled fields, laid out as the page's cards are (one 720 column; two on a big screen). */
 function Form({ n }: { n: number }) {
   return (
-    <div className="flex max-w-[720px] flex-col gap-4">
+    <div className="@container">
+      <div className={RULES.page.cards}>
       {Array.from({ length: n }, (_, s) => (
         <div key={s} className="rounded-2xl border border-line bg-surface p-5">
           <Bar className="mb-5 h-4 w-40" />
@@ -318,6 +319,7 @@ function Form({ n }: { n: number }) {
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 }

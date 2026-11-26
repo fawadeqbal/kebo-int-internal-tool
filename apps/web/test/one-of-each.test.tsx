@@ -158,12 +158,15 @@ describe("one of each", () => {
     expect(found(/\|\| "empty"/g)).toEqual([]);
   });
 
-  it("one app frame, no help line under a page's title, settings in one 720 column", () => {
+  it("one app frame, no help line under a page's title, settings in one way (720 column, columns on a big screen)", () => {
     expect(found(/max-w-\[1400px\]|lg:px-8/g)).toEqual([]);
     expect(found(/<main id="main" className=\{cn\(RULES\.page\.frame/g)).toHaveLength(2);
     expect(found(/data-page-desc|<PageHeader\b[^>]*\sdescription=|<PageHeader\b[^>]*\ssummary="/g)).toEqual([]);
     expect(found(/<SettingsPage\b[^>]*description=/g)).toEqual([]);
-    expect(found(/<div className=\{RULES\.page\.column\}>/g).length).toBeGreaterThanOrEqual(4);
+    // Settings: the page of cards (RULES.page.settings, its cards in SettingsCardsFrame); one-form pages: the 720 column.
+    expect(found(/<div className=\{RULES\.page\.settings\}>/g).length).toBeGreaterThanOrEqual(3);
+    expect(found(/className=\{RULES\.page\.cards\}/g).length).toBeGreaterThanOrEqual(1);
+    expect(found(/<div className=\{RULES\.page\.column\}>/g).length).toBeGreaterThanOrEqual(2);
   });
 
   it("one record body: every record's panel is RecordBody's 320, no hand-typed page grid, no second RecordFrame", () => {

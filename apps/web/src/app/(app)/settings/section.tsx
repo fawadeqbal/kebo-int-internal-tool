@@ -12,16 +12,25 @@ import { getSettings } from "@/lib/loaders";
 
 /**
  * One page of Settings (design system: Settings frame, design page 33: each section is a page in
- * the sidebar), in the one 720px column: the breadcrumb and title, then its cards with their values read-only and ✎ Edit
- * for the side panel, or switches that save at once. Changes apply to new quotations and orders,
+ * the sidebar): the breadcrumb and title, then its cards (one 720px column on a laptop, two that fill a big screen:
+ * RULES.page.cards) with their values read-only and ✎ Edit for the side panel, or switches that save at once. Changes apply to new quotations and orders,
  * not ones already made.
  */
 export async function SettingsPage({ href, children, adminOnly }: { href: string; children: ReactNode; /** For admins only (the company's address, the website form): not for a manager. */ adminOnly?: boolean }) {
   await requirePermission("settings.manage");
   if (adminOnly) await requirePermission("security.manage");
   return (
-    <div className={RULES.page.column}>
+    <div className={RULES.page.settings}>
       <PageHeader crumbs={crumbsFor(href)} title={labelFor(href)} />
+      <SettingsCardsFrame>{children}</SettingsCardsFrame>
+    </div>
+  );
+}
+
+/** A settings page's cards: one 720px column on a laptop, two or three that fill a big screen (RULES.page.cards). */
+export function SettingsCardsFrame({ children }: { children: ReactNode }) {
+  return (
+    <div data-settings-cards="" className={RULES.page.cards}>
       {children}
     </div>
   );

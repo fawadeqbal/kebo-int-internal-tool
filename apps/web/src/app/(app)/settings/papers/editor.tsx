@@ -25,10 +25,12 @@ export function PapersEditor({ off: initial, action }: { off: string[]; action: 
     return r;
   };
   return (
-    <div className="flex flex-col">
+    // On a big screen the rows run on in a second column (a line between), none cut in two, no title left alone at a
+    // column's foot.
+    <div className="flex flex-col @min-[68rem]:block @min-[68rem]:columns-2 @min-[112rem]:columns-3 @min-[68rem]:gap-0 @min-[68rem]:[column-rule:1px_solid_var(--color-line)] [&_li]:break-inside-avoid">
       {PAPER_SWITCH_GROUPS.map((g) => (
         <section key={g.title} aria-labelledby={`papers-${g.title}`} className="flex flex-col border-t border-line first:border-t-0">
-          <div className="px-4 pt-3 pb-1">
+          <div className="px-4 pt-3 pb-1 break-after-avoid">
             <h3 id={`papers-${g.title}`} className={capsClass}>
               {g.title}
             </h3>

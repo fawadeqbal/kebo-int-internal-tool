@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/session";
 import { removeMailAction, saveMailAction, testMailAction } from "./actions";
 import { MailCards } from "@/components/common/mail-cards";
 import { MoreMenu } from "@/components/common/more-menu";
+import { SettingsCardsFrame } from "../section";
 
 export const metadata = { title: "Email sending · Admin settings" };
 
@@ -14,7 +15,7 @@ export default async function Page() {
   const me = await requirePermission("security.manage");
   const view = await api.get<MailSettingsView>("/mail-settings");
   return (
-    <div className={RULES.page.column}>
+    <div className={RULES.page.settings}>
       <PageHeader
         crumbs={crumbsFor("/settings/mail")}
         title={labelFor("/settings/mail")}
@@ -39,7 +40,9 @@ export default async function Page() {
           ) : undefined
         }
       />
-      <MailCards view={view} me={me.email} saveAction={saveMailAction} testAction={testMailAction} />
+      <SettingsCardsFrame>
+        <MailCards view={view} me={me.email} saveAction={saveMailAction} testAction={testMailAction} />
+      </SettingsCardsFrame>
     </div>
   );
 }
