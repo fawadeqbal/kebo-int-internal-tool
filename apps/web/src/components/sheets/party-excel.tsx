@@ -7,6 +7,7 @@ import { CheckCircle2, X } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
 import type { CustomerInput, FactoryInput, ImportResult } from "@kebo/shared";
 import type { ReadSheet } from "@/lib/sheet-spec";
+import { useFocusTrap } from "@/components/common/dialog";
 import { ExcelMenu } from "./excel-menu";
 import { customersFromSheet, customersTemplate, factoriesFromSheet, factoriesTemplate, type PartyRead } from "./party-sheets";
 
@@ -71,6 +72,9 @@ function Review({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<ImportResult | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  // It covers the page: Tab stays in it, and closing gives the focus back to the Excel button.
+  useFocusTrap(box, true);
   const good = read.items.filter((i) => i.input);
   const bad = read.items.length - good.length;
   const count = (k: number, word = one) => `${k} ${k === 1 ? word : `${word}s`}`;
@@ -95,7 +99,7 @@ function Review({
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-6">
       <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={() => !busy && onClose()} />
-      <div role="dialog" aria-modal="true" aria-labelledby="party-review-title" className="relative flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-t-2xl border border-line bg-surface shadow-pop sm:rounded-2xl">
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="party-review-title" className="relative flex max-h-[90dvh] w-full max-w-3xl flex-col rounded-t-2xl border border-line bg-surface shadow-pop sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-line p-4">
           <div className="min-w-0">
             <h2 ref={title} tabIndex={-1} id="party-review-title" className="text-base font-semibold outline-none">

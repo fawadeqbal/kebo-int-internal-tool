@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
 import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button, linkClass, CountDot } from "@kebo/ui";
+import { useFocusTrap } from "./dialog";
 import { FloatingMenu, useIsPhone } from "./floating";
 
 export interface FilterSelect {
@@ -235,6 +236,8 @@ function FilterSheet({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [find, setFind] = useState<Record<string, string>>({});
+  // Tab stays in the sheet, and closing it gives the focus back to Filters (review 27 Nov: neither).
+  useFocusTrap(box, true);
   useEffect(() => {
     box.current?.querySelector<HTMLElement>("[data-sheet-close]")?.focus({ preventScroll: true });
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
