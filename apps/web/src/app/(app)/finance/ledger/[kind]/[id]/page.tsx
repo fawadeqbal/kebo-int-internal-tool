@@ -26,11 +26,28 @@ import { DataTable } from "@/components/common/data-table";
 import { EntryPanel } from "@/components/ledger/entry-panel";
 import { EntryBody } from "@/components/ledger/entry-body";
 import { StatementButtons } from "@/components/ledger/statement-buttons";
+import type { Recipient } from "@/components/send/send";
+import { optional } from "@/components/print/data";
+import type { CustomerDetail, FactoryDetail } from "@/lib/types-people";
 import { AgeingTiles, day, LedgerFilters, PARTY_PATH, periodOf, span, TypeBadge } from "@/components/ledger/ledger-parts";
 import type { LedgerEntry, LedgerParty } from "@/lib/types-ledger";
 import { UUID } from "@/lib/ids";
 
 const KIND: Record<string, LedgerPartyKind> = { customers: "customer", factories: "factory", staff: "staff" };
+
+/** A customer's main contact or a supplier's person, when they can be read (staff: no one to email). */
+async function recipientOf(kind: LedgerPartyKind, id: string): Promise<Recipient | null> {
+  if (kind === "customer") {
+    const c = await optional(() => api.get<CustomerDetail>(`/customers/${id}`));
+    const k = c?.contacts.find((x) => x.isPrimary) ?? c?.contacts[0];
+    return k ? { name: k.name, email: k.email, phone: k.whatsapp ?? k.phone } : null;
+  }
+  if (kind === "factory") {
+    const f = await optional(() => api.get<FactoryDetail>(`/factories/${id}`));
+    return f ? { name: f.contactPerson ?? f.name, email: f.email, phone: f.phone } : null;
+  }
+  return null;
+}
 
 type Search = { period?: string; from?: string; to?: string; open?: string; removed?: string; cur?: string; panel?: string; id?: string };
 
@@ -68,6 +85,8 @@ export default async function PartyLedgerPage({
       removed: sp.removed === "1" ? "true" : undefined,
     }),
   );
+  // Who the statement's Email and Share go to: the customer's main contact, the supplier's person.
+  const recipient = await recipientOf(kind, id);
   const base = `/finance/ledger/${path}/${id}`;
   const all = sp as Record<string, string | undefined>;
   const entry =
@@ -114,7 +133,7 @@ export default async function PartyLedgerPage({
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {/* The statement's buttons, then ⋯ (the export) last, as on every page. */}
-            <StatementButtons kind={kind} id={id} from={period.from} to={period.to} cur={sp.cur ?? single ?? undefined} back={base} />
+            <StatementButtons kind={kind} id={id} from={period.from} to={period.to} cur={sp.cur ?? single ?? undefined} back={base} recipient={recipient} today={today} />
             <ExportCsv what="ledger-party" query={{ kind, id, from: period.from, to: period.to, open: open ? "1" : undefined }} />
           </div>
         }

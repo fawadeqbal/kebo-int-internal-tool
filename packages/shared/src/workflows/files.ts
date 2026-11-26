@@ -109,15 +109,38 @@ export const orderFilesZipQuery = z.object({
 export type OrderFilesZipQuery = z.infer<typeof orderFilesZipQuery>;
 
 /**
- * "Share…": the app sends nothing; the phone's share sheet or a download plus a copied message does.
- * This only notes in History who shared what, when and how.
+ * How a document went out when the app did not email it (design "Email and Share", 26 Nov 2026): the phone's
+ * share sheet, a download to send, the person's own mail app, a chat app, in person or another way.
+ */
+export const SHARE_VIA = ["share", "download", "email", "whatsapp", "wechat", "telegram", "in_person", "other"] as const;
+export type ShareVia = (typeof SHARE_VIA)[number];
+/** "on WhatsApp": how it went, after "sent the commercial invoice". */
+export const SHARE_VIA_TEXT: Record<ShareVia, string> = {
+  share: "through the phone's share sheet",
+  download: "after downloading it",
+  email: "by email from their own mail app",
+  whatsapp: "on WhatsApp",
+  wechat: "on WeChat",
+  telegram: "on Telegram",
+  in_person: "in person",
+  other: "another way",
+};
+
+/**
+ * Sent by the person, not the app (Share, Email › myself): this only notes in History who sent what, how and
+ * when (`on`: the day it went, when it was not today).
  */
 export const orderFilesShareInput = z
   .object({
     files: z.array(orderFileRef).max(300).default([]),
     /** Paper keys of GET /orders/:id/papers (commercial-invoice, doc:<id>, …). */
     papers: z.array(z.string().trim().min(1).max(120)).max(60).default([]),
-    via: z.enum(["share", "download"]),
+    via: z.enum(SHARE_VIA),
+    on: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullish()
+      .transform((v) => v ?? null),
     message: z
       .string()
       .trim()
@@ -127,6 +150,44 @@ export const orderFilesShareInput = z
   })
   .refine((v) => v.files.length + v.papers.length > 0, { message: "Choose what to share" });
 export type OrderFilesShareInput = z.infer<typeof orderFilesShareInput>;
+
+const listOf = (s: string | undefined) => (s ?? "").split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+
+/**
+ * Email from the app (design "Email and Share", 26 Nov 2026): multipart, these fields and what goes as `files`
+ * (the documents' PDFs as shown, the stored files), `names` their names in the same order (JSON). For an order,
+ * `order` with the paper keys and file refs that go, so its History says what was emailed; else `about`
+ * (customer:<id>, inquiry:<id>, supplier:<id>) for the activity log.
+ */
+export const mailOutForm = z.object({
+  to: z.string().transform(listOf).pipe(z.array(z.string().email("Check the email address")).min(1, "Who is it to?").max(10, "At most 10 addresses")),
+  cc: z.string().optional().transform(listOf).pipe(z.array(z.string().email("Check the copy address")).max(10, "At most 10 addresses")),
+  subject: z.string().trim().min(1, "Write a subject").max(300),
+  message: z
+    .string()
+    .trim()
+    .max(10000)
+    .optional()
+    .transform((v) => v || null),
+  names: z
+    .string()
+    .optional()
+    .transform((v, ctx) => {
+      try {
+        const x: unknown = JSON.parse(v || "[]");
+        if (Array.isArray(x) && x.every((n) => typeof n === "string" && n.length <= 200)) return x as string[];
+      } catch {
+        /* said below */
+      }
+      ctx.addIssue({ code: "custom", message: "The files' names could not be read" });
+      return z.NEVER;
+    }),
+  order: z.preprocess((v) => (v === "" ? undefined : v), z.string().uuid().optional()),
+  papers: z.string().optional().transform(listOf).pipe(z.array(z.string().min(1).max(120)).max(60)),
+  files: z.string().optional().transform(listOf).pipe(z.array(orderFileRef).max(60)),
+  about: z.preprocess((v) => (v === "" ? undefined : v), z.string().regex(/^(customer|inquiry|supplier):[0-9a-f-]{36}$/).optional()),
+});
+export type MailOutForm = z.infer<typeof mailOutForm>;
 
 /** Size as people read it: 380 KB, 2.4 MB. */
 export function fileSize(bytes: number): string {

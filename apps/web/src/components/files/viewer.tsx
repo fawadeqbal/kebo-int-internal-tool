@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from "next/navigation";
 import { Download, FileText } from "lucide-react";
 import { fileSize } from "@kebo/shared";
-import { Button, buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
+import { buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
 import { useIsPhone } from "@/components/common/floating";
 import { orderWindowOfPrint } from "@/lib/doc-links";
 import {
@@ -18,7 +18,8 @@ import {
   type PaperLook,
   type WindowAction,
 } from "@/components/window/doc-window";
-import { useSend } from "@/components/window/send";
+import { EmailButton, ShareButton, type Outgoing } from "@/components/send/send";
+import { emailOutAction, noteSentAction, noteSharedAction, type Going } from "@/app/(app)/send-actions";
 
 /* ---------------------------------------------------------------- what is shown */
 
@@ -43,10 +44,10 @@ export interface ViewFile {
   facts?: [string, ReactNode][];
   /** Earlier versions: their name, day and download. */
   versions?: { key: string; label: string; href: string }[];
-  /** More things to do: `main` (Replace) at the foot of Details, the rest (Rename, Delete…) in ⋯. */
-  actions?: { label: string; onClick: () => void; danger?: boolean; main?: boolean }[];
-  /** Send: the words to start from, and where the sending is noted (an order's History). */
-  send?: { message?: string; onNoted?: (via: "share" | "download", message: string) => Promise<unknown> };
+  /** More things to do (Replace, Rename, Delete…): in ⋯, Delete last. */
+  actions?: { label: string; onClick: () => void; danger?: boolean }[];
+  /** Email and Share: the words to start from, and the order it is noted on (its file ref). */
+  send?: { message?: string; order?: string | null; file?: string | null };
 }
 
 const EXT_KIND: Record<string, ViewKind> = {
@@ -273,7 +274,6 @@ function OneFile({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; on
   const paperView = usePaperView();
   const [imageZoom, setImageZoom] = useState<number | null>(null);
   const [look, setLook] = useState<PaperLook>(NO_LOOK);
-  const [tab, setTab] = useState("details");
 
   const paper = kind === "paper" ? paperView.info : null;
   const title = kind === "paper" && paper?.title ? paper.title : file.name;
@@ -281,13 +281,18 @@ function OneFile({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; on
   const download = kind === "paper" ? (paper?.pdfHref ?? null) : file.href;
   const sendName = kind === "paper" ? `${title}.pdf` : file.name;
   const detail = kind === "paper" ? [paper?.choices?.flatMap((c) => c.options.filter((o) => o.on).map((o) => o.word)).join(" · "), paperView.pages ? `${paperView.pages.of} page${paperView.pages.of === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ") || "PDF" : [file.size ? fileSize(file.size) : null, KIND_WORD[kind]].filter(Boolean).join(" · ");
-  const send = useSend({
-    what: { href: download ?? file.href, name: sendName, detail, paper: kind === "paper" },
-    subject: title,
-    message: file.send?.message ?? `Please find attached: ${title}.`,
-    link: kind === "paper" ? shown : file.href,
-    onNoted: file.send?.onNoted,
-  });
+  // Email and Share (design "Email and Share", 26 Nov): the file as it is, a paper as shown; an order's noted there.
+  const out: Outgoing = {
+    key: file.key,
+    name: sendName,
+    detail,
+    view: kind === "paper" ? shown : (file.viewHref ?? null),
+    download: download ?? file.href,
+    file: file.send?.file ?? null,
+  };
+  const on = { order: file.send?.order ?? null };
+  const going: Going[] = [{ key: out.key, name: out.name, download: out.download, file: out.file ?? null }];
+  const message = file.send?.message ?? `Please find attached: ${title}.`;
   const canSend = !!download;
   const print =
     kind === "paper" || kind === "pdf"
@@ -296,16 +301,14 @@ function OneFile({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; on
         ? () => printImage(file.viewHref ?? file.href, title)
         : null;
 
-  const mains = (file.actions ?? []).filter((x) => x.main);
   const more: WindowAction[] = [
     ...(paper?.excelHref ? [{ label: "Download Excel", onClick: () => saveHref(paper.excelHref!) }] : []),
     { label: "Open in a new tab", onClick: () => window.open(kind === "paper" ? shown : (file.viewHref ?? file.href), "_blank", "noopener") },
-    ...(file.actions ?? []).filter((x) => !x.main).sort((a, b) => Number(!!a.danger) - Number(!!b.danger)),
+    ...(file.actions ?? []).slice().sort((a, b) => Number(!!a.danger) - Number(!!b.danger)),
   ];
   const where = [file.where, kind !== "paper" && file.size ? `${fileSize(file.size)} · ${KIND_WORD[kind]}` : null, kind === "paper" ? paper?.note : null]
     .filter(Boolean)
     .join(" · ");
-  const openTab = canSend ? tab : "details";
 
   const details = (
     <div className="flex flex-col gap-4">
@@ -334,16 +337,21 @@ function OneFile({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; on
       )}
     </div>
   );
-  const foot =
-    openTab === "send"
-      ? send.foot
-      : mains.length
-        ? mains.map((x) => (
-            <Button key={x.label} variant="secondary" onClick={x.onClick}>
-              {x.label}…
-            </Button>
-          ))
-        : null;
+  const foot = canSend ? (
+    <>
+      <ShareButton items={[out]} message={message} link={kind === "paper" ? shown : file.href} noteAction={on.order ? noteSharedAction.bind(null, on, going) : null} />
+      <EmailButton
+        title={`Email ${title}`}
+        items={[out]}
+        to={null}
+        subject={title}
+        message={message}
+        emailAction={emailOutAction.bind(null, on, going)}
+        markAction={on.order ? noteSentAction.bind(null, on, going) : null}
+        today={new Date().toISOString().slice(0, 10)}
+      />
+    </>
+  ) : null;
 
   const state: DocState = kind === "paper" ? "doc" : "file";
   return (
@@ -376,12 +384,12 @@ function OneFile({ set, at, onMove, onClose }: { set: ViewFile[]; at: number; on
       }
       panel={{
         label: "About this file",
-        tabs: canSend ? [{ key: "details", label: "Details" }, { key: "send", label: "Send" }] : [{ key: "details", label: "Details" }],
-        tab: openTab,
-        onTab: setTab,
-        body: openTab === "send" ? send.body : details,
+        tabs: [{ key: "details", label: "Details" }],
+        tab: "details",
+        onTab: () => {},
+        body: details,
         foot,
-        bar: { text: openTab === "send" ? send.bar : <><b className="font-semibold">Details</b> · {where || KIND_WORD[kind]}</>, state: phone ? state : undefined },
+        bar: { text: <><b className="font-semibold">Details</b> · {where || KIND_WORD[kind]}</>, state: phone ? state : undefined },
       }}
     />
   );

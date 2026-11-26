@@ -22,7 +22,7 @@ import { CheckChip, checksOf, optionOf, optionTitle, PaymentParts, quoteCount, q
 import { UrlWindow } from "@/components/common/panel";
 import { EditAllWindow, NewRevisionWindow } from "@/components/deals/quote-windows";
 import { SendWindow, type SendItem } from "@/components/deals/send-quote";
-import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPricesAction, offersAction, reviseAction, saidNoAction, updateRevisionAction } from "../../quotation/actions";
+import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPricesAction, offersAction, reviseAction, saidNoAction, shareSentAction, updateRevisionAction } from "../../quotation/actions";
 import { ActionForm } from "@/components/common/action-form";
 import { SubmitButton } from "@kebo/ui/client";
 import { inquiryTitle } from "@/lib/titles";
@@ -185,12 +185,25 @@ export default async function QuotationOwnPage({
         </ButtonLink>
       ),
     },
+    {
+      // Share (design "Email and Share"): the PDF as it goes; a draft, once shared, can be marked sent that way.
+      id: "share",
+      place: "paper",
+      label: "Share",
+      share: {
+        items: [{ key: r.id, name: `${quoteRef}.pdf`, view: printHref(r), download: `${pdfHref(r)}${isDraft ? "?sending=1" : ""}` }],
+        message: `${dear} please find our ${r.number > 1 ? "revised " : ""}quotation ${quoteRef} for ${d.title}.`,
+        to: { name: who?.name ?? d.customer.name, phone: who?.whatsapp ?? who?.phone ?? null },
+        link: here,
+        noteAction: isDraft && manage ? shareSentAction.bind(null, d.id, r.id) : null,
+        ask: isDraft && manage ? { question: `Mark R${r.number} as sent {via}? It is then kept exactly as sent.`, confirmLabel: `Mark R${r.number} as sent` } : null,
+      },
+    },
     { id: "print", place: "paper", label: "Print", icon: <Eye aria-hidden />, href: printHref(r) },
     { id: "pdf", place: "paper", label: "PDF", phoneLabel: "Download PDF", ariaLabel: `Download ${quoteRef} as PDF`, icon: <Download aria-hidden />, href: pdfHref(r), download: true },
     { id: "edit", place: "more", when: !!editor, label: "Edit all", panel: "edit-quote" },
     { id: "send-again", place: "more", when: r.status === "sent" && !!send, label: "Send again", panel: "send-again" },
     { id: "revise", place: "more", when: manage && x.canStartRevision && !isDraft, label: "New revision", panel: "new-revision" },
-    { id: "link", place: "more", label: "Copy link to this quotation", copy: here },
     {
       id: "delete",
       place: "more",

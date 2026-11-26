@@ -3,6 +3,7 @@ import { buttonClass } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { OpenPanelButton } from "@/components/common/panel";
+import { ShareButton, type ShareProps } from "@/components/send/send";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -11,7 +12,9 @@ type Run =
   | { href: string; newTab?: boolean; download?: boolean }
   | { panel: string; panelId?: string }
   | { copy: string }
-  | { confirm: { title: string; body?: string; confirmLabel: string }; action: Action };
+  | { confirm: { title: string; body?: string; confirmLabel: string }; action: Action }
+  /** Share (WhatsApp, WeChat…): a paper button beside ⋯, Share… in ⋯ on a phone. */
+  | { share: ShareProps };
 
 /**
  * One thing a record can do (canvas board "Actions: one list per record type"): its words, where it goes — the one
@@ -45,6 +48,7 @@ const entryOf = (a: Plain): MenuEntry => {
   if ("href" in a) return { label: a.label, href: a.href, newTab: a.newTab, download: a.download };
   if ("panel" in a) return { label: a.label, panel: a.panel, id: a.panelId, ...(a.danger ? { danger: true as const } : {}) };
   if ("copy" in a) return { label: a.label, copy: a.copy };
+  if ("share" in a) return { label: a.label.endsWith("…") ? a.label : `${a.label}…`, share: a.share };
   return { label: a.label, confirm: a.confirm, action: a.action, ...(a.danger ? { danger: true as const } : {}) };
 };
 
@@ -82,7 +86,9 @@ export function recordActions(menuLabel: string, list: RecordAction[]): { primar
     papers: papers.length ? (
       <>
         {papers.map((a) =>
-          "href" in a ? (
+          "share" in a ? (
+            <ShareButton key={a.id} {...a.share} label={a.label} size="sm" />
+          ) : "href" in a ? (
             <a
               key={a.id}
               href={a.href}

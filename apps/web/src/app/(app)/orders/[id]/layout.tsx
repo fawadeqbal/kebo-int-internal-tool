@@ -8,6 +8,8 @@ import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf, orderPapersOf, orderS
 import { optional } from "@/components/print/data";
 import { date } from "@/lib/format";
 import { orderName } from "@/lib/titles";
+import { api } from "@/lib/api";
+import type { CustomerDetail } from "@/lib/types-people";
 import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { RecordFrame } from "@/components/records/record-frame";
@@ -36,12 +38,15 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const o = await orderOf(id);
   // Cancelling is a manager's: it sits last in ⋯, away from the everyday buttons.
   const canCancel = can(me, "orders.manage") && o.status !== "cancelled";
-  const [sections, flow, costs, files] = await Promise.all([
+  const [sections, flow, costs, files, customer] = await Promise.all([
     optional(() => orderSectionsOf(id)),
     optional(() => orderFlowOf(id)),
     orderCostsSetup(id),
     optional(() => orderFilesOf(id)),
+    // Who the order's Email and Share go to: the customer's main contact (read as is: no page change if it cannot be).
+    optional(() => api.get<CustomerDetail>(`/customers/${o.customer.id}`)),
   ]);
+  const contact = customer?.contacts.find((c) => c.isPrimary) ?? customer?.contacts[0] ?? null;
   // Where the order stands, in words: the one word worked out from what is stored, then the next two dates.
   const now = today();
   const ready = flow?.factory.readyOn ?? o.readyOn;
@@ -197,7 +202,14 @@ export default async function OrderLayout({ children, params }: { children: Reac
         orderId={o.id}
         files={files?.files ?? []}
         targets={files?.targets ?? []}
-        share={{ refNo: o.refNo, greeting: `Dear ${o.customer.name}`, vessel: ship?.vessel ?? null, eta: ship?.eta ? date(ship.eta) : null }}
+        share={{
+          refNo: o.refNo,
+          greeting: `Dear ${contact?.name.split(" ")[0] ?? o.customer.name}`,
+          vessel: ship?.vessel ?? null,
+          eta: ship?.eta ? date(ship.eta) : null,
+          to: { name: contact?.name ?? o.customer.name, email: contact?.email ?? null, phone: contact?.whatsapp ?? contact?.phone ?? null },
+          today: now,
+        }}
       >
         {children}
       </FileToolsProvider>

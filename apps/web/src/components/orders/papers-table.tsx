@@ -4,7 +4,7 @@ import { ViewSwitch } from "@/components/common/view-switch";
 import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileText, MoreHorizontal, Plus, Share2 } from "lucide-react";
+import { Download, FileText, Mail, MoreHorizontal, Plus, Share2 } from "lucide-react";
 import { BANK_PAPERS, paperDone, type FlowStep, type PaperKind } from "@kebo/shared";
 import { Badge, Button, buttonClass, Card, CardHeader, cn, capsClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
@@ -13,7 +13,7 @@ import { FloatingMenu } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
 import { downloadHref, FileChip, uploadToOrder, useFileTools } from "@/components/files/file-tools";
-import { rowWindowHref } from "@/lib/doc-links";
+import { outOf, rowWindowHref } from "@/lib/doc-links";
 import { ownDocumentAction, paperAgainAction, paperDeleteDraftAction } from "@/app/(app)/orders/files-actions";
 import { RecordForm, StateMark } from "./papers-card";
 
@@ -83,6 +83,9 @@ export function printOf(orderId: string, r: PaperLineRow) {
   return { view: `/print/orders/${orderId}/${r.kind}?${q}`, pdf: `/pdf/${r.kind}/${orderId}${pq.size ? `?${pq}` : ""}` };
 }
 
+/** Share's menu opens at what has focus once the row's ⋯ closes: the ⋯ itself. */
+const focused = () => document.activeElement as HTMLElement | null;
+
 /** Where a paper takes a file ("paper:doc:<id>" or "paper:<kind>"), for drops and "Attach the signed scan". */
 const attachKey = (r: PaperRow) => (r.doc ? `paper:doc:${r.doc.id}` : r.docKind ? `paper:${r.docKind}` : null);
 
@@ -132,6 +135,10 @@ export function PapersTable({
   const still = bank.filter((r) => !paperDone(r.state));
   const makeable = rows.filter((r) => r.makeable && !paperDone(r.state));
   const setKeys = (tab === "bank" ? bank : shown).filter((r) => paperDone(r.state) || r.live);
+  const setOut = setKeys.flatMap((r) => {
+    const o = outOf(orderId, r);
+    return o ? [o] : [];
+  });
   const tabs: { key: PapersTab; label: string; n: number }[] = [
     { key: "bank", label: "For the bank", n: bank.length },
     { key: "all", label: "All documents", n: rows.length },
@@ -231,20 +238,23 @@ export function PapersTable({
                 >
                   as zip
                 </a>
-                {tools && (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() =>
-                      tools.open({
-                        kind: "share",
-                        files: [],
-                        papers: setKeys.map((r) => ({ key: r.key, label: [r.label, r.number].filter(Boolean).join(" "), draft: r.draft || (r.kind === "proforma" && !r.number) })),
-                      })
-                    }
-                  >
-                    <Share2 aria-hidden /> Share…
-                  </Button>
+                {/* Email and Share (design "Email and Share"): the set's documents, each as its own file. */}
+                {tools && setOut.length > 0 && (
+                  <>
+                    <Button size="xs" variant="ghost" onClick={() => tools.open({ kind: "email", out: setOut, title: `Email the set · ${setOut.length} documents` })}>
+                      <Mail aria-hidden /> Email {setOut.length}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={(e) => {
+                        const el = e.currentTarget;
+                        tools.open({ kind: "share", out: setOut, at: () => el });
+                      }}
+                    >
+                      <Share2 aria-hidden /> Share {setOut.length}
+                    </Button>
+                  </>
                 )}
               </>
             )}
@@ -457,6 +467,7 @@ export function PaperMenu({
   const [busy, start] = useTransition();
   const { ask, dialog } = useConfirm();
   const more = useRef<HTMLButtonElement>(null);
+  const out = outOf(orderId, r);
   const scanId = useId();
   const print = printOf(orderId, r);
   const win = windowOf(orderId, r);
@@ -523,19 +534,12 @@ export function PaperMenu({
             </>
           )}
           {file && !print && item("Download", () => downloadHref(file.href))}
-          {tools &&
-            (paperDone(r.state) || r.live) &&
-            (print || file) &&
-            item(
-              "Send…",
-              () =>
-                tools.open({
-                  kind: "share",
-                  files: print ? [] : file ? [file] : [],
-                  papers: print ? [{ key: r.key, label: [r.label, r.number].filter(Boolean).join(" "), draft: r.draft || (r.kind === "proforma" && !r.number) }] : [],
-                }),
-              "WhatsApp, email",
-            )}
+          {tools && out && (
+            <>
+              {item("Email…", () => tools.open({ kind: "email", out: [out], title: `Email the ${r.label.toLowerCase()}` }))}
+              {item("Share…", () => tools.open({ kind: "share", out: [out], at: focused }), "WhatsApp, WeChat…")}
+            </>
+          )}
           {canMake && finalApp && sep}
           {canMake &&
             finalApp &&

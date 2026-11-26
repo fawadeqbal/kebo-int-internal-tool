@@ -7,7 +7,7 @@ import { api, SESSION_COOKIE } from "@/lib/api";
 import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail } from "@/lib/types";
-import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
+import { LOST_REASON_LABEL, SENT_VIA_TEXT, type LostReason, type SentVia, type ShareVia } from "@kebo/shared";
 import type { NewQuotationsResult, QuotationView, QuoteOffers } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
@@ -128,6 +128,16 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
     expired: { message: `${name} marked expired` },
   };
   return { ...r, ...(said[v.to ?? ""] ?? {}) };
+}
+
+/** Shared (WhatsApp, WeChat… from Share) and said yes to "Mark R1 as sent?": the draft becomes Sent that way. */
+export async function shareSentAction(dealId: string, revisionId: string, via: ShareVia): Promise<ActionState> {
+  const how: SentVia = via === "whatsapp" || via === "wechat" || via === "email" || via === "in_person" ? via : "other";
+  const form = new FormData();
+  form.set("to", "sent");
+  form.set("via", how);
+  form.set("reason", `Sent ${SENT_VIA_TEXT[how]}`);
+  return moveRevisionAction(dealId, revisionId, {}, form);
 }
 
 /** The offers with costs in another currency (the editor asks when the quotation currency changes). */

@@ -1,19 +1,21 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Share2 } from "lucide-react";
+import { FileText, Mail, Share2 } from "lucide-react";
 import type { LedgerPartyKind } from "@kebo/shared";
-import { Button, Field, Textarea, Notice } from "@kebo/ui";
-import { PanelBody, SidePanel, WindowFooter } from "@/components/common/panel";
-import { downloadHref } from "@/components/files/file-tools";
+import { Button, Notice } from "@kebo/ui";
+import { EmailPanel, ShareNow, type Outgoing, type Recipient } from "@/components/send/send";
 import { issueStatementAction, type IssuedStatement } from "@/app/(app)/finance/ledger/actions";
+import { emailOutAction } from "@/app/(app)/send-actions";
+
+/** What the activity log puts a statement's email under. */
+const ABOUT: Partial<Record<LedgerPartyKind, string>> = { customer: "customer", factory: "supplier" };
 
 /**
  * The statement of a customer, factory or person, for the period on screen: "Statement PDF" gives it its number
- * and opens the paper (print or download it there); "Share statement" gives it its number and opens the share
- * panel with a ready message: on a phone the share sheet with the PDF (WhatsApp, email, WeChat), on a computer
- * the PDF downloads and the message is copied to paste.
+ * and opens the paper; Share and Email (the app's two buttons, design "Email and Share", 26 Nov 2026) give it its
+ * number and send it: WhatsApp, WeChat… or an email from the company's address (or your own mail app).
  */
 export function StatementButtons({
   kind,
@@ -22,6 +24,8 @@ export function StatementButtons({
   to,
   cur,
   back,
+  recipient,
+  today,
 }: {
   kind: LedgerPartyKind;
   id: string;
@@ -29,11 +33,17 @@ export function StatementButtons({
   to: string;
   cur?: string;
   back: string;
+  /** Who it goes to: the customer's main contact, the supplier's person (To, and WhatsApp's number). */
+  recipient: Recipient | null;
+  /** The company's today (Sent on's latest day). */
+  today: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [share, setShare] = useState<IssuedStatement | null>(null);
+  const [email, setEmail] = useState<IssuedStatement | null>(null);
+  const [sharing, setSharing] = useState<{ n: number; s: IssuedStatement } | null>(null);
+  const shareRef = useRef<HTMLButtonElement>(null);
   const issue = (then: (s: IssuedStatement) => void) =>
     start(async () => {
       setError(null);
@@ -41,85 +51,37 @@ export function StatementButtons({
       if (!s.ok) return setError(s.message ?? "The statement could not be made.");
       then(s);
     });
+  const outOf = (s: IssuedStatement): Outgoing => ({ key: s.number ?? "statement", name: `${s.share?.fileName ?? "Statement"}.pdf`, view: s.view, download: s.pdf! });
+  const about = ABOUT[kind] ? { about: `${ABOUT[kind]}:${id}` } : {};
   return (
     <>
       <Button size="sm" variant="secondary" disabled={pending} onClick={() => issue((s) => router.push(s.view!))}>
         <FileText aria-hidden /> Statement PDF
       </Button>
-      <Button size="sm" variant="primary" disabled={pending} onClick={() => issue(setShare)}>
-        <Share2 aria-hidden /> Share statement
+      <Button ref={shareRef} size="sm" variant="secondary" disabled={pending} aria-haspopup="menu" onClick={() => issue((s) => setSharing((x) => ({ n: (x?.n ?? 0) + 1, s })))}>
+        <Share2 aria-hidden /> Share
+      </Button>
+      <Button size="sm" variant="primary" disabled={pending} onClick={() => issue(setEmail)}>
+        <Mail aria-hidden /> Email
       </Button>
       {error && (
         <Notice tone="bad" className="basis-full">
           {error}
         </Notice>
       )}
-      {share && <SharePanel s={share} onClose={() => setShare(null)} />}
+      {sharing && <ShareNow key={sharing.n} share={{ items: [outOf(sharing.s)], message: sharing.s.share?.message ?? "", to: recipient }} at={() => shareRef.current} />}
+      {email && (
+        <EmailPanel
+          title={`Email statement ${email.number}`}
+          onClose={() => setEmail(null)}
+          items={[outOf(email)]}
+          to={recipient}
+          subject={`Statement of account ${email.number}`}
+          message={email.share?.message ?? ""}
+          emailAction={emailOutAction.bind(null, about, [{ key: email.number ?? "statement", name: outOf(email).name, download: email.pdf! }])}
+          today={today}
+        />
+      )}
     </>
-  );
-}
-
-function SharePanel({ s, onClose }: { s: IssuedStatement; onClose: () => void }) {
-  const id = useId();
-  const [message, setMessage] = useState(s.share?.message ?? "");
-  const [pending, start] = useTransition();
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const name = `${s.share?.fileName ?? "Statement"}.pdf`;
-  const downloadOnly = async () => {
-    downloadHref(s.pdf!);
-    try {
-      await navigator.clipboard.writeText(message);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
-  const doShare = () =>
-    start(async () => {
-      setError(null);
-      const phone = "canShare" in navigator && window.matchMedia("(max-width: 639px), (pointer: coarse)").matches;
-      if (phone) {
-        try {
-          const res = await fetch(s.pdf!);
-          if (!res.ok) throw new Error(`The PDF could not be made (${res.status}).`);
-          const file = new File([await res.blob()], name, { type: "application/pdf" });
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], text: message, title: s.number });
-            onClose();
-            return;
-          }
-        } catch (e) {
-          if (e instanceof DOMException && e.name === "AbortError") return;
-          if (e instanceof Error && e.message.startsWith("The PDF")) return setError(e.message);
-        }
-      }
-      await downloadOnly();
-    });
-  return (
-    <SidePanel
-      title={`Share statement ${s.number}`}
-      description="On a phone: the share sheet with the PDF. On a computer: the PDF downloads and the message is copied for you to paste."
-      onClose={onClose}
-    >
-      <PanelBody className="gap-4">
-        {error && <Notice tone="bad">{error}</Notice>}
-        {copied && <Notice tone="ok">Downloaded, and the message is copied: paste it in WhatsApp, WeChat or your email.</Notice>}
-        <Field label="Message" htmlFor={`${id}-m`}>
-          <Textarea id={`${id}-m`} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
-        </Field>
-        <WindowFooter cancel={false}>
-          <Button size="sm" variant="primary" disabled={pending} onClick={doShare}>
-            {pending ? "Preparing…" : "Share"}
-          </Button>
-          <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(downloadOnly)}>
-            Download only
-          </Button>
-          <Button size="sm" variant="ghost" data-window-cancel="" onClick={onClose}>
-            {copied ? "Done" : "Cancel"}
-          </Button>
-        </WindowFooter>
-      </PanelBody>
-    </SidePanel>
   );
 }

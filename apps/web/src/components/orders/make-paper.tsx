@@ -23,12 +23,13 @@ import {
   type WindowAction,
   type WindowItem,
 } from "@/components/window/doc-window";
-import { useSend, type SendTo, type SendWhat } from "@/components/window/send";
+import { EmailButton, ShareButton, type Outgoing, type Recipient } from "@/components/send/send";
+import { emailOutAction, noteSentAction, noteSharedAction, type Going } from "@/app/(app)/send-actions";
 import { orderWindowHref } from "@/lib/doc-links";
 import type { ActionState } from "@/lib/actions";
 import type { HsLine, PaperChecks } from "@/lib/types-papers";
 import type { PaperOp } from "@/app/(app)/orders/papers-actions";
-import { filesShareAction, ownDocumentAction, paperDeleteDraftAction } from "@/app/(app)/orders/files-actions";
+import { ownDocumentAction, paperDeleteDraftAction } from "@/app/(app)/orders/files-actions";
 import { useTime } from "@/lib/time-client";
 import type { PaperLineRow } from "./papers-table";
 import { RecordForm } from "./papers-card";
@@ -350,15 +351,16 @@ export type OrderDocItem =
 export interface OrderWindowProps {
   order: { id: string; refNo: string; customer: string };
   doc: OrderDocItem;
-  /** The order's documents (the strip and ‹ ›) and which one this is (its row's key). */
-  items: { key: string; name: string; state: DocState; href: string }[];
+  /** The order's documents (the strip and ‹ ›) and which one this is (its row's key); `out`: how a final one goes out. */
+  items: { key: string; name: string; state: DocState; href: string; out?: Outgoing | null }[];
   current: string | null;
   /** The window's own address (no way back): the link for the team. */
   self: string;
   back: string;
   /** Who it goes to (the customer's main contact; none for a supplier's paper). */
-  to: SendTo | null;
+  to: Recipient | null;
   sender: string;
+  today: string;
   /** How it opened: a version, a copy, a language. */
   look: { v: string | null; copy: string | null; lang: string | null };
 }
@@ -411,27 +413,54 @@ function usePaper(base: string, pdfBase: string, first: PaperLook) {
   };
 }
 
-/** The Send tab for one of the order's documents: to the customer, noted in the order's History. */
-function useOrderSend(
+const goingOf = (x: Outgoing): Going => ({ key: x.key, name: x.name, download: x.download, paper: x.paper ?? null, file: x.file ?? null });
+
+/**
+ * Share and Email for one of the order's documents (design "Email and Share", 26 Nov 2026): the panel's foot,
+ * Email strong (sending is the next step). Email can take the order's other final documents along (under Include);
+ * each send is noted in the order's History.
+ */
+function useOrderPair(
   props: OrderWindowProps,
-  what: SendWhat,
+  what: Outgoing,
   name: string,
-  noted: { files?: string[]; papers?: string[] },
   text?: { subject: string; text: string },
   /** "our proforma" for a paper we make, "the bill of lading" for one others issue. */
   whose: "our" | "the" = "our",
 ) {
   const { order, to, sender } = props;
-  return useSend({
-    what,
-    to,
-    subject: text?.subject ?? `${name} · order ${order.refNo}`,
-    message:
-      text?.text ??
-      `Dear ${to?.name ?? "Sir/Madam"},\n\nPlease find attached ${whose} ${name.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} for order ${order.refNo}.\n\nBest regards,\n${sender}`,
-    link: props.self,
-    onNoted: (via, message) => filesShareAction(order.id, { files: noted.files ?? [], papers: noted.papers ?? [], via, message }),
-  });
+  const others = props.items.flatMap((x) => (x.out && x.key !== props.current && x.out.download !== what.download ? [x.out] : []));
+  const items = [what, ...others];
+  const on = { order: order.id };
+  const going = items.map(goingOf);
+  const message =
+    text?.text ??
+    `Dear ${to?.name ?? "Sir/Madam"},\n\nPlease find attached ${whose} ${name.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} for order ${order.refNo}.\n\nBest regards,\n${sender}`;
+  const foot = (
+    <>
+      <ShareButton
+        items={[what]}
+        message={message.replace(/\n\nBest regards,[\s\S]*$/, "")}
+        to={to}
+        link={props.self}
+        noteAction={noteSharedAction.bind(null, on, [goingOf(what)])}
+      />
+      <EmailButton
+        strong
+        label={to?.name ? `Email ${to.name}` : "Email"}
+        title={`Email the ${name.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())}`}
+        description={`${order.refNo} · ${order.customer}`}
+        items={items}
+        to={to}
+        subject={(chosen) => text?.subject ?? (chosen.length > 1 ? `${name} and ${chosen.length - 1} more · order ${order.refNo}` : `${name} · order ${order.refNo}`)}
+        message={message}
+        emailAction={emailOutAction.bind(null, on, going)}
+        markAction={noteSentAction.bind(null, on, going)}
+        today={props.today}
+      />
+    </>
+  );
+  return { foot };
 }
 
 /** The panel's tab: the first one of its state until another is picked (a new state opens its own first tab). */
@@ -572,15 +601,14 @@ function MakeWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { typ
   const named = [p.label, p.number ?? p.refNo].filter(Boolean).join(" ");
   const forWhom = p.buyer?.buyer.name ?? p.factories?.find((f) => f.id === p.ref)?.name ?? props.order.customer;
 
-  const send = useOrderSend(
+  const send = useOrderPair(
     props,
-    { href: paper.pdf, name: `${named}.pdf`, detail: paper.detail, draft: !sendable, paper: true },
+    { key: props.current ?? p.kind, name: `${named}.pdf`, detail: paper.detail, view: paper.src.replace(/([?&])embed=1&?/, "$1"), download: paper.pdf, paper: props.current, draft: !sendable },
     [p.label, p.number].filter(Boolean).join(" "),
-    { papers: props.current ? [props.current] : [] },
     props.doc.text,
   );
 
-  const first = editing ? "make" : sendable ? "send" : "details";
+  const first = editing ? "make" : "details";
   const [tab, setTab] = useTab(first);
 
   const state: { state: DocState; word: string } = p.live
@@ -779,12 +807,7 @@ function MakeWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { typ
         { key: "make", label: "Make", count: missing.length },
         { key: "details", label: "Details" },
       ]
-    : sendable
-      ? [
-          { key: "send", label: "Send" },
-          { key: "details", label: "Details" },
-        ]
-      : [{ key: "details", label: "Details" }];
+    : [{ key: "details", label: "Details" }];
 
   return (
     <>
@@ -804,11 +827,11 @@ function MakeWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { typ
         stage={paper.stage(`${p.label} as it prints`)}
         view={paper.view}
         panel={{
-          label: editing ? "Make it" : sendable ? "Send it" : "About it",
+          label: editing ? "Make it" : "About it",
           tabs,
           tab,
           onTab: setTab,
-          body: tab === "make" ? makeBody : tab === "send" ? send.body : detailsBody,
+          body: tab === "make" ? makeBody : detailsBody,
           foot,
           bar: editing
             ? missing.length
@@ -821,9 +844,7 @@ function MakeWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { typ
                   state: "draft",
                 }
               : { text: "Ready · what it takes and what shows", state: "final" }
-            : sendable
-              ? { text: send.bar }
-              : { text: <>Details · {p.madeFrom}</> },
+            : { text: <>Details · {p.madeFrom}</> },
         }}
       />
       {dialog}
@@ -859,8 +880,12 @@ function OwnWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { type
       router.refresh();
     });
 
-  const send = useOrderSend(props, { href: paper.pdf, name: `${named || r.label}.pdf`, detail: paper.detail, draft: !issued, paper: true }, named || r.label, { papers: props.current ? [props.current] : [] });
-  const first = issued ? "send" : "make";
+  const send = useOrderPair(
+    props,
+    { key: r.key, name: `${named || r.label}.pdf`, detail: paper.detail, view: paper.src.replace(/([?&])embed=1&?/, "$1"), download: paper.pdf, paper: r.key, draft: !issued },
+    named || r.label,
+  );
+  const first = issued ? "details" : "make";
   const [tab, setTab] = useTab(first);
 
   const state: { state: DocState; word: string } = draft
@@ -1013,21 +1038,18 @@ function OwnWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { type
         stage={paper.stage(`${r.label} as it prints`)}
         view={paper.view}
         panel={{
-          label: issued ? "Send it" : "Make it",
+          label: issued ? "About it" : "Make it",
           tabs: issued
-            ? [
-                { key: "send", label: "Send" },
-                { key: "details", label: "Details" },
-              ]
+            ? [{ key: "details", label: "Details" }]
             : [
                 { key: "make", label: kind === "proforma" && !draft ? "Issue" : "Make" },
                 { key: "details", label: "Details" },
               ],
           tab,
           onTab: setTab,
-          body: tab === "send" ? send.body : tab === "make" ? makeBody : detailsBody,
+          body: tab === "make" ? makeBody : detailsBody,
           foot,
-          bar: issued ? { text: send.bar } : { text: <>{state.word} · {r.sub}</>, state: state.state },
+          bar: { text: <>{state.word} · {r.sub}</>, state: state.state },
         }}
       />
       {dialog}
@@ -1044,8 +1066,8 @@ function QuotationWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, 
   view.searchParams.delete("back");
   view.searchParams.set("embed", "1");
   const paper = usePaper(view.pathname + view.search, r.links?.pdf ?? "", { copy: props.look.copy, lang: props.look.lang });
-  const send = useOrderSend(props, { href: paper.pdf, name: `${r.label}.pdf`, detail: paper.detail, paper: true }, r.label, { papers: [r.key] });
-  const [tab, setTab] = useTab("send");
+  const send = useOrderPair(props, { key: r.key, name: `${r.label}.pdf`, detail: paper.detail, view: r.links?.view ?? null, download: paper.pdf, paper: r.key }, r.label);
+  const [tab, setTab] = useTab("details");
   return (
     <DocWindow
       kind="order"
@@ -1065,27 +1087,21 @@ function QuotationWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, 
       stage={paper.stage(`${r.label} as it prints`)}
       view={paper.view}
       panel={{
-        label: "Send it",
-        tabs: [
-          { key: "send", label: "Send" },
-          { key: "details", label: "Details" },
-        ],
+        label: "About it",
+        tabs: [{ key: "details", label: "Details" }],
         tab,
         onTab: setTab,
-        body:
-          tab === "send" ? (
-            send.body
-          ) : (
-            <Facts
-              rows={[
-                ["What it is", "The quotation the customer accepted; the order was made from it"],
-                ["For", props.order.customer],
-                ["Order", props.order.refNo],
-              ]}
-            />
-          ),
+        body: (
+          <Facts
+            rows={[
+              ["What it is", "The quotation the customer accepted; the order was made from it"],
+              ["For", props.order.customer],
+              ["Order", props.order.refNo],
+            ]}
+          />
+        ),
         foot: send.foot,
-        bar: { text: send.bar },
+        bar: { text: <>Details · the quotation the order was made from</> },
       }}
     />
   );
@@ -1109,11 +1125,17 @@ function UploadWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { t
   const setRecord = (mode: "upload" | "elsewhere" | null) => setRecordFor({ state: r.state, mode });
   const viewFile = file ? { key: file.id, name: file.name, href: file.href, viewHref: file.viewHref, type: file.type, size: file.size } : null;
   const kind = viewFile ? kindOf(viewFile) : "other";
-  const send = useOrderSend(
+  const send = useOrderPair(
     props,
-    { href: file?.href ?? "", name: file?.name ?? r.label, detail: file ? `${fileSize(file.size)} · ${(file.name.split(".").pop() ?? "").toUpperCase()}` : "" },
+    {
+      key: r.key,
+      name: file?.name ?? r.label,
+      detail: file ? `${fileSize(file.size)} · ${(file.name.split(".").pop() ?? "").toUpperCase()}` : null,
+      view: file?.viewHref ?? null,
+      download: file?.href ?? "",
+      file: file?.id ?? null,
+    },
     [r.label, r.number].filter(Boolean).join(" "),
-    { files: file ? [file.id] : [] },
     undefined,
     "the",
   );
@@ -1182,26 +1204,17 @@ function UploadWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { t
   );
   const tabs = record
     ? [{ key: "record", label: record === "upload" ? "Upload it" : "Kept elsewhere" }]
-    : file
-      ? [
-          { key: "details", label: "Details" },
-          { key: "send", label: "Send" },
-        ]
-      : [{ key: "details", label: "Details" }];
+    : [{ key: "details", label: "Details" }];
   const openTab = tabs.some((t) => t.key === tab) ? tab : tabs[0]!.key;
-  const foot =
-    openTab === "send" ? (
-      send.foot
-    ) : record ? null : needed && canRecord ? (
-      <Button variant="primary" onClick={() => setRecord("upload")}>
-        Upload
-      </Button>
-    ) : file?.can.replace ? (
-      <Button variant="secondary" onClick={() => tools?.open({ kind: "replace", file })}>
-        Replace file…
-      </Button>
-    ) : null;
+  const foot = record ? null : needed && canRecord ? (
+    <Button variant="primary" onClick={() => setRecord("upload")}>
+      Upload
+    </Button>
+  ) : file ? (
+    send.foot
+  ) : null;
   const more: WindowAction[] = [
+    ...(file?.can.replace ? [{ label: "Replace file…", hint: "keeps this one as an earlier version", onClick: () => tools?.open({ kind: "replace", file }) }] : []),
     ...(file?.can.rename ? [{ label: "Rename", onClick: () => tools?.open({ kind: "rename", file }) }] : []),
     ...(canRecord && needed && record !== "elsewhere" ? [{ label: "Kept elsewhere…", hint: "no file in the app; counts as done", onClick: () => setRecord("elsewhere") }] : []),
     ...(canRecord && kept ? [{ label: "Upload it instead", onClick: () => setRecord("upload") }] : []),
@@ -1247,13 +1260,11 @@ function UploadWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { t
         tabs,
         tab: openTab,
         onTab: setTab,
-        body: openTab === "record" ? recordBody : openTab === "send" ? send.body : details,
+        body: openTab === "record" ? recordBody : details,
         foot,
         bar: record
           ? { text: <>{record === "upload" ? "Upload it" : "Kept elsewhere"} · the file, its number and date</>, state: "needed" }
-          : openTab === "send"
-            ? { text: send.bar }
-            : { text: <>{state.word} · {r.label}</>, state: state.state },
+          : { text: <>{state.word} · {r.label}</>, state: state.state },
       }}
     />
   );

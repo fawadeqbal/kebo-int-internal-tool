@@ -205,6 +205,10 @@ export function ActionForm({
         named[0]?.focus();
       }
       // Else it waits for its step to be drawn (the effect above).
+      // A refusal with no field to go to (the company's email not set up…): its note, drawn at the top, comes
+      // into view, as the button was pressed at the foot of a long form.
+      if (state.ok === false && !named.length)
+        form?.querySelector('[role="alert"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }, 0);
     // No connection: the note says so, with Try again (the window stays, with what was typed).
     if (state.code === "offline")
