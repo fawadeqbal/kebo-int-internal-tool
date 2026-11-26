@@ -518,7 +518,8 @@ function ContactLines({ contact }: { contact: SiteContent["contact"] }) {
 function PlansTable({ plans, demo }: { plans: SitePlan[]; demo: (cta: string) => string }) {
   const per = (p: string) => (p === "year" ? "a year" : "a month");
   return (
-    <Scroll axis="x" size="lg" fade label="The plans compared" className="mt-10 rounded-2xl border border-(--s-line) bg-white">
+    // On a phone the plans stay side by side and slide (data-slides: a comparison, on purpose), the first column kept.
+    <Scroll axis="x" size="lg" fade data-slides="" label="The plans compared" className="mt-10 rounded-2xl border border-(--s-line) bg-white">
       <table className="w-full min-w-[40rem] border-collapse text-left">
         <caption className="sr-only">The plans compared</caption>
         <thead>

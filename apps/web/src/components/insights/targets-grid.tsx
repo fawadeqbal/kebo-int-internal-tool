@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Pencil } from "lucide-react";
-import { THead, Th, Button, cn, Input } from "@kebo/ui";
+import { THead, Th, Button, cn, Input, Scroll } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
@@ -30,7 +30,7 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
   const [editing, setEditing] = useState<string | null>(null);
   const cols = ["company", ...people.map((p) => `p:${p.id}`)];
   return (
-    <div className="scroll-x scroll-lg">
+    <Scroll axis="x" size="lg" fade stack>
       <table className="w-full text-sm">
         <THead>
           <tr>
@@ -96,6 +96,6 @@ export function TargetsGrid({ rows, people, actions, currency }: { rows: TargetR
           )}
         </tbody>
       </table>
-    </div>
+    </Scroll>
   );
 }

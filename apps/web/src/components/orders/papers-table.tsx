@@ -168,6 +168,7 @@ export function PapersTable({
       <div className="flex flex-col px-4 pt-3 pb-3.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <ViewSwitch
+            fill
             label="Documents"
             current={tab}
             views={tabs.map((t) => ({ key: t.key, label: t.label, href: `${base}?tab=${t.key}#papers`, count: t.n }))}

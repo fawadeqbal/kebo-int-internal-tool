@@ -56,7 +56,8 @@ export function StatementButtons({
   return (
     <>
       <Button size="sm" variant="secondary" disabled={pending} onClick={() => issue((s) => router.push(s.view!))}>
-        <FileText aria-hidden /> Statement PDF
+        {/* "PDF" on a phone: the four buttons (PDF, Share, Email, ⋯) keep to one line. */}
+        <FileText aria-hidden /> <span className="max-sm:hidden">Statement</span> PDF
       </Button>
       <Button ref={shareRef} size="sm" variant="secondary" disabled={pending} aria-haspopup="menu" onClick={() => issue((s) => setSharing((x) => ({ n: (x?.n ?? 0) + 1, s })))}>
         <Share2 aria-hidden /> Share
