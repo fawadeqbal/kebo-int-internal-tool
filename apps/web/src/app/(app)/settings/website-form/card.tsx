@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Notice, capsClass } from "@kebo/ui";
+import { Card, CardBody, CardHeader, Notice, RULES, capsClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CopyBlock, NewKeyButton } from "./form";
 import type { WebsiteFormView } from "./types";
@@ -26,7 +26,8 @@ document.getElementById("rfq-form").addEventListener("submit", function (e) {
 export async function WebsiteFormCard() {
   const view = await api.get<WebsiteFormView>("/company/website-form").catch(() => null);
   return (
-    <Card>
+    // The key and a long snippet: across both columns on a big screen.
+    <Card className={RULES.page.across}>
       <CardHeader
         title="Website form"
         description="Inquiries sent from a form on your own website arrive here as new inquiries. The form sends this key, which says they are for your company."

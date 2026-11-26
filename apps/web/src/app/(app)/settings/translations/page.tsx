@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/loaders";
 import { SettingsCards } from "../cards";
 import { saveSettingsAction } from "../actions";
 import { TranslationList } from "./list";
+import { SettingsCardsFrame } from "../section";
 
 export const metadata = { title: "Chinese on papers · Settings" };
 
@@ -39,8 +40,9 @@ export default async function TranslationsPage({ searchParams }: { searchParams:
   const counts: Record<TranslationShow, number> = { ...status.counts, all: status.counts.done + status.counts.waiting + status.counts.failed };
   const words = can(me, "settings.manage") ? await getSettings() : null;
   return (
-    <div className={RULES.page.column}>
+    <div className={RULES.page.settings}>
       <PageHeader crumbs={crumbsFor(HREF)} title={labelFor(HREF)} />
+      <SettingsCardsFrame>
       <Card>
         <CardHeader
           title={
@@ -58,7 +60,8 @@ export default async function TranslationsPage({ searchParams }: { searchParams:
       {words && (
         <SettingsCards groupKey="translation" values={words.translation as Record<string, unknown>} action={saveSettingsAction.bind(null, "translation")} currencyLocked={null} />
       )}
-      <Card>
+      {/* A long list: across both columns on a big screen. */}
+      <Card className={RULES.page.across}>
         <CardHeader title="Its texts" description="The newest first. Checked ones are kept as they are." />
         <CardBody className="flex flex-col gap-3">
           <LinkTabs
@@ -75,6 +78,7 @@ export default async function TranslationsPage({ searchParams }: { searchParams:
           <Pager base={HREF} params={{ show }} page={page} pageSize={size} total={list.total} />
         </CardBody>
       </Card>
+      </SettingsCardsFrame>
     </div>
   );
 }

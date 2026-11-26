@@ -34,25 +34,43 @@ export const RULES = {
   page: {
     /**
      * How wide the app gets and its sides — the page and the top bar alike, so they line up on any screen: the
-     * whole width up to 1920px (a big screen is filled, not a strip in the middle), 16px at the sides on a phone,
-     * 24px from 640, 32px from 1280.
+     * whole width up to 2560px (a big screen is filled, not a strip in the middle; at 1920px a 2560px screen kept
+     * 230px empty between the menu and the page, review 26 Nov), 16px at the sides on a phone, 24px from 640, 32px
+     * from 1280.
      */
-    width: "mx-auto w-full max-w-[1920px]",
+    width: "mx-auto w-full max-w-[2560px]",
     sides: "px-4 sm:px-6 xl:px-8",
     /**
      * The one app frame (canvas row "The one of each, frames", AFOne): the company app and the platform alike —
      * the width and sides above, 18px under the top bar, and its parts one under another `gap` apart.
      */
-    frame: "mx-auto flex w-full max-w-[1920px] flex-col gap-4 px-4 pt-[18px] sm:px-6 xl:px-8",
+    frame: "mx-auto flex w-full max-w-[2560px] flex-col gap-4 px-4 pt-[18px] sm:px-6 xl:px-8",
     /** The one space between the parts of a page (its header, tabs, filters, boxes), down and across. */
     gap: "gap-4",
     /** Parts one under another, `gap` apart: a page, a column of boxes. */
     stack: "flex min-w-0 flex-col gap-4",
     /**
-     * The settings pages (and other one-form pages): one 720px column (rule 4), at the page's left edge like every
-     * other page's title and boxes (centred, its title started mid-page: sweep 20 Nov).
+     * A one-form page (a new company, a new lead on the platform): one 720px column (rule 4), at the page's left
+     * edge like every other page's title and boxes (centred, its title started mid-page: sweep 20 Nov).
      */
     column: "flex w-full max-w-[720px] min-w-0 flex-col gap-4",
+    /**
+     * A page of cards read and changed one by one (every settings page): its title across the page, then `cards`.
+     * Its width is what `cards` measures (a container), so a closed side menu gives it room too.
+     */
+    settings: "@container flex w-full min-w-0 flex-col gap-4",
+    /**
+     * The cards of such a page: one 720px column on a laptop; from a 68rem-wide page (a 1440px screen up) two columns
+     * that fill it, from 112rem (a 2560px screen) three; each card whole in one column (review 26 Nov, a 1920px
+     * screen: "much empty space, it looks dummy": one 720px column left 900px empty beside it).
+     */
+    cards:
+      "w-full max-w-[720px] gap-4 @min-[68rem]:max-w-none @min-[68rem]:columns-2 @min-[112rem]:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid [&>*:last-child]:mb-0",
+    /**
+     * A part of such a page that takes both columns: a long list (the translator's texts), a code snippet. Its own
+     * space above: a column drops the margin under its last card.
+     */
+    across: "[column-span:all] not-first:mt-4",
     /**
      * A record page (the inquiry, a supplier offer, a quotation): its boxes, and beside them the one side panel,
      * 320px from 1024 on every record and every tab; below that one column, the panel a bar that opens a sheet
