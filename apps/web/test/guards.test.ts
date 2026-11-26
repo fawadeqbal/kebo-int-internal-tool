@@ -60,7 +60,8 @@ const GUARDS: Record<keyof typeof known.counts, Guard> = {
   handWiredWindow: {
     what: 'window wired by hand (role="dialog")',
     use: "SidePanel, Modal or BottomSheet (components/common): they keep Tab inside and give the focus back",
-    count: times(/role="(?:dialog|alertdialog)"/g),
+    // (An attribute in the markup, not the same words in a selector: '[role="dialog"]'.)
+    count: times(/(?<!\[)role="(?:dialog|alertdialog)"/g),
   },
   apiOutsideData: {
     what: "page, layout or component that calls the API client itself",
