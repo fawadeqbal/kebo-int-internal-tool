@@ -311,6 +311,14 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
   // It covers the page: Tab stays in it (review 27 Nov: it went on over the page behind).
   useFocusTrap(screen, true);
   useEffect(() => lockScroll(), []);
+  // A wider window shows the search box in the top bar: this screen is put away (hidden but still open, it
+  // would keep the keyboard with nothing to give it to).
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 768px)");
+    const onWide = () => wide.matches && onClose();
+    wide.addEventListener("change", onWide);
+    return () => wide.removeEventListener("change", onWide);
+  }, [onClose]);
   useBackGuard(onClose, () => true);
   const go = (href: string, words?: string) => {
     rememberSearch(words ?? q);

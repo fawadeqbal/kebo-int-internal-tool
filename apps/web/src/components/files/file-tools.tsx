@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { Download, Eye, FileText, Image as ImageIcon, MoreHorizontal } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, ATTACHMENT_KINDS, fileSize, FLOW_STEP_LABEL, type AttachmentKind } from "@kebo/shared";
 import { Button, buttonClass, cn, Field, Input, Select, Notice, linkClass } from "@kebo/ui";
+import { useFocusTrap } from "@/components/common/dialog";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { AttachTarget, OrderFile } from "@/lib/types-files";
@@ -435,6 +436,9 @@ function Modal({
   const id = useId();
   const mounted = useMounted();
   const head = useRef<HTMLHeadingElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  // It opens over the page or over the document window: Tab stays in it, and closing gives the focus back.
+  useFocusTrap(box, mounted);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
@@ -448,6 +452,7 @@ function Modal({
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-4">
       <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-t`}

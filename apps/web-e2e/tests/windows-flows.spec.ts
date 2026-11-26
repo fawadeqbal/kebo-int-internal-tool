@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { newOrder } from "./orders";
 import { foundPages } from "./routes";
 
 /**
@@ -112,14 +113,31 @@ const WINDOWS: Window[] = [
   },
 ];
 
-/** Where the focus is: null inside an open window, else a few words for what has it. */
+/**
+ * Where the focus is: null inside the top window (the last one opened), else a few words for what has it:
+ * something on the page, or in a window under the top one.
+ */
 const outside = (page: Page) =>
   page.evaluate(() => {
     const at = document.activeElement;
-    const open = [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')];
-    if (at && open.some((w) => w.contains(at))) return null;
+    const shown = [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="alertdialog"]')].filter(
+      (w) => w.getClientRects().length > 0,
+    );
+    const top = shown.at(-1);
+    if (at && top?.contains(at)) return null;
     return `${at?.tagName.toLowerCase() ?? "nothing"} "${(at?.getAttribute("aria-label") ?? at?.textContent ?? "").trim().slice(0, 40)}"`;
   });
+
+/** Tab and Shift+Tab, many times: every place the focus went that was not in the top window. */
+async function wanderings(page: Page, tabs: number, back: number) {
+  const left: string[] = [];
+  for (const key of [...Array<string>(tabs).fill("Tab"), ...Array<string>(back).fill("Shift+Tab")]) {
+    await page.keyboard.press(key);
+    const where = await outside(page);
+    if (where) left.push(`${key}: ${where}`);
+  }
+  return left;
+}
 
 for (const w of WINDOWS) {
   test.describe(w.name, () => {
@@ -141,14 +159,8 @@ for (const w of WINDOWS) {
       test.fail(!!w.gap, w.gap);
 
       await expect.poll(() => outside(page), { message: "the focus moved into the window" }).toBeNull();
-      const left: string[] = [];
       // More presses than the fullest window has buttons (the document window: about 30), so a way out at its end is found.
-      for (const key of [...Array<string>(60).fill("Tab"), ...Array<string>(10).fill("Shift+Tab")]) {
-        await page.keyboard.press(key);
-        const where = await outside(page);
-        if (where) left.push(`${key}: ${where}`);
-      }
-      expect(left, "Tab left the window for the page behind it").toEqual([]);
+      expect(await wanderings(page, 60, 10), "Tab left the window for the page behind it").toEqual([]);
 
       await page.keyboard.press("Escape");
       await expect(open, "Esc closed it").toBeHidden();
@@ -156,3 +168,46 @@ for (const w of WINDOWS) {
     });
   });
 }
+
+// One window over another: the Email panel opened from the document window. Only the top one keeps the
+// keyboard (review of #427: with both keeping it, Tab from plain words went into the window underneath).
+test("a window opened over the document window keeps the keyboard, and gives it back to the one under it", async ({ page }) => {
+  // An order of its own whose quotation can be emailed (its customer has a contact with an address).
+  const id = await newOrder(page);
+  await page.goto(`/orders/${id}/documents`);
+  await page.waitForLoadState("networkidle");
+  await page
+    .getByRole("link", { name: /Quotation \(accepted\)/ })
+    .first()
+    .click();
+  const paper = page.getByRole("dialog", { name: /Quotation \(accepted\)/ });
+  await expect(paper).toBeVisible();
+
+  const email = paper.getByRole("button", { name: /^Email / });
+  await email.click();
+  const panel = page.getByRole("dialog", { name: /^Email / });
+  await expect(panel).toBeVisible();
+  await expect.poll(() => outside(page), { message: "the focus moved into the Email panel" }).toBeNull();
+  expect(await wanderings(page, 30, 10), "Tab left the Email panel").toEqual([]);
+
+  // The focus nowhere (as after a click on plain words), then Tab: into the panel, not the document under it.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  expect(await wanderings(page, 3, 0), "Tab from nowhere left the Email panel").toEqual([]);
+
+  // Typing in it works (the window under it does not take the focus away).
+  const message = panel.getByRole("textbox", { name: "Message" });
+  await message.fill("See the quotation attached.");
+  await expect(message).toBeFocused();
+  await expect(message).toHaveValue("See the quotation attached.");
+
+  // Closed (something was typed, so it asks first): the document window has the keyboard again.
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: /Discard/ })
+    .click();
+  await expect(panel).toBeHidden();
+  await expect(paper).toBeVisible();
+  await expect(email, "the focus is back on the button that opened the panel").toBeFocused();
+  expect(await wanderings(page, 40, 5), "Tab left the document window").toEqual([]);
+});

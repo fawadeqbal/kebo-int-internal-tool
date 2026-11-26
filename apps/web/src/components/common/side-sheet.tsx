@@ -18,10 +18,7 @@ export function SideSheet({ title, summary, children }: { title: string; summary
   const sheet = useRef<HTMLDivElement>(null);
   // As a sheet it covers the page: Tab stays in it (review 27 Nov: it went on over the page behind).
   useFocusTrap(sheet, open);
-  const close = () => {
-    setOpen(false);
-    bar.current?.focus({ preventScroll: true });
-  };
+  const close = () => setOpen(false);
   useEffect(() => {
     if (!open) return;
     shut.current?.focus({ preventScroll: true });
@@ -35,6 +32,9 @@ export function SideSheet({ title, summary, children }: { title: string; summary
     return () => {
       document.body.style.overflow = was;
       wide.removeEventListener("change", onWide);
+      // Closed: the focus goes back to the bar, once the sheet has let go of the keyboard (the trap above ends
+      // first). By itself, not by what had the focus before: a phone's browser does not focus a button it taps.
+      bar.current?.focus({ preventScroll: true });
     };
   }, [open]);
 

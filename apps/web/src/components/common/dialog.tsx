@@ -37,15 +37,23 @@ export function focusables(box: HTMLElement): HTMLElement[] {
 const LAYER = "[data-layer],[role=menu],[role=listbox],[role=alertdialog],[role=status]";
 
 /**
- * Focus that is not this window's to take back: in a layer over it, or in another window that covers the page
- * (an Email panel opened from the document window). Each window keeps its own focus; two of them pulling it
- * to themselves would leave neither usable.
+ * The windows that keep the keyboard now, in the order they opened: the last one is on top, and only it
+ * acts. One opened over another (the Email panel over the document window, a confirm over a panel) takes
+ * the keyboard; the one under it has it again when the top one closes. Two windows each pulling the focus to
+ * themselves would leave neither usable.
+ */
+const traps: RefObject<HTMLElement | null>[] = [];
+
+/**
+ * Focus that is not this window's to take back: in a layer over it (a menu, the toast), or in a window that
+ * covers the page without keeping the keyboard itself (it sits over this one, and its focus is its own). Focus
+ * in a window under this one is taken back like focus on the page.
  */
 function elsewhere(box: HTMLElement, at: Element | null): boolean {
   if (!at || box.contains(at)) return false;
   if (at.closest(LAYER)) return true;
   const other = at.closest('[role="dialog"][aria-modal="true"]');
-  return !!other && !other.contains(box);
+  return !!other && !other.contains(box) && !traps.some((t) => t.current === other);
 }
 
 /**
@@ -57,10 +65,12 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
   useEffect(() => {
     if (!active) return;
     const opener = document.activeElement as HTMLElement | null;
+    traps.push(box);
+    const onTop = () => traps.at(-1) === box;
     const tab = (e: KeyboardEvent) => {
       const el = box.current;
-      if (e.key !== "Tab" || !el) return;
-      // A layer on top (a confirm), or another window, handles its own Tab.
+      if (e.key !== "Tab" || !el || !onTop()) return;
+      // A layer on top (a menu) handles its own Tab.
       if (elsewhere(el, document.activeElement)) return;
       const items = focusables(el);
       if (!items.length) {
@@ -81,7 +91,7 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     const back = (e: FocusEvent) => {
       const el = box.current;
       const t = e.target as HTMLElement | null;
-      if (!el || !t || el.contains(t) || elsewhere(el, t)) return;
+      if (!el || !t || !onTop() || el.contains(t) || elsewhere(el, t)) return;
       (focusables(el)[0] ?? el).focus();
     };
     document.addEventListener("keydown", tab);
@@ -105,6 +115,7 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     });
     return () => {
       cancelAnimationFrame(into);
+      traps.splice(traps.indexOf(box), 1);
       document.removeEventListener("keydown", tab);
       document.removeEventListener("focusin", back);
       // Give focus back to the opener; when the page drew it again meanwhile (a row's Pay link while its window was
