@@ -13,8 +13,8 @@ import { foundPages } from "./routes";
 interface Window {
   name: string;
   phone?: boolean;
-  /** Where it is opened from: a page's address, or the page of the demo's first order. */
-  at: string | "order";
+  /** Where it is opened from: a page's address, or the demo's first order ("order", "order/documents"). */
+  at: string;
   /** Opens it, and gives the button the focus must come back to. */
   open: (page: Page) => Promise<Locator>;
   gap?: string;
@@ -59,7 +59,16 @@ const WINDOWS: Window[] = [
       await paper.click();
       return paper;
     },
-    gap: "after its last button Tab goes on to the page behind it",
+  },
+  {
+    name: "the document window, opened from the Documents list",
+    at: "order/documents",
+    open: async (page) => {
+      const paper = page.getByRole("link", { name: /Quotation \(accepted\)/ }).first();
+      await paper.click();
+      return paper;
+    },
+    gap: "there it is a page of its own: closing it goes back, and the focus starts again at the top of the page",
   },
   {
     name: "the phone's Filters sheet",
@@ -70,7 +79,6 @@ const WINDOWS: Window[] = [
       await filters.click();
       return filters;
     },
-    gap: "Tab goes to the page behind it, and closing it does not give the focus back",
   },
   {
     name: "the phone's menu",
@@ -91,7 +99,6 @@ const WINDOWS: Window[] = [
       await search.click();
       return search;
     },
-    gap: "Tab goes to the page behind it",
   },
   {
     name: "the phone's record panel sheet",
@@ -102,7 +109,6 @@ const WINDOWS: Window[] = [
       await bar.click();
       return bar;
     },
-    gap: "Tab goes to the page behind it",
   },
 ];
 
@@ -120,7 +126,8 @@ for (const w of WINDOWS) {
     if (w.phone) test.use(PHONE);
 
     test("keeps the keyboard inside, closes on Esc and gives the focus back", async ({ page }) => {
-      const address = w.at === "order" ? foundPages()["/orders/[id]"] : w.at;
+      const order = foundPages()["/orders/[id]"];
+      const address = w.at.startsWith("order") ? order && `${order}${w.at.slice("order".length)}` : w.at;
       test.skip(!address, "no order in the demo data");
       await page.goto(address!);
       await page.waitForLoadState("networkidle");

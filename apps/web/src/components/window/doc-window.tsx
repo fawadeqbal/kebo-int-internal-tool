@@ -21,7 +21,7 @@ import {
 import { Badge, Button, buttonClass, capsClass, cn } from "@kebo/ui";
 import { SegmentedChoice } from "@kebo/ui/client";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
-import { useMounted } from "@/components/common/dialog";
+import { useFocusTrap, useMounted } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import type { PaperChoice } from "@/components/print/copies";
 
@@ -182,6 +182,11 @@ export function DocWindow(p: DocWindowProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const stripRef = useRef<HTMLElement>(null);
+  const box = useRef<HTMLElement>(null);
+  // Tab stays in the window, and closing it gives the focus back to what opened it (review 27 Nov: after its
+  // last button Tab went on over the page behind). Before the effect that focuses its title: the trap notes
+  // what had the focus first.
+  useFocusTrap(box, mounted);
   const [more, setMore] = useState(false);
   const [sheet, setSheet] = useState(false);
   const items = p.items ?? [];
@@ -416,6 +421,7 @@ export function DocWindow(p: DocWindowProps) {
     <div className={cn("fixed inset-0 flex", p.kind === "viewer" ? "z-[80]" : "z-[70]")} data-doc-window={p.kind}>
       <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/50" onClick={onClose} />
       <section
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-t`}

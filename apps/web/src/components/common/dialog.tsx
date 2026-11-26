@@ -37,6 +37,18 @@ export function focusables(box: HTMLElement): HTMLElement[] {
 const LAYER = "[data-layer],[role=menu],[role=listbox],[role=alertdialog],[role=status]";
 
 /**
+ * Focus that is not this window's to take back: in a layer over it, or in another window that covers the page
+ * (an Email panel opened from the document window). Each window keeps its own focus; two of them pulling it
+ * to themselves would leave neither usable.
+ */
+function elsewhere(box: HTMLElement, at: Element | null): boolean {
+  if (!at || box.contains(at)) return false;
+  if (at.closest(LAYER)) return true;
+  const other = at.closest('[role="dialog"][aria-modal="true"]');
+  return !!other && !other.contains(box);
+}
+
+/**
  * Keeps keyboard focus inside a dialog while it is open (Tab and Shift+Tab
  * go round), and gives it back to whatever had it before (the button that
  * opened it) when it closes.
@@ -48,8 +60,8 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     const tab = (e: KeyboardEvent) => {
       const el = box.current;
       if (e.key !== "Tab" || !el) return;
-      // A layer on top (a confirm) handles its own Tab.
-      if (!el.contains(document.activeElement) && (document.activeElement as HTMLElement | null)?.closest(LAYER)) return;
+      // A layer on top (a confirm), or another window, handles its own Tab.
+      if (elsewhere(el, document.activeElement)) return;
       const items = focusables(el);
       if (!items.length) {
         e.preventDefault();
@@ -69,7 +81,7 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     const back = (e: FocusEvent) => {
       const el = box.current;
       const t = e.target as HTMLElement | null;
-      if (!el || !t || el.contains(t) || t.closest(LAYER)) return;
+      if (!el || !t || el.contains(t) || elsewhere(el, t)) return;
       (focusables(el)[0] ?? el).focus();
     };
     document.addEventListener("keydown", tab);

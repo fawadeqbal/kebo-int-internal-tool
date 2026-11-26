@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { ArrowLeft, Clock, Loader2, Search, X } from "lucide-react";
 import { SEARCH_KIND_LABEL, type SearchKind, type SearchResult } from "@kebo/shared";
 import { Badge, cn, Kbd, controlClass, controlSizes, EmptyLine, capsClass } from "@kebo/ui";
-import { useBackGuard } from "@/components/common/dialog";
+import { useBackGuard, useFocusTrap } from "@/components/common/dialog";
 import { lockScroll } from "@/lib/scroll-lock";
 import { ResultText, kindCount, kindOne, SEARCH_ICON as ICON, searchHref } from "./search-bits";
 
@@ -283,9 +283,16 @@ function Row({ o, on, onPick, onHover, icon }: { o: Option; on: boolean; onPick:
  */
 export function PhoneSearch() {
   const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  // Closed: the focus goes back to the icon that opened it (the screen's own box had it, and is gone).
+  useEffect(() => {
+    if (wasOpen.current && !open) button.current?.focus({ preventScroll: true });
+    wasOpen.current = open;
+  }, [open]);
   return (
     <>
-      <button type="button" className="grid size-10 place-items-center rounded-md text-text hover:bg-surface-2 md:hidden" aria-label="Search everything" onClick={() => setOpen(true)}>
+      <button ref={button} type="button" className="grid size-10 place-items-center rounded-md text-text hover:bg-surface-2 md:hidden" aria-label="Search everything" onClick={() => setOpen(true)}>
         <Search className="size-5" aria-hidden />
       </button>
       {/* Over everything (the top bar keeps its own layer): drawn at the page's end. */}
@@ -300,6 +307,9 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
   const [recent] = useState(readRecent);
   const { result, loading, failed } = useResults(text);
   const q = text.trim();
+  const screen = useRef<HTMLDivElement>(null);
+  // It covers the page: Tab stays in it (review 27 Nov: it went on over the page behind).
+  useFocusTrap(screen, true);
   useEffect(() => lockScroll(), []);
   useBackGuard(onClose, () => true);
   const go = (href: string, words?: string) => {
@@ -309,6 +319,7 @@ function PhoneSearchScreen({ onClose }: { onClose: () => void }) {
   };
   return (
     <div
+      ref={screen}
       role="dialog"
       aria-modal="true"
       aria-label="Search everything"
