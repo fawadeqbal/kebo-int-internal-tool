@@ -58,6 +58,8 @@ const expenseQuery = z.object({
   q: z.string().trim().max(100).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
+  /** none: live costs only; only: the removed ones (a Removed tab). Not given: both. */
+  removed: z.enum(["none", "only"]).optional(),
 });
 const MAX_UPLOAD = 200 * 1024 * 1024; // hard ceiling; the configured limit is checked in the service
 const yearQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });
@@ -201,7 +203,7 @@ export class MoneyController {
     return this.money.forOrder(user, id);
   }
 
-  /** Managers only. ?from&to (dates), ?orderId, ?customerId, ?category, ?kind=order|customer|general; with totals by kind and by customer. */
+  /** Managers only. ?from&to (dates), ?orderId, ?customerId, ?category, ?kind=order|customer|general, ?removed=none|only; with totals by kind and by customer. */
   @RequireFeature("expenses")
   @SignedIn("checked inside: expenses.manage")
   @Get("expenses")

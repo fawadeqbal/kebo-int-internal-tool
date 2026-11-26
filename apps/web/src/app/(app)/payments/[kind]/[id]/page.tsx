@@ -13,13 +13,13 @@ import { VoidWindow } from "@/components/money/forms";
 import { MoreMenu } from "@/components/common/more-menu";
 import { AttachedFile } from "@/components/money/attachment";
 import { MoneyHero } from "@/components/money/money-hero";
-import { ChangeCustomerPayment, ChangeExpense, ChangeSupplierPayment } from "@/components/money/payment-change";
+import { AgainExpense, ChangeCustomerPayment, ChangeExpense, ChangeSupplierPayment } from "@/components/money/payment-change";
 import type { ExpenseView } from "@/lib/types-money";
 import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Me } from "@/lib/session";
 import { fieldLabel, hiddenChange, shown } from "@/components/common/history-words";
-import { editPaymentAction, factoryPaymentAction } from "../../../money/actions";
+import { editPaymentAction, factoryPaymentAction, repeatingAction } from "../../../money/actions";
 import { removeRecordFileAction, voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
 import { cache } from "react";
@@ -74,7 +74,10 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
   const p = await paymentOf(kind as PaymentRecordKind, id);
   if (!p) notFound();
   const order = p.for.find((f) => f.href?.startsWith("/orders/"));
-  const change = await changeOf(me, p);
+  // A cost (an expense) its managers can change: Change, Add again and Stop repeating are in its ⋯ (they were in
+  // the Expenses list's fold-open row, review 26 Nov).
+  const expense = p.kind === "expense" && !p.voided && can(me, "expenses.manage") ? await api.get<ExpenseView>(`/expenses/${p.id}`).catch(() => null) : null;
+  const change = await changeOf(me, p, expense);
   const paper = paperOf(p);
   const fileKind = p.kind === "customer" || p.kind === "supplier" || p.kind === "expense" ? p.kind : null;
   // The customer's file is kept on the payment on the order (one order paid in full); the others on the record.
@@ -134,7 +137,11 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
         top={
           <RecordTop
             header={{
-              crumbs: [...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }],
+              // A company's cost (no order) is reached from Finance › Expenses: its crumbs say so; the rest, Payments.
+              crumbs:
+                p.kind === "expense" && !order
+                  ? [...crumbsFor("/money/company-costs").slice(0, 1), { label: "Expenses", href: "/money/company-costs" }, { label: p.number ?? p.title }]
+                  : [...crumbsFor("/payments").slice(0, 1), { label: "Payments", href: "/payments" }, { label: p.number ?? p.title }],
               title: title,
               record: { kind: kindOf(p), number: p.number },
               badge: <StatusBadge meaning={STATUS_MEANING[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</StatusBadge>,
@@ -157,7 +164,24 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
                 p.voidPath || change ? (
                   <MoreMenu
                     label={`More for ${p.number ?? "this payment"}`}
-                    items={[...(change ? [{ label: "Change", panel: "change" }] : []), ...(p.voidPath ? [{ label: "Remove this payment", panel: "remove", danger: true as const }] : [])]}
+                    items={[
+                      ...(change ? [{ label: "Change", panel: "change" }] : []),
+                      ...(expense ? [{ label: "Add again", panel: "again" }] : []),
+                      ...(expense?.repeats && expense.repeatKey
+                        ? [
+                            {
+                              label: "Stop repeating",
+                              confirm: {
+                                title: "Stop repeating this cost?",
+                                body: "It is no longer proposed each month. This one and the months already added stay.",
+                                confirmLabel: "Stop repeating",
+                              },
+                              action: repeatingAction.bind(null, expense.repeatKey, "stop"),
+                            },
+                          ]
+                        : []),
+                      ...(p.voidPath ? [{ label: "Remove this payment", panel: "remove", danger: true as const }] : []),
+                    ]}
                   />
                 ) : undefined,
             }}
@@ -309,7 +333,7 @@ function HistoryLine({ who, what, at, reason }: { who: string | null; what: stri
  * The Change window of a payment, opened from ⋯: the same window the order (or the costs list) uses, with the same
  * data, so a payment is changed in one place whatever page it was recorded from.
  */
-async function changeOf(me: Me, p: PaymentView): Promise<ReactNode> {
+async function changeOf(me: Me, p: PaymentView, expense: ExpenseView | null): Promise<ReactNode> {
   if (p.voided) return null;
   const today = companyToday();
   if (p.kind === "customer" && p.orderId) {
@@ -336,10 +360,15 @@ async function changeOf(me: Me, p: PaymentView): Promise<ReactNode> {
       />
     );
   }
-  if (p.kind === "expense" && can(me, "expenses.manage")) {
-    const [e, people, settings] = await Promise.all([api.get<ExpenseView>(`/expenses/${p.id}`).catch(() => null), getPeople(), getSettings()]);
-    if (!e) return null;
-    return <ChangeExpense e={e} people={people} fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }} today={today} />;
+  if (p.kind === "expense" && expense) {
+    const [people, settings] = await Promise.all([getPeople(), getSettings()]);
+    const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+    return (
+      <>
+        <ChangeExpense e={expense} people={people} fx={fx} today={today} />
+        <AgainExpense e={expense} people={people} fx={fx} today={today} />
+      </>
+    );
   }
   return null;
 }

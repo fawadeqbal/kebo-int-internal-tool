@@ -168,6 +168,8 @@ export interface FactoryPaymentView {
 
 export interface ExpenseView {
   id: string;
+  /** Its number as the ledger posted it (EX-2026-0213): given in the expenses list. */
+  number?: string | null;
   order: { id: string; refNo: string } | null;
   orderId: string | null;
   /** Who it was spent on; an order's expense is always on its customer. Null: the company's own cost. */
@@ -337,6 +339,8 @@ export interface ExpenseList {
   byCategory: { category: ExpenseCategory; total: string; count: number }[];
   /** Ignores the customer filter. */
   byCustomer: { customer: { id: string; name: string }; total: string; count: number; orders: number }[];
+  /** The period's removed costs (a Removed tab); the list shows them only with removed=only, or crossed out when not asked. */
+  removed: number;
   /** One page of the list; `listed` is how many rows it has in all. */
   rows: ExpenseView[];
   page: number;

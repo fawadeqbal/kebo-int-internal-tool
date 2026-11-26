@@ -105,6 +105,30 @@ describe("expenses", () => {
     expect(Number(onCustomers.total)).toBe(Number(onCustomers.customers));
   });
 
+  it("numbers each cost as the ledger does (EX-…), and lists the live or the removed ones (the Expenses page's tabs)", async () => {
+    const add = async (description: string) =>
+      (await api(app, manager).post("/expenses", { category: "office", description, amount: 25, currency: "USD", spentOn: today }).expect(201)).body as { id: string };
+    const kept = await add(`Paper for printer-${tag}`);
+    const gone = await add(`Ink for printer-${tag}`);
+    await api(app, manager).post(`/expenses/${gone.id}/void`, { reason: "Entered twice" }).expect(200);
+    const find = (b: { rows: (Row & { number: string | null })[] }, id: string) => b.rows.find((r) => r.id === id);
+
+    const live = await list(`kind=company&removed=none&q=printer-${tag}&pageSize=100`);
+    expect(find(live, kept.id)?.number).toMatch(new RegExp(`^EX-${today.slice(0, 4)}-\\d+`));
+    expect(find(live, gone.id)).toBeUndefined();
+    expect(live.listed).toBe(1);
+    expect(live.removed).toBe(1);
+
+    const removed = await list(`kind=company&removed=only&q=printer-${tag}&pageSize=100`);
+    expect(removed.rows.map((r: Row) => r.id)).toEqual([gone.id]);
+    // The totals never count a removed cost, whichever tab is open.
+    expect(removed.total).toBe(live.total);
+
+    // Not asked: both, as the other lists (a customer's, a supplier's) show them.
+    const both = await list(`kind=company&q=printer-${tag}&pageSize=100`);
+    expect(both.listed).toBe(2);
+  });
+
   it("lists customers by name for pickers", async () => {
     const names = (await api(app, manager).get("/customers/names").expect(200)).body as { id: string; name: string }[];
     expect(names.find((n) => n.id === customerId)).toEqual({ id: customerId, name: `Lahore Dairy ${tag}` });

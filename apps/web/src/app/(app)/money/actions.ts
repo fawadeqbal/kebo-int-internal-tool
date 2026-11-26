@@ -276,13 +276,6 @@ export async function repayAction(orderId: string | null, expenseIds: string[], 
   return r;
 }
 
-/** Removes the receipt kept with an expense. */
-export async function removeReceiptAction(expenseId: string, customerId: string | null, orderId: string | null): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/expenses/${expenseId}/receipt`), "Receipt removed.");
-  if (r.ok) refresh(orderId, customerId);
-  return r;
-}
-
 export async function voidExpenseAction(
   orderId: string | null,
   expenseId: string,

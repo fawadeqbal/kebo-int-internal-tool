@@ -54,24 +54,3 @@ export function RepeatingRow({ w, setup }: { w: Waiting; setup: CostSetup }) {
     </li>
   );
 }
-
-/** "Stop repeating" on a cost that comes every month: it is no longer proposed. Its past months stay. */
-export function StopRepeating({ repeatKey }: { repeatKey: string }) {
-  const [busy, start] = useTransition();
-  const router = useRouter();
-  return (
-    <Button
-      size="xs"
-      variant="ghost"
-      disabled={busy}
-      onClick={() =>
-        start(async () => {
-          const r = await repeatingAction(repeatKey, "stop");
-          if (r.ok) router.refresh();
-        })
-      }
-    >
-      Stop repeating
-    </Button>
-  );
-}
