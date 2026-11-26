@@ -1,5 +1,6 @@
 import { isPaperKind, paperDone, type FlowStep } from "@kebo/shared";
 import type { DocState } from "@/components/window/doc-window";
+import type { Outgoing } from "@/components/send/send";
 import { UUID } from "./ids";
 import type { PaperRow } from "./types-papers";
 
@@ -50,3 +51,19 @@ export const rowWindowHref = (orderId: string, r: Pick<PaperRow, "kind" | "ref" 
 const STEP_ORDER: FlowStep[] = ["payment", "factory", "production", "shipping", "documents", "delivery"];
 export const byStep = <T extends { step: FlowStep }>(rows: T[]): T[] =>
   rows.map((r, i) => ({ r, i })).sort((a, b) => STEP_ORDER.indexOf(a.r.step) - STEP_ORDER.indexOf(b.r.step) || a.i - b.i).map((x) => x.r);
+
+/**
+ * How one of the order's documents goes out when it is final (under Email's Include, Share): the PDF of a paper we
+ * make, the stored file of one uploaded; null while it is a draft or not here.
+ */
+export function outOf(orderId: string, r: PaperRow & { links?: { view: string; pdf: string } }): Outgoing | null {
+  if (r.source === "upload")
+    return r.doc?.file && r.state === "up"
+      ? { key: r.key, name: r.doc.file.name, view: `/files/${r.doc.file.id}?view=1`, download: `/files/${r.doc.file.id}`, file: `attachment:${r.doc.file.id}` }
+      : null;
+  if (r.draft || !(r.live || paperDone(r.state))) return null;
+  const q = r.ref ? `?ref=${r.ref}` : "";
+  const links = r.links ?? (r.printable ? { view: `/print/orders/${orderId}/${r.kind}${q}`, pdf: `/pdf/${r.kind}/${orderId}${q}` } : null);
+  if (!links) return null;
+  return { key: r.key, name: `${[r.label, r.number].filter(Boolean).join(" ")}.pdf`, view: links.view, download: links.pdf, paper: r.key };
+}

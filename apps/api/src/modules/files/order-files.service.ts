@@ -16,6 +16,7 @@ import {
   ORDER_DOCUMENT_KINDS,
   ORDER_DOCUMENT_LABEL,
   ORDER_FILE_GROUP_LABEL,
+  SHARE_VIA_TEXT,
   ORDER_FILE_GROUPS,
   PAYMENT_KIND_LABEL,
   STEP_FILE_GROUP,
@@ -711,35 +712,59 @@ export class OrderFilesService {
     return (await db.attachment.findFirst({ where: { deletedAt: null, expenseId: f.sourceId }, select: { storageKey: true } }))?.storageKey ?? null;
   }
 
-  /** POST /orders/:id/files/share — nothing is sent by the app: this only notes who shared what, how and when. */
-  async share(user: SessionUser, orderId: string, input: OrderFilesShareInput) {
+  /** What of the order goes out (papers by key, files by ref), all of it on the order, and how History names it. */
+  private async going(user: SessionUser, orderId: string, paperKeys: string[], fileRefs: string[]) {
     const all = await this.list(user, orderId);
-    const files = all.files.filter((f) => input.files.includes(f.id));
-    if (files.length !== new Set(input.files).size) throw new NotFoundError("File");
-    const papers = input.papers.length ? (await this.papers.list(user, orderId)).papers.filter((p) => input.papers.includes(p.key)) : [];
-    if (papers.length !== new Set(input.papers).size) throw new NotFoundError("Document");
+    const files = all.files.filter((f) => fileRefs.includes(f.id));
+    if (files.length !== new Set(fileRefs).size) throw new NotFoundError("File");
+    const papers = paperKeys.length ? (await this.papers.list(user, orderId)).papers.filter((p) => paperKeys.includes(p.key)) : [];
+    if (papers.length !== new Set(paperKeys).size) throw new NotFoundError("Document");
     const o = await this.orders.load(user, orderId);
     const names = [...papers.map((p) => [p.label, p.number].filter(Boolean).join(" ")), ...files.map((f) => f.name)];
     const steps = new Set([...files.map((f) => f.step), ...papers.map((p) => p.step)].filter(Boolean));
     const step = steps.size === 1 ? ([...steps][0] as FlowStep) : "documents";
     const n = names.length;
+    const what = n === 1 ? names[0]! : `${n} files (${names.slice(0, 3).join(", ")}${n > 3 ? ` and ${n - 3} more` : ""})`;
+    return { o, files, papers, step, what };
+  }
+
+  /** POST /orders/:id/files/share — sent by the person, not the app: this only notes who sent what, how and when. */
+  async share(user: SessionUser, orderId: string, input: OrderFilesShareInput) {
+    const g = await this.going(user, orderId, input.papers, input.files);
+    const verb = input.via === "share" || input.via === "download" ? "shared" : input.via === "in_person" ? "gave" : "sent";
+    const when = input.on ? ` on ${input.on}` : "";
     await this.prisma.tx((tx) =>
-      this.log(
-        tx,
-        user,
-        o,
-        "share",
-        `shared ${n === 1 ? names[0] : `${n} files (${names.slice(0, 3).join(", ")}${n > 3 ? ` and ${n - 3} more` : ""})`} — ${input.via === "share" ? "through the phone's share sheet" : "downloaded to send"}`,
-        step,
-        {
-          files: files.map((f) => f.name),
-          papers: papers.map((p) => p.key),
-          via: input.via,
-          ...(input.message ? { message: input.message } : {}),
-        },
-      ),
+      this.log(tx, user, g.o, "share", `${verb} ${g.what} ${SHARE_VIA_TEXT[input.via]}${when}`, g.step, {
+        files: g.files.map((f) => f.name),
+        papers: g.papers.map((p) => p.key),
+        via: input.via,
+        ...(input.on ? { on: input.on } : {}),
+        ...(input.message ? { message: input.message } : {}),
+      }),
     );
     return { ok: true };
+  }
+
+  /**
+   * Emailed from the app (MailOutService): checked before it goes (what is said to go is on the order), then
+   * `done` notes it in History.
+   */
+  async emailing(user: SessionUser, orderId: string, paperKeys: string[], fileRefs: string[]) {
+    const g = await this.going(user, orderId, paperKeys, fileRefs);
+    return {
+      what: g.what,
+      done: (mail: { to: string[]; cc: string[]; message: string | null }) =>
+        this.prisma.tx((tx) =>
+          this.log(tx, user, g.o, "email", `emailed ${g.what} to ${mail.to.join(", ")} from the app`, g.step, {
+            files: g.files.map((f) => f.name),
+            papers: g.papers.map((p) => p.key),
+            via: "app",
+            to: mail.to,
+            ...(mail.cc.length ? { cc: mail.cc } : {}),
+            ...(mail.message ? { message: mail.message } : {}),
+          }),
+        ),
+    };
   }
 }
 

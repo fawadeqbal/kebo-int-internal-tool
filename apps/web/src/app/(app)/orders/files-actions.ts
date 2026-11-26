@@ -38,13 +38,6 @@ export async function fileRemoveAction(orderId: string, source: OrderFileSource,
   return done(orderId, await attempt(null, () => api.delete(`/orders/${orderId}/files/${source}/${fileId}`), "Deleted."));
 }
 
-/** Notes a share in History; the app itself sends nothing. */
-export async function filesShareAction(
-  orderId: string,
-  body: { files: string[]; papers: string[]; via: "share" | "download"; message?: string | null },
-): Promise<ActionState> {
-  return done(orderId, await attempt(null, () => api.post(`/orders/${orderId}/files/share`, body), "Noted in History."));
-}
 
 /** Make again: a new version of a final paper, as a draft. */
 export async function paperAgainAction(orderId: string, kind: PaperKind, ref: string | null): Promise<ActionState> {

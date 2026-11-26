@@ -97,20 +97,22 @@ describe("the file viewer", () => {
     expect(screen.getAllByRole("link", { name: /Download/ })[0]!.getAttribute("href")).toBe("/files/eee");
   });
 
-  it("sends any file from the panel's Send tab: email, WhatsApp, or the link for the team", () => {
+  it("sends any file with the app's two buttons: Share (chat apps, the link) and Email, once each", () => {
     render(
       <FileViewerProvider>
         <a href="/files/fff?view=1">Bank slip.pdf</a>
       </FileViewerProvider>,
     );
     fireEvent.click(screen.getByText("Bank slip.pdf"));
-    // One window: Download and Print in the header, sending in the panel (no Share button beside them).
-    expect(screen.queryByRole("button", { name: /^Share/ })).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "Send" }));
-    expect(screen.getByRole("radio", { name: "Email" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "WhatsApp" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("radio", { name: "Copy link" }));
-    expect(screen.getByRole("button", { name: /Copy the link/ })).toBeTruthy();
+    // No Send tab: the panel's foot holds Share and Email, nothing else sends.
+    expect(screen.queryByRole("tab", { name: "Send" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Share$/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Email$/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /^Share$/ }));
+    const apps = screen.getAllByRole("menuitem").map((m) => m.textContent ?? "");
+    expect(apps.some((t) => t.startsWith("WhatsApp"))).toBe(true);
+    expect(apps.some((t) => t.startsWith("WeChat"))).toBe(true);
+    expect(apps.some((t) => t.startsWith("Copy link"))).toBe(true);
   });
 
   it("opens an order's paper in the order's own window, not the viewer", () => {

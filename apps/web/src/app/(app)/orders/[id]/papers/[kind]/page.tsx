@@ -9,9 +9,9 @@ import type { CustomerNow } from "@/lib/types-orders";
 import type { PaperChecks } from "@/lib/types-papers";
 import { backTo, optional } from "@/components/print/data";
 import { OrderDocWindow, type OrderDocItem } from "@/components/orders/make-paper";
-import type { SendTo } from "@/components/window/send";
+import type { Recipient } from "@/components/send/send";
 import { today } from "@/components/orders/today";
-import { byStep, docStateOf, orderWindowHref, rowWindowHref } from "@/lib/doc-links";
+import { byStep, docStateOf, orderWindowHref, outOf, rowWindowHref } from "@/lib/doc-links";
 import { UUID } from "@/lib/ids";
 import { titled } from "@/lib/titles";
 import { paperAction } from "../../../papers-actions";
@@ -81,11 +81,19 @@ export default async function OrderDocumentPage({
   // Back where it was opened from (Documents, a step's page), else its step's page.
   const back = backTo(sp.back, `${base}/${STEP_PATH[fallbackStep]}`);
   const look = { v: clean(sp.v, /^\d{1,3}$/), copy: clean(sp.copy, /^[a-z]{1,20}$/), lang: clean(sp.lang, /^[a-z]{2}$/) };
-  const items = rows.map((r) => ({ key: r.key, name: [r.label, r.number].filter(Boolean).join(" "), state: docStateOf(r), href: rowWindowHref(id, r, back) }));
+  const items = rows.map((r) => ({
+    key: r.key,
+    name: [r.label, r.number].filter(Boolean).join(" "),
+    state: docStateOf(r),
+    href: rowWindowHref(id, r, back),
+    out: outOf(id, r),
+  }));
   const customer = await optional(() => api.get<CustomerNow>(`/customers/${o.customer.id}`));
   const contact = customer?.contacts.find((c) => c.isPrimary) ?? customer?.contacts[0] ?? null;
-  const toCustomer: SendTo = { name: contact?.name ?? o.customer.name, email: contact?.email ?? null, phone: contact?.whatsapp ?? contact?.phone ?? null };
-  const common = { order: { id, refNo: o.refNo, customer: o.customer.name }, items, back, sender: me.name, look };
+  // Copy: the customer's other contacts with an email (at most two), as a quotation's Send does.
+  const cc = (customer?.contacts ?? []).filter((c) => c.email && c !== contact).slice(0, 2).map((c) => c.email).join(", ");
+  const toCustomer: Recipient = { name: contact?.name ?? o.customer.name, email: contact?.email ?? null, cc: cc || null, phone: contact?.whatsapp ?? contact?.phone ?? null };
+  const common = { order: { id, refNo: o.refNo, customer: o.customer.name }, items, back, sender: me.name, look, today: today() };
 
   if (isPaperKind(kind)) {
     let p: PaperChecks;
