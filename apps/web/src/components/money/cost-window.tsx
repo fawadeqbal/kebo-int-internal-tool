@@ -738,7 +738,7 @@ export function CostPanel({
   );
 }
 
-const subOf = (f: CostFor | null) => (!f ? "Choose what it is for" : f.place === "company" ? "For the company" : `For ${f.label.replace(/^(Order|Inquiry) /, "")}`);
+export const subOf = (f: CostFor | null) => (!f ? "Choose what it is for" : f.place === "company" ? "For the company" : `For ${f.label.replace(/^(Order|Inquiry) /, "")}`);
 
 /** "Add a cost": the button and its window (New cost). With `template`: "Add again", filled in from that cost. */
 export function AddCost({

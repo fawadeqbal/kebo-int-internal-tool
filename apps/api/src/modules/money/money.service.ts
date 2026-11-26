@@ -485,6 +485,11 @@ export class MoneyService {
       /** The list comes a page at a time; the totals are always for the whole period. */
       page?: number;
       pageSize?: number;
+      /**
+       * none: only live costs are listed; only: only the removed ones (a list's Removed tab, as Payments has). Not
+       * given: both, the removed crossed out. The totals never count removed costs.
+       */
+      removed?: "none" | "only";
     },
   ) {
     this.assertExpenses(user);
@@ -572,14 +577,30 @@ export class MoneyService {
       byCustomer: [...customers.values()]
         .map((c) => ({ customer: c.customer, total: fromMinor(c.total), count: c.count, orders: c.orders.size }))
         .sort((a, b) => Number(b.total) - Number(a.total)),
+      /** The removed costs of the period (every kind), for a Removed tab. */
+      removed: rows.filter((e) => e.voidedAt && (!q.customerId || e.customerId === q.customerId)).length,
       ...(await (async () => {
-        const listed = rows.filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category));
+        const listed = rows.filter(
+          (e) =>
+            (!q.customerId || e.customerId === q.customerId) &&
+            (!q.category || e.category === q.category) &&
+            (q.removed === "none" ? !e.voidedAt : q.removed === "only" ? !!e.voidedAt : true),
+        );
         const ids = listed.slice((page - 1) * pageSize, page * pageSize).map((e) => e.id);
         const full = ids.length
           ? await this.prisma.db.expense.findMany({ where: { id: { in: ids } }, include: expenseInclude, orderBy })
           : [];
-        /** `listed`: how many rows the list has (removed ones included), for the page links. */
-        return { page, pageSize, listed: listed.length, rows: full.map((e) => this.expenseView(e)) };
+        // Each cost's number (EX-2026-0213) is the one the ledger posted it under, as Payments shows it.
+        const posted = ids.length
+          ? await this.prisma.db.ledgerEntry.findMany({
+              where: { sourceType: "expense", sourceId: { in: ids }, part: "" },
+              select: { sourceId: true, ref: true },
+              distinct: ["sourceId"],
+            })
+          : [];
+        const number = new Map(posted.map((p) => [p.sourceId, p.ref]));
+        /** `listed`: how many rows the list has (removed ones included unless `removed` says), for the page links. */
+        return { page, pageSize, listed: listed.length, rows: full.map((e) => ({ ...this.expenseView(e), number: number.get(e.id) || null })) };
       })()),
     };
   }

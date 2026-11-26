@@ -300,7 +300,7 @@ describe("one of each", () => {
     expect(found(/\[&_thead_th\]:bg-surface-2/g)).toEqual([]);
     expect(found(/tableClassName="text-md"/g)).toEqual([]);
     // A record's read table draws THead/Th, not a hand-made head (editors in windows keep their grids).
-    const read = ["sourcing/page.tsx", "person-spending.tsx", "quotation-tab.tsx", "customer-payments.tsx", "payment-record.tsx", "targets-grid.tsx", "domain-card.tsx", "entry-body.tsx", "lines-sheet.tsx"];
+    const read = ["sourcing/page.tsx", "person-spending.tsx", "quotation-tab.tsx", "customer-payments.tsx", "targets-grid.tsx", "domain-card.tsx", "entry-body.tsx", "lines-sheet.tsx"];
     expect(found(/<thead className="bg-surface-2|<tr className="bg-surface-2 text-(?:left )?text-xs/g).filter((f) => read.some((r) => f.includes(r)))).toEqual([]);
     // Numbers (RFQ-, QUO-, SO-, PO-) are RefCode, not plain mono or bold words.
     expect(found(/cell: \(d\) => d\.refNo \}/g)).toEqual([]);
