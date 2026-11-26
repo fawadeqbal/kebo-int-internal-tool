@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
+import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL, warrantyDates } from "@kebo/shared";
 import { Badge, RULES, linkClass, cn } from "@kebo/ui";
 import { getPeople } from "@/lib/loaders";
 import { date } from "@/lib/format";
@@ -23,16 +23,6 @@ export const generateMetadata = orderTitle("Delivery and SAT");
 
 const RESULT_TONE = { pending: "neutral", pass: "ok", fail: "bad", not_applicable: "neutral" } as const;
 
-/** A day some months later (YYYY-MM-DD), kept inside the month it lands in. */
-function addMonths(iso: string, months: number) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  const day = d.getUTCDate();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() + months);
-  d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
-  return d.toISOString().slice(0, 10);
-}
-
 /**
  * Delivery & SAT (design "the order, final"): the delivery to the customer with its lines, the
  * installation and the site acceptance test with its points, the warranty, and the claims. Open from
@@ -51,11 +41,17 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   const open = dv.claims.filter((c) => c.status === "open" || c.status === "with_factory").length;
   // The warranty (design "terms that travel"): as agreed with the customer, counted from the moment agreed; one
   // typed here before (an older order) stays as it was, from the SAT day or, without a SAT, the delivery day.
-  const agreedW = !dv.warrantyMonths && o.agreed?.warrantyMonths ? { months: o.agreed.warrantyMonths, from: o.agreed.warrantyFrom ?? "shipment" } : null;
-  const months = dv.warrantyMonths ?? agreedW?.months ?? null;
-  // Counted from the SAT: it starts on the SAT day only (review 24 Nov: delivery before any SAT started it).
-  const from = !agreedW ? (dv.satDoneOn ?? dv.deliveredOn) : agreedW.from === "shipment" ? o.shippedOn : agreedW.from === "delivery" ? dv.deliveredOn : dv.satDoneOn;
-  const until = from && months ? addMonths(from, months) : null;
+  // The rule itself is the shared one (warrantyDates), so every screen and paper counts it the same way.
+  const warranty = warrantyDates({
+    typedMonths: dv.warrantyMonths ?? null,
+    agreed: o.agreed ? { months: o.agreed.warrantyMonths, from: o.agreed.warrantyFrom } : null,
+    shippedOn: o.shippedOn,
+    deliveredOn: dv.deliveredOn,
+    satDoneOn: dv.satDoneOn,
+  });
+  const agreedW = warranty.agreedFrom && warranty.months ? { months: warranty.months, from: warranty.agreedFrom } : null;
+  const from = warranty.startsOn;
+  const until = warranty.endsOn;
   const passed = dv.sat.filter((c) => c.result === "pass" || c.result === "not_applicable").length;
   const action = fieldsAction.bind(null, o.id, "delivery");
   const sub = `${o.refNo} · ${o.customer.name}`;

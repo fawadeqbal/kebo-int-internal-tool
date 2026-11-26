@@ -59,6 +59,19 @@ export function addDays(date: ISODate, days: number): ISODate {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * The same day some months later, kept inside the month it lands in: 31 Jan + 1 month → 28 Feb (29 in a leap
+ * year), 30 Nov + 3 months → 28 Feb. For a warranty's end, a plan's months.
+ */
+export function addMonths(date: ISODate, months: number): ISODate {
+  const d = new Date(`${date}T00:00:00Z`);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
+  return d.toISOString().slice(0, 10);
+}
+
 /** Whole days from `from` to `to` (negative when `to` is earlier). */
 export function daysBetween(from: ISODate, to: ISODate): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
@@ -97,7 +110,12 @@ function partsOf(d: Date, zone: string) {
 /** A day as the company writes it; `year: false` leaves the year out ("14 Nov", "14/11"). */
 function dayText(d: Date, zone: string, f: DateFormat, year = true): string {
   if (f === "d_mmm_yyyy")
-    return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", ...(year ? { year: "numeric" as const } : {}), timeZone: zone }).format(d);
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      ...(year ? { year: "numeric" as const } : {}),
+      timeZone: zone,
+    }).format(d);
   const { day, month, year: y } = partsOf(d, zone);
   if (f === "dd_mm_yyyy") return year ? `${day}/${month}/${y}` : `${day}/${month}`;
   if (f === "mm_dd_yyyy") return year ? `${month}/${day}/${y}` : `${month}/${day}`;
