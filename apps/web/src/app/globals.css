@@ -50,6 +50,14 @@
   [class*="sr-only"] {
     left: 0;
   }
+  /*
+   * A group of choices (Include, Who sends it?, a radio group) is as wide as the window, never as wide as its
+   * longest line: browsers give a fieldset its content's width, so one long name ("Payment request · Balance
+   * before shipment PR-2026-0005-6") pushed a window wider than a phone and everything slid sideways.
+   */
+  fieldset {
+    min-width: 0;
+  }
 }
 
 /*

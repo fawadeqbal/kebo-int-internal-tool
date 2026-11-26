@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "./cn";
 import { HowMade } from "./primitives";
@@ -91,13 +91,17 @@ export function FactsLine({ facts, className }: { facts: Fact[]; className?: str
   return (
     <>
       {/* A phone: the same figures as words under the bar, no box: two lines at most, a figure never split. */}
+      {/* Each fact keeps together; the line breaks after a "·" (the dot stays with the fact before it), so a
+          third fact goes to the next line instead of off the screen (review 26 Nov: "Sold this…" cut at the edge). */}
       <p data-phone-facts="" className="line-clamp-2 text-md text-muted sm:hidden">
         {facts.map((f, i) => (
-          <span key={i} className="whitespace-nowrap">
-            {i > 0 && <span aria-hidden> · </span>}
-            {f.label}{" "}
-            <b className={cn("font-semibold text-text tabular", f.tone === "bad" && "text-bad", f.tone === "warn" && "text-warn")}>{f.value}</b>
-          </span>
+          <Fragment key={i}>
+            {i > 0 && <span aria-hidden>{"\u00a0· "}</span>}
+            <span className="whitespace-nowrap">
+              {f.label}{" "}
+              <b className={cn("font-semibold text-text tabular", f.tone === "bad" && "text-bad", f.tone === "warn" && "text-warn")}>{f.value}</b>
+            </span>
+          </Fragment>
         ))}
       </p>
     <dl aria-label="Facts" data-part="facts" data-count={facts.length} className={cn("flex min-h-[46px] flex-wrap items-center rounded-xl border border-line bg-surface px-1.5 py-1.5 max-sm:hidden", className)}>

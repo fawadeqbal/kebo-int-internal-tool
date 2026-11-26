@@ -1102,6 +1102,75 @@ html::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb); }
 }
 
 /*
+ * A table whose columns do not fit a phone, made one card per row (usePhoneStack sets data-stack and names each
+ * cell with its column, data-label): the row's first cell is its name, in bold; then each column on its own line,
+ * its name on the left and the value on the right. A cell across columns (a total's words) has no name. The
+ * column heads stay for screen readers only.
+ */
+@media (max-width: 639.98px) {
+  table[data-stack] {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+  }
+  table[data-stack] > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  table[data-stack] > :is(tbody, tfoot) {
+    display: block;
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-line);
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr:last-child {
+    border-bottom: 0;
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr > :is(td, th) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    height: auto;
+    padding: 1px 0;
+    border: 0;
+    text-align: right;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr > :is(td, th)::before {
+    content: attr(data-label);
+    flex: none;
+    max-width: 55%;
+    text-align: left;
+    color: var(--color-muted);
+    font-weight: 500;
+    overflow-wrap: normal;
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr > :is(td, th):first-child {
+    justify-content: flex-start;
+    text-align: left;
+    font-weight: 600;
+    padding-bottom: 3px;
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr > :is(td, th):is(:first-child, [data-label=""])::before {
+    content: none;
+  }
+  table[data-stack] > :is(tbody, tfoot) > tr > :is(td, th):is(:empty, .hidden, [class~="max-sm:hidden"]) {
+    display: none;
+  }
+}
+
+/*
  * Scroll's classes, for a box that cannot be the Scroll piece itself (a dialog's body, a list inside a menu): the
  * only way to make a box scroll (one-of-each keeps overflow-auto out). scroll-x · scroll-y · scroll-xy, and its
  * size: scroll-sm · scroll-lg · scroll-none (md when none is said).

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import { cn } from "./cn";
+import { usePhoneStack } from "./phone-stack";
 
 /**
  * Scroll — the one scroll bar (canvas "Scroll: one scroll bar for the whole app", 21 Nov). Every box that scrolls is
@@ -14,6 +15,7 @@ import { cn } from "./cn";
  *   axis  y (the default) · x · both
  *   fade  the edge with more to see fades out
  *   label what is in it: while it scrolls it takes the keyboard (a region with that name, arrow keys scroll it)
+ *   stack a table in it becomes one card per row on a phone when its columns do not fit (usePhoneStack)
  *
  * A test (one-of-each) keeps scroll-xy / scroll-x / scroll-y out of every other file.
  */
@@ -25,6 +27,7 @@ export function Scroll({
   size = "md",
   fade = false,
   label,
+  stack = false,
   className,
   children,
   ...props
@@ -34,10 +37,12 @@ export function Scroll({
   size?: ScrollSize;
   fade?: boolean;
   label?: string;
+  stack?: boolean;
   className?: string;
   children?: ReactNode;
 } & Omit<ComponentProps<"div">, "ref" | "children">) {
   const ref = useRef<HTMLElement>(null);
+  usePhoneStack(ref, stack);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;

@@ -465,11 +465,12 @@ export function NoteCardForm({ action, contacts, today }: { action: Action; cont
         setDay(today);
         close(s);
       }}
-      className="grid grid-cols-3 gap-4"
+      // A phone: two columns (a date in a third of the width was cut, "11/26/2"); When under Kind and With.
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3"
     >
       {(s) => (
         <>
-          <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind} className={contacts ? undefined : "col-span-2 sm:col-span-1"}>
+          <Field label="Kind" htmlFor={`${id}-kind`} error={s.errors?.kind}>
             <Select id={`${id}-kind`} name="kind" defaultValue={s.values?.kind ?? "note"}>
               {NOTE_KINDS.map((k) => (
                 <option key={k} value={k}>
@@ -490,11 +491,11 @@ export function NoteCardForm({ action, contacts, today }: { action: Action; cont
               </Select>
             </Field>
           )}
-          <Field label="When" htmlFor={`${id}-on`} error={s.errors?.at} className={contacts ? undefined : "max-sm:col-span-1"}>
+          <Field label="When" htmlFor={`${id}-on`} error={s.errors?.at} className={contacts ? "max-sm:col-span-2" : undefined}>
             <Input id={`${id}-on`} type="date" max={today} value={day} onChange={(e) => setDay(e.target.value || today)} />
           </Field>
           <input type="hidden" name="at" value={day === today ? "" : `${day}T12:00`} />
-          <Field label="Note" required htmlFor={`${id}-body`} error={s.errors?.body} className="col-span-3">
+          <Field label="Note" required htmlFor={`${id}-body`} error={s.errors?.body} className="col-span-2 sm:col-span-3">
             <Textarea
               id={`${id}-body`}
               name="body"
@@ -504,7 +505,7 @@ export function NoteCardForm({ action, contacts, today }: { action: Action; cont
               defaultValue={s.values?.body}
             />
           </Field>
-          <div className="col-span-3">
+          <div className="col-span-2 sm:col-span-3">
             <SubmitButton pendingText="Adding…">
               <Check aria-hidden />
               Add note

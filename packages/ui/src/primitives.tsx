@@ -625,7 +625,8 @@ export const tableClass = "w-full border-collapse text-md max-sm:[&_tbody_td:fir
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     // Focusable so a keyboard can scroll a wide table sideways; the edge with more fades on a phone.
-    <Scroll axis="x" size="lg" fade data-part="table" className="w-full focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
+    // On a phone, a table whose columns do not fit becomes one card per row (stack).
+    <Scroll axis="x" size="lg" fade stack data-part="table" className="w-full focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none" tabIndex={0}>
       <table className={cn(tableClass, className)} {...props} />
     </Scroll>
   );

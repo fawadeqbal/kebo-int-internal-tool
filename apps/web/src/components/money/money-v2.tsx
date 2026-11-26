@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Circle, Info, Lock, Plus, Square } from "lucide-react";
 import { divideMinor, formatMinor, fromMinor, toMinor, type Minor } from "@kebo/money";
 import { allocateOldestFirst, PAYMENT_METHOD_LABEL, PAYMENT_METHODS, type LcCheck, type PaymentMethod } from "@kebo/shared";
-import { Button, cn, Field, Input, RULES, Select, Textarea, Notice, EmptyLine, RefCode } from "@kebo/ui";
+import { Button, cn, Field, Input, RULES, Select, Textarea, Notice, EmptyLine, RefCode, Scroll } from "@kebo/ui";
 import { SubmitButton } from "@kebo/ui/client";
 import { FormButtons } from "@/components/common/route-window";
 import { ActionForm } from "@/components/common/action-form";
@@ -229,7 +229,7 @@ export function ReceivedFields({
             <p className="text-sm font-semibold">
               Counts as {fmt(a.countsMinor, currency)} · goes to
             </p>
-            <div className="scroll-x">
+            <Scroll axis="x" stack>
               <table className="w-full min-w-[22rem] border-collapse text-sm">
                 <thead>
                   <tr className="text-left text-xs text-text-2">
@@ -260,7 +260,7 @@ export function ReceivedFields({
                   </tr>
                 </tbody>
               </table>
-            </div>
+            </Scroll>
             {tooMuch && <p className="text-xs text-bad">That is more than is still due on {refNo}.</p>}
             {leftMinor > 0 && (
               <p className="flex items-start gap-2 rounded-md border border-info/30 bg-info-soft px-2.5 py-2 text-xs">
@@ -480,7 +480,7 @@ function ReceiptFields({
             {order.length === 0 ? (
               <EmptyLine>No open {currency} orders: it all becomes {customer}&apos;s credit.</EmptyLine>
             ) : (
-              <div className="scroll-x">
+              <Scroll axis="x" stack>
                 <table className="w-full min-w-[22rem] border-collapse text-sm">
                   <thead>
                     <tr className="text-left text-xs text-text-2">
@@ -522,7 +522,7 @@ function ReceiptFields({
                     </tr>
                   </tbody>
                 </table>
-              </div>
+              </Scroll>
             )}
             {over && <p className="text-xs text-bad">{over.refNo} takes more than it owes.</p>}
             {leftMinor > 0 && (

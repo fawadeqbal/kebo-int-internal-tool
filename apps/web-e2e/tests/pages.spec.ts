@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectSoundPage, watchErrors } from "./check";
+import { cutOffOnPhone, expectSoundPage, watchErrors } from "./check";
 import { appRoutes, foundPages } from "./routes";
 
 /**
  * Every page of the app, at laptop and phone width: it opens, nothing goes wrong in the browser, nothing is wider
- * than the screen, and it meets WCAG 2.2 AA. The list comes from the app's folders, so a new page is checked too.
+ * than the screen (on a phone, nothing cut off at its edge either), and it meets WCAG 2.2 AA. The list comes from the app's folders, so a new page is checked too.
  * Left out: the platform's own pages (/platform/…, behind its two-step sign-in), and pages that only send an old
  * address on (checked once below that they still land somewhere; the page they land on is checked here).
  */
@@ -28,6 +28,8 @@ async function open(page: Page, address: string) {
   await page.waitForLoadState("networkidle");
   test.info().annotations.push({ type: "load", description: `${Date.now() - started} ms` });
   await expectSoundPage(page, errors);
+  // A phone: nothing cut off at the edge (a table is one card per row; facts go to a second line).
+  if ((page.viewportSize()?.width ?? 1280) < 640) expect(await cutOffOnPhone(page), "cut off at the phone's edge").toEqual([]);
 }
 
 for (const size of SIZES) {
