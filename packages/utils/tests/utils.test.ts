@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  addMonths,
   amountInWords,
   daysBetween,
   startOfDayIn,
@@ -29,6 +30,14 @@ describe("dates", () => {
     expect(addDays("2026-12-30", 3)).toBe("2027-01-02");
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(daysBetween("2026-10-01", "2026-10-26")).toBe(25);
+  });
+  it("adds months, staying inside the month it lands in", () => {
+    expect(addMonths("2026-11-04", 12)).toBe("2027-11-04");
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonths("2028-01-31", 1)).toBe("2028-02-29"); // a leap year
+    expect(addMonths("2026-11-30", 3)).toBe("2027-02-28");
+    expect(addMonths("2026-03-31", -1)).toBe("2026-02-28");
+    expect(addMonths("2026-05-15", 0)).toBe("2026-05-15");
   });
   it("validates dates", () => {
     expect(isISODate("2026-02-28")).toBe(true);
