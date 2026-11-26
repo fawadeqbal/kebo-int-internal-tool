@@ -21,13 +21,17 @@ function Trapped({ name, children }: { name: string; children: React.ReactNode }
 
 function Windows({ untrapped }: { untrapped?: boolean }) {
   const [email, setEmail] = useState(false);
+  const [paper, setPaper] = useState(true);
   return (
     <>
       <button>Behind</button>
-      <Trapped name="The document">
-        <button>Print</button>
-        <button onClick={() => setEmail(true)}>Email</button>
-      </Trapped>
+      <button onClick={() => setPaper(false)}>Close the document</button>
+      {paper && (
+        <Trapped name="The document">
+          <button>Print</button>
+          <button onClick={() => setEmail(true)}>Email</button>
+        </Trapped>
+      )}
       {email && (
         <Trapped name="Email it">
           <button>Send</button>
@@ -40,6 +44,19 @@ function Windows({ untrapped }: { untrapped?: boolean }) {
         </div>
       )}
     </>
+  );
+}
+
+/** A page shown as a window: once it is leaving it draws nothing, while it is still there (and its trap with it). */
+function Leaving() {
+  const box = useRef<HTMLDivElement>(null);
+  const [gone, setGone] = useState(false);
+  useFocusTrap(box, true);
+  if (gone) return null;
+  return (
+    <div ref={box} role="dialog" aria-modal="true" aria-label="Record payment">
+      <button onClick={() => setGone(true)}>Leave</button>
+    </div>
   );
 }
 
@@ -86,6 +103,33 @@ describe("useFocusTrap", () => {
     act(() => button("Email").click());
     act(() => button("Cancel").click());
     expect(document.activeElement).toBe(button("Email"));
+    button("Behind").focus();
+    expect(document.activeElement).toBe(button("Print"));
+  });
+
+  it("the window under it closing first leaves the top one with the keyboard", () => {
+    render(<Windows />);
+    act(() => button("Email").click());
+    act(() => button("Close the document").click());
+    button("Behind").focus();
+    expect(document.activeElement).toBe(button("Send"));
+    button("Cancel").focus();
+    tab();
+    expect(document.activeElement).toBe(button("Send"));
+  });
+
+  it("a top window that has gone from the page does not keep the keyboard from the one under it", () => {
+    render(
+      <>
+        <Windows />
+        <Leaving />
+      </>,
+    );
+    // Over the document, and with the keyboard…
+    button("Behind").focus();
+    expect(document.activeElement).toBe(button("Leave"));
+    // …then off the page while its trap has not let go yet: the document has the keyboard again.
+    act(() => button("Leave").click());
     button("Behind").focus();
     expect(document.activeElement).toBe(button("Print"));
   });

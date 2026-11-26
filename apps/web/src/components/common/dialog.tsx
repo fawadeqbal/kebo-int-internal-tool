@@ -45,6 +45,15 @@ const LAYER = "[data-layer],[role=menu],[role=listbox],[role=alertdialog],[role=
 const traps: RefObject<HTMLElement | null>[] = [];
 
 /**
+ * The top window: the last one opened that is on the page and drawn. One that has gone before its turn to
+ * let go (a page shown as a window, once it is leaving), or that is hidden at this width (the phone's menu on
+ * a wide screen), is passed over, so the window under it is not left without the keyboard.
+ * (The order is the order the windows' effects ran in. A window that is first drawn with another trapped
+ * window already open inside it would be listed after its child: none is built that way.)
+ */
+const topTrap = () => traps.findLast((t) => !!t.current?.isConnected && (t.current.getClientRects().length > 0 || noLayout()));
+
+/**
  * Focus that is not this window's to take back: in a layer over it (a menu, the toast), or in a window that
  * covers the page without keeping the keyboard itself (it sits over this one, and its focus is its own). Focus
  * in a window under this one is taken back like focus on the page.
@@ -66,7 +75,7 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     if (!active) return;
     const opener = document.activeElement as HTMLElement | null;
     traps.push(box);
-    const onTop = () => traps.at(-1) === box;
+    const onTop = () => topTrap() === box;
     const tab = (e: KeyboardEvent) => {
       const el = box.current;
       if (e.key !== "Tab" || !el || !onTop()) return;
@@ -115,7 +124,8 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     });
     return () => {
       cancelAnimationFrame(into);
-      traps.splice(traps.indexOf(box), 1);
+      const at = traps.indexOf(box);
+      if (at >= 0) traps.splice(at, 1);
       document.removeEventListener("keydown", tab);
       document.removeEventListener("focusin", back);
       // Give focus back to the opener; when the page drew it again meanwhile (a row's Pay link while its window was
