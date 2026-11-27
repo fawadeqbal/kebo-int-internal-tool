@@ -2,6 +2,7 @@ import { can } from "@kebo/shared";
 import { requireUser } from "@/lib/session";
 import { customerOf, partyNotesOf } from "@/lib/party-data";
 import { NotesTab } from "@/components/notes/notes-tab";
+import { dataOf, failedWhat } from "@/lib/part";
 import { addNoteAction } from "../../../follow-ups/actions";
 import { customerTitle } from "@/lib/titles";
 
@@ -11,10 +12,11 @@ export const generateMetadata = customerTitle("Notes");
 export default async function CustomerNotes({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const [c, notes] = await Promise.all([customerOf(id), partyNotesOf("customers", id)]);
+  const [c, notesPart] = await Promise.all([customerOf(id), partyNotesOf("customers", id)]);
   return (
     <NotesTab
-      notes={notes}
+      notes={dataOf(notesPart) ?? []}
+      failed={failedWhat(notesPart)}
       add={can(me, "customers.manage") ? addNoteAction.bind(null, { key: "customerId", id: c.id }) : null}
       contacts={c.contacts.map((p) => ({ id: p.id, name: p.name }))}
     />

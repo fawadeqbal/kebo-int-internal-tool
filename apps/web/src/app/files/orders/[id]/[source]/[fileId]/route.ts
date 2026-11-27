@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import { sameSite } from "@/lib/file-proxy";
 import { UUID } from "@/lib/ids";
+import { bodyOf } from "@/lib/quiet";
 
 const SOURCES = new Set(["attachment", "payment", "factory_payment", "expense"]);
 
@@ -20,6 +21,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = new FormData();
   body.set("file", file, file.name);
   const res = await apiFetch(`/orders/${id}/files/${source}/${fileId}/replace`, { method: "POST", body });
-  const json = await res.json().catch(() => ({ error: `Upload failed (${res.status})` }));
+  const json = (await bodyOf<unknown>(res)) ?? { error: `Upload failed (${res.status})` };
   return Response.json(json, { status: res.status });
 }

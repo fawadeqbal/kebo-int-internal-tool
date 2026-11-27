@@ -6,6 +6,7 @@ import { date, companyToday } from "@/lib/format";
 import type { ActionState } from "@/lib/actions";
 import type { Note } from "@/lib/types-notes";
 import { NoteCardForm } from "./note-forms";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const KIND_TONE: Record<NoteKind, "neutral" | "info" | "primary" | "ok" | "outline"> = {
   note: "neutral",
@@ -21,10 +22,13 @@ const KIND_TONE: Record<NoteKind, "neutral" | "info" | "primary" | "ok" | "outli
  */
 export function NotesTab({
   notes,
+  failed,
   add,
   contacts,
 }: {
   notes: Note[];
+  /** What could not be read ("the notes"): said in place of the list, never "No notes yet". */
+  failed?: string | null;
   /** Adding (null: may only read). */
   add: ((prev: ActionState, form: FormData) => Promise<ActionState>) | null;
   /** The record's people, for "With" (suppliers have none to choose). */
@@ -53,7 +57,11 @@ export function NotesTab({
           ) : undefined
         }
       />
-        {notes.length === 0 ? (
+        {failed ? (
+          <div className="px-5 pb-4">
+            <CouldNotLoad what={failed} />
+          </div>
+        ) : notes.length === 0 ? (
           <EmptyLine inset>No notes yet. Calls, visits and messages show here, the latest first.</EmptyLine>
         ) : (
           <ol className="px-5 pb-4" aria-label="Notes and calls">

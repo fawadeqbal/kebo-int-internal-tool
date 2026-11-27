@@ -5,6 +5,8 @@ import { supplierOf, supplierPayablesOf } from "@/lib/party-data";
 import { date, whole } from "@/lib/format";
 import { DataTable } from "@/components/common/data-table";
 import { supplierTitle } from "@/lib/titles";
+import { dataOf, failedWhat } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = supplierTitle("Orders");
 
@@ -15,9 +17,11 @@ export const generateMetadata = supplierTitle("Orders");
 export default async function SupplierOrders({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requirePermission("sourcing.manage");
-  const [f, payables] = await Promise.all([supplierOf(id), supplierPayablesOf(id)]);
+  const [f, payablesPart] = await Promise.all([supplierOf(id), supplierPayablesOf(id)]);
+  // Not read: the orders still show, without what we owe on each, and the tab says so.
+  const failed = failedWhat(payablesPart);
   const owed = new Map(
-    payables.flatMap((p) => p.orders.filter((o) => Number(o.toPay) > 0.005).map((o) => [o.id, { ...o, currency: p.currency }] as const)),
+    (dataOf(payablesPart) ?? []).flatMap((p) => p.orders.filter((o) => Number(o.toPay) > 0.005).map((o) => [o.id, { ...o, currency: p.currency }] as const)),
   );
   // Every order it made for us, the latest first (review 24 Nov, O-38: only the ones in production were listed).
   const all = f.record.orders ?? f.record.openOrders.map((o) => ({ ...o, status: "open" as const, stage: "in_production" }));
@@ -44,6 +48,7 @@ export default async function SupplierOrders({ params }: { params: Promise<{ id:
   return (
     // A list tab as every record's (a customer's Orders): its title and count, then the rows or the empty state.
     <TabList title="In production" summary={`${rows.length} order${rows.length === 1 ? "" : "s"}`}>
+      {failed && <CouldNotLoad what={failed} />}
       {rows.length === 0 ? (
         <EmptyState
           title="Nothing in production here"

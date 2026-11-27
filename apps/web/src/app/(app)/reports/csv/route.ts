@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api";
 import { excelRefusal } from "@/app/sheets/guard";
 import type { ReportView } from "@/lib/types-deals";
 import { PROFIT_LABEL } from "@kebo/money";
+import { bodyOf } from "@/lib/quiet";
 
 /** The report's tables as one CSV file (the API checks the person may see reports). */
 const cell = (v: string | number | null | undefined) => {
@@ -89,7 +90,7 @@ export async function GET(req: Request) {
   }
   const res = await apiFetch("/reports", { query });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
+    const body = (await bodyOf(res)) ?? {};
     return new Response(body.error ?? "Could not make the report.", {
       status: res.status,
       headers: { "content-type": "text/plain; charset=utf-8" },

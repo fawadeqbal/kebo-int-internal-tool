@@ -382,7 +382,7 @@ export async function loadCustomers(p: Period, today: string) {
     facts<OrderGroups>("orders/groups", { ...prev, period: "all", by: "customer" }),
     facts<OrderGroups>("orders/groups", { period: "all", by: "customer" }),
     facts<OrderGroups>("orders/groups", { ...six, period: "month", by: "customer" }),
-    api.get<{ total: number }>("/customers", { pageSize: 1 }).catch(() => ({ total: 0 })),
+    part("how many customers there are", () => api.get<{ total: number }>("/customers", { pageSize: 1 })),
   ]);
   const c = period.currency;
   const firstOf = new Map(ever.rows.map((r) => [r.key, r.firstOrderedOn]));
@@ -423,7 +423,8 @@ export async function loadCustomers(p: Period, today: string) {
   rows.sort((x, y) => y.sales - x.sales || y.owed - x.owed || y.allSales - x.allSales || x.name.localeCompare(y.name));
   const data = {
     currency: c,
-    total: count.total,
+    // Not read: no "of n" (never "of 0"), and the page says so.
+    total: dataOf(count)?.total ?? null,
     ordered: { now: period.rows.length, before: before.rows.length, new: rows.filter((r) => r.kinds.has("new")).length },
     repeat: { now: pct(repeatOrders(period.rows, p.from), orders), before: pct(repeatOrders(before.rows, p.prevFrom), ordersBefore) },
     average: { now: orders ? sales / orders : null, before: ordersBefore ? salesBefore / ordersBefore : null, orders },
@@ -457,7 +458,7 @@ export async function loadCustomers(p: Period, today: string) {
       ]),
     },
   ];
-  return { ...data, sheets };
+  return { ...data, sheets, failed: failedWhat(count) };
 }
 
 /* ------------------------------------------------------------------------------------------- Suppliers */
@@ -468,7 +469,7 @@ export async function loadSuppliers(p: Period) {
     facts<SupplierGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
     facts<SupplierGroups>("factories/groups", { period: "all", by: "factory" }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
-    api.get<{ total: number }>("/factories", { pageSize: 1 }).catch(() => ({ total: 0 })),
+    part("how many suppliers there are", () => api.get<{ total: number }>("/factories", { pageSize: 1 })),
   ]);
   const c = period.currency;
   const keys = new Set([
@@ -494,7 +495,7 @@ export async function loadSuppliers(p: Period) {
     })
     .sort((x, y) => n(y.spend) - n(x.spend) || y.orders - x.orders || n(y.toPay) - n(x.toPay) || x.name.localeCompare(y.name));
   const t = totalOf(orders);
-  const data = { currency: c, seeMoney: period.seeMoney, total: count.total, rows, shipped: t?.shipped ?? null };
+  const data = { currency: c, seeMoney: period.seeMoney, total: dataOf(count)?.total ?? null, rows, shipped: t?.shipped ?? null };
   const sheets: SheetSpec[] = [
     {
       name: `Insights suppliers ${p.from} to ${p.to}`,
@@ -523,7 +524,7 @@ export async function loadSuppliers(p: Period) {
       ]),
     },
   ];
-  return { ...data, sheets };
+  return { ...data, sheets, failed: failedWhat(count) };
 }
 
 /* ------------------------------------------------------------------------------------------- People */

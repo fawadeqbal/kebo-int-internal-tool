@@ -2,6 +2,7 @@ import "server-only";
 import puppeteer from "puppeteer-core";
 import { SESSION_COOKIE } from "@/lib/api";
 import { chromiumPath } from "./chromium";
+import { ignore } from "@/lib/quiet";
 
 /** At most this many Chromiums at once; more requests are told to try again (each one is ~100 MB). */
 const MAX_RENDERS = 3;
@@ -70,7 +71,7 @@ export async function withChromium<T>(session: string, fn: (render: Render) => P
               },
         );
       } finally {
-        await page.close().catch(() => undefined);
+        await page.close().catch(ignore("closing the page that made a PDF (the browser is closed after)"));
       }
     });
   } catch (e) {

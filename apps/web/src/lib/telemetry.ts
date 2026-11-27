@@ -1,3 +1,5 @@
+import { ignore } from "@/lib/quiet";
+
 /**
  * What people's browsers saw, sent to Dev tools › Speed and errors (POST /api/telemetry): an error on a page
  * (counted once per kind there, like the server's), and how fast a page showed its main part. Fire and forget:
@@ -30,7 +32,9 @@ export function report(r: Report) {
     const body = JSON.stringify({ ...r, page: r.page.split(/[?#]/)[0] || "/" });
     const beacon = typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function";
     if (beacon && navigator.sendBeacon(URL_, new Blob([body], { type: "application/json" }))) return;
-    void fetch(URL_, { method: "POST", body, headers: { "content-type": "application/json" }, keepalive: true }).catch(() => undefined);
+    void fetch(URL_, { method: "POST", body, headers: { "content-type": "application/json" }, keepalive: true }).catch(
+      ignore("a report", { silent: true }),
+    );
   } catch {
     // Never in the way of the page.
   }

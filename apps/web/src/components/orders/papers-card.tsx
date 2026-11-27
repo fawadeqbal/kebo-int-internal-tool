@@ -9,6 +9,7 @@ import { PAPER_STATE_TONE, paperDone, type PaperState } from "@kebo/shared";
 import { Badge, Button, buttonClass, Card, CardHeader, cn, Field, Input, Notice, EmptyLine, linkClass } from "@kebo/ui";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
+import { bodyOf } from "@/lib/quiet";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -20,7 +21,7 @@ async function uploadToDeal(dealId: string, file: File, note: string): Promise<{
   body.set("note", note.slice(0, 300));
   try {
     const res = await fetch(`/files/inquiries/${dealId}`, { method: "POST", body });
-    const json = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+    const json = (await bodyOf<{ id?: string; error?: string }>(res)) ?? {};
     if (!res.ok) return { error: json.error ?? (res.status === 413 ? "This file is too large." : `Upload failed (${res.status})`) };
     return { id: json.id };
   } catch {

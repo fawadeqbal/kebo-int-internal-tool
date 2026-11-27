@@ -5,14 +5,17 @@ import { AuthShell } from "@/app/login/auth-shell";
 import { DiagnosisList, DiagnosisVerdict } from "@/components/domains/diagnosis";
 import { apiFetch } from "@/lib/api";
 import { checkPath, CheckForm, RecordTable } from "../parts";
+import { bodyOf, ignore } from "@/lib/quiet";
 
 export const metadata = { title: "Check a domain" };
 
 /** The look-up, or why there is none (a domain that cannot be one, too many checks, the API down). */
 async function look(domain: string): Promise<{ d: DomainDiagnosis } | { error: string }> {
-  const res = await apiFetch("/platform/public/connect-check", { auth: false, query: { domain } }).catch(() => null);
+  const res = await apiFetch("/platform/public/connect-check", { auth: false, query: { domain } }).catch(
+    ignore("the domain check (shown as not made)"),
+  );
   if (!res) return { error: "The check could not be made just now. Try again in a minute." };
-  const body = await res.json().catch(() => null);
+  const body = await bodyOf(res);
   return res.ok ? { d: body as DomainDiagnosis } : { error: body?.error ?? "The check could not be made just now. Try again in a minute." };
 }
 

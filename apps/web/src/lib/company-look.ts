@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { ColourSet } from "@kebo/shared";
 import { addressCompany, apiFetch } from "@/lib/api";
 import { savedColours } from "@/lib/colours";
+import { bodyOf, ignore } from "@/lib/quiet";
 
 export interface CompanyLook {
   name: string;
@@ -18,9 +19,11 @@ export interface CompanyLook {
 export const companyLook = cache(async (): Promise<CompanyLook | null> => {
   const slug = await addressCompany();
   if (!slug) return null;
-  const res = await apiFetch(`/platform/public/company-look?slug=${encodeURIComponent(slug)}`, { auth: false }).catch(() => null);
+  const res = await apiFetch(`/platform/public/company-look?slug=${encodeURIComponent(slug)}`, { auth: false }).catch(
+    ignore("the company's look for the pages before sign-in (they show the plain look)"),
+  );
   if (!res?.ok) return null;
-  const body = (await res.json().catch(() => null)) as { name?: string; colours?: string; logo?: string | null } | null;
+  const body = await bodyOf<{ name?: string; colours?: string; logo?: string | null }>(res);
   if (!body?.name) return null;
   return {
     name: body.name,

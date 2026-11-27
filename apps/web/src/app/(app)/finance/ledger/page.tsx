@@ -227,10 +227,15 @@ async function Entries({
 
 /** Orders: pick one to see exactly its rows (the order, its suppliers' parts, money in and out, its expenses). */
 async function OrderPicker() {
-  const orders = await api.get<OrderRow[]>("/orders").catch(() => [] as OrderRow[]);
+  const read = await part("the orders", () => api.get<OrderRow[]>("/orders"));
+  const orders = dataOf(read) ?? [];
   return (
     <Card className="overflow-clip">
-      {orders.length === 0 ? (
+      {isFailed(read) ? (
+        <div className="p-4">
+          <CouldNotLoad what={read.what} />
+        </div>
+      ) : orders.length === 0 ? (
         <EmptyState framed title="No orders yet" description="An order's rows appear here once a customer accepts a quotation." />
       ) : (
         <DataTable label="Orders">

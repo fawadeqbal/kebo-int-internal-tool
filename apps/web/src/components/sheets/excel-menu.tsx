@@ -6,12 +6,13 @@ import { Button, cn } from "@kebo/ui";
 import { FloatingMenu } from "@/components/common/floating";
 import type { ReadSheet, SheetSpec } from "@/lib/sheet-spec";
 import { useExcelAllowed } from "@/components/common/features";
+import { bodyOf } from "@/lib/quiet";
 
 /** Makes the file on the server and saves it in the browser. Returns a message when it could not. */
 export async function downloadSheet(spec: SheetSpec): Promise<string | null> {
   try {
     const res = await fetch("/sheets/write", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(spec) });
-    if (!res.ok) return ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Could not make the file.";
+    if (!res.ok) return (await bodyOf(res))?.error ?? "Could not make the file.";
     const url = URL.createObjectURL(await res.blob());
     const a = document.createElement("a");
     a.href = url;
@@ -32,7 +33,7 @@ export async function readSheetFile(file: File): Promise<{ ok: true; sheet: Read
   body.set("file", file, file.name);
   try {
     const res = await fetch("/sheets/read", { method: "POST", body });
-    const json = (await res.json().catch(() => null)) as (ReadSheet & { error?: string }) | null;
+    const json = await bodyOf<ReadSheet & { error?: string }>(res);
     if (!res.ok || !json) return { ok: false, message: json?.error ?? "Could not read the file." };
     return { ok: true, sheet: json };
   } catch {

@@ -53,9 +53,10 @@ const GUARDS: Record<keyof typeof known.counts, Guard> = {
     count: times(/\btext-\[[0-9.]+(?:px|rem)\]/g),
   },
   hiddenFailure: {
-    what: "read whose failure is shown as nothing (.catch(() => null))",
-    use: "optional() for a read the person may not see (403, 404); any other failure belongs on the error page",
-    count: times(/\.catch\(\(\) => (?:null|undefined|false|0|\[\]|\{\})\)/g),
+    what: "failure dropped without its error (.catch(() => …))",
+    use: "part() for a read the person relies on (the page says Could not load), optional() for a page's main read (lib/part.ts), or ignore, bestEffort or bodyOf (lib/quiet.ts) for a step whose failure changes nothing, each naming why",
+    // Every catch that does not look at its error, whatever it puts in its place (null, [], {}, "", a default).
+    count: times(/\.catch\(\(\) =>/g),
   },
   handWiredWindow: {
     what: 'window wired by hand (role="dialog")',

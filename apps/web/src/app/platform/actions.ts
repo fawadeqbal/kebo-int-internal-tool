@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { api, apiFetch, platformApi, PLATFORM_COOKIE, SESSION_COOKIE } from "@/lib/api";
 import { attempt, formValues, newPasswordProblems, type ActionState } from "@/lib/actions";
 import { FLASH_COOKIE } from "@/lib/platform";
+import { bestEffort, bodyOf, type Refusal } from "@/lib/quiet";
 
 const cookieOptions = (maxAge: number) => ({
   httpOnly: true,
@@ -29,8 +30,10 @@ export async function platformLoginAction(_prev: ActionState, form: FormData): P
     auth: false,
     body: JSON.stringify({ email, password: String(form.get("password") ?? "") }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf<Refusal & { token?: string; expiresInSeconds?: number; twoStepRequired?: boolean }>(res)) ?? {};
   if (!res.ok) return { ok: false, message: body.error ?? "Could not sign in.", errors: body.fieldErrors, values: { email } };
+  if (!body.token || !body.expiresInSeconds)
+    return { ok: false, message: "Could not sign in: the server's answer could not be read. Try again.", values: { email } };
   (await cookies()).set(PLATFORM_COOKIE, body.token, cookieOptions(body.expiresInSeconds));
   redirect(body.twoStepRequired ? "/platform/two-step" : "/platform/set-up-two-step");
 }
@@ -41,14 +44,17 @@ export async function platformTwoStepAction(_prev: ActionState, form: FormData):
     platform: true,
     body: JSON.stringify({ code: String(form.get("code") ?? "") }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   if (res.status === 401 && /password/i.test(body.error ?? "")) redirect("/platform/login");
   if (!res.ok) return { ok: false, message: body.error ?? "That code is not right.", errors: body.fieldErrors };
   redirect("/platform");
 }
 
 export async function platformLogoutAction() {
-  await apiFetch("/platform/auth/logout", { method: "POST", platform: true, body: "{}" }).catch(() => undefined);
+  await bestEffort(
+    "signing out at the API (the cookie is cleared anyway)",
+    apiFetch("/platform/auth/logout", { method: "POST", platform: true, body: "{}" }),
+  );
   (await cookies()).set(PLATFORM_COOKIE, "", cookieOptions(0));
   redirect("/platform/login");
 }
@@ -97,7 +103,7 @@ export async function openCompanyAction(id: string) {
 
 /** Leave the company the platform admin opened: back to the platform, on that company's page. */
 export async function leaveCompanyAction(slug?: string) {
-  await api.post("/auth/logout").catch(() => undefined);
+  await bestEffort("signing out of the company at the API (the cookie is cleared anyway)", api.post("/auth/logout"));
   (await cookies()).set(SESSION_COOKIE, "", cookieOptions(0));
   const base = process.env.BASE_DOMAIN;
   const list = `/platform/companies${slug && /^[a-z0-9-]{1,63}$/.test(slug) ? `?from=${slug}` : ""}`;

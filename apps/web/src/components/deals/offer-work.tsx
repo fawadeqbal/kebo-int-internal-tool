@@ -13,7 +13,7 @@ import { SheetFact, SheetPart } from "@/components/records/phone-items";
 import { BoxFacts, RecordBox } from "@/components/common/record-box";
 import { PaperFacts, PaperLayout } from "@/components/records/paper-boxes";
 import { HistoryButton, type HistoryEntry } from "@/components/edits/history-button";
-import { recordEditAction } from "@/lib/edit-actions";
+import { editNotes } from "@/components/edits/edit-notes";
 import { ConfirmDialog } from "@/components/common/dialog";
 import { changeLine } from "@/components/common/change-words";
 import type { ActionState } from "@/lib/actions";
@@ -268,6 +268,7 @@ function OfferWindow({
     }
     const id = q.id;
     setError(null);
+    const notes = editNotes();
     const problems = await upload(id);
     if (problems.length) {
       router.refresh();
@@ -284,7 +285,7 @@ function OfferWindow({
         return;
       }
       if (saved.reason || !linesCard?.first)
-        await recordEditAction({
+        await notes.keep({
           type: "factory_quote",
           id,
           card: "lines",
@@ -293,14 +294,14 @@ function OfferWindow({
           changes: batch.diff.changes.slice(0, 60),
           keys: batch.diff.keys.slice(0, 500),
           lines: Object.fromEntries(Object.entries(batch.diff.byKey).slice(0, 200)),
-        }).catch(() => undefined);
+        });
     }
     if (saved.reason)
       for (const part of ["factory", "prices", "terms", "conditions"] as OfferPart[]) {
         const list = saved.changes.filter((c) => c.part === part);
         const added = part === "factory" ? files.map((f) => `Added · File: ${f.name}`) : [];
         if (!list.length && !added.length) continue;
-        await recordEditAction({
+        await notes.keep({
           type: "factory_quote",
           id,
           card: `offer.${part}`,
@@ -308,8 +309,9 @@ function OfferWindow({
           reason: saved.reason,
           changes: [...list.map((c) => changeLine(c.label, c.from, c.to)), ...added],
           keys: list.map((c) => c.key),
-        }).catch(() => undefined);
+        });
       }
+    notes.tell();
     router.refresh();
     // Saved: close without asking "Discard your change?".
     close(st);

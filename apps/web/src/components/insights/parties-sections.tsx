@@ -57,7 +57,7 @@ export function CustomersSection({
           label="Customers who ordered"
           value={String(d.ordered.now)}
           delta={<Delta value={change(d.ordered.now, d.ordered.before)} vs={vs} />}
-          sub={`of ${d.total} · ${d.ordered.new} new`}
+          sub={`${d.total === null ? "" : `of ${d.total} · `}${d.ordered.new} new`}
           how={how.customersWhoOrdered(span)}
         />
         <StatTile

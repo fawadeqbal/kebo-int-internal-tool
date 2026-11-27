@@ -36,7 +36,7 @@ import { send, type Staged } from "@/components/files/upload";
 import { FileRow, FileZone, fileSize } from "@/components/common/file-zone";
 import { LineTable } from "@/components/lines/line-table";
 import { ReasonSheet } from "@/components/edits/reason-chips";
-import { recordEditAction } from "@/lib/edit-actions";
+import { editNotes } from "@/components/edits/edit-notes";
 import type { DealItem } from "@/lib/types";
 import type { LineRow } from "@/components/lines/line-table";
 import type { EditCard, EditRef } from "@/lib/types-edits";
@@ -202,15 +202,16 @@ export function DealForm({
     if (!r.ok) return r;
     const { id, refNo } = r.data as { id: string; refNo?: string };
     // A changed list of items is kept as an edit of the items, with its reason ("Edited n×").
+    const notes = editNotes();
     if (!create && sheet.dirty && itemsEdit && (why?.trim() || !itemsEdit.card?.first))
-      await recordEditAction({
+      await notes.keep({
         ...itemsEdit.edit,
         kind: why?.trim() ? "edit" : "first",
         reason: why?.trim() || undefined,
         changes: sheet.diff.changes.slice(0, 60),
         keys: sheet.diff.keys.slice(0, 500),
         lines: Object.fromEntries(Object.entries(sheet.diff.byKey).slice(0, 200)),
-      }).catch(() => undefined);
+      });
     // Each box keeps its own history (design rules 18 Nov): what changed in Customer and in Details, with why.
     if (!create && itemsEdit && why?.trim())
       for (const [card, part] of [
@@ -219,7 +220,7 @@ export function DealForm({
       ] as const) {
         const list = fieldChanges.filter((c) => PART_OF[c.key] === part);
         if (!list.length) continue;
-        await recordEditAction({
+        await notes.keep({
           type: itemsEdit.edit.type,
           id: itemsEdit.edit.id,
           card,
@@ -227,8 +228,9 @@ export function DealForm({
           reason: why.trim(),
           changes: list.map((c) => changeLine(c.label, c.from, c.to)),
           keys: list.map((c) => c.key),
-        }).catch(() => undefined);
+        });
       }
+    notes.tell();
     const list = stagedNow.current;
     if (list.length) {
       setUploading(true);

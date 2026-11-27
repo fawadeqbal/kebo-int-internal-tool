@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import { UUID } from "@/lib/ids";
+import { bodyOf } from "@/lib/quiet";
 
 /**
  * Uploading the file kept with a record (an expense's receipt, a payment's
@@ -25,7 +26,7 @@ export function uploadRoute(apiPath: (id: string) => string, choose: string) {
     const body = new FormData();
     body.set("file", file, file.name);
     const res = await apiFetch(apiPath(id), { method: "POST", body });
-    const json = await res.json().catch(() => ({ error: `Upload failed (${res.status})` }));
+    const json = (await bodyOf<unknown>(res)) ?? { error: `Upload failed (${res.status})` };
     return Response.json(json, { status: res.status });
   }
 

@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import { UUID } from "@/lib/ids";
+import { bodyOf } from "@/lib/quiet";
 
 /** All of a deal's URS & documents in one zip (the API checks the person may see the deal). */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -7,7 +8,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!UUID.test(id)) return new Response("Not found", { status: 404 });
   const res = await apiFetch(`/inquiries/${id}/files.zip`);
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
+    const body = await bodyOf(res);
     return new Response(body?.error ?? (res.status === 404 ? "Not found" : "Not allowed"), { status: res.status });
   }
   const headers = new Headers();
@@ -44,6 +45,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (typeof v === "string" && v.trim()) body.set(k, v.trim());
   }
   const res = await apiFetch(`/inquiries/${id}/files`, { method: "POST", body });
-  const json = await res.json().catch(() => ({ error: `Upload failed (${res.status})` }));
+  const json = (await bodyOf<unknown>(res)) ?? { error: `Upload failed (${res.status})` };
   return Response.json(json, { status: res.status });
 }

@@ -24,7 +24,7 @@ const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 export async function CustomerSide({ id }: { id: string }) {
   const me = await requireUser();
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, payPart, notes, accountPart, peoplePart] = await Promise.all([
+  const [c, payPart, notesPart, accountPart, peoplePart] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
     partyNotesOf("customers", id),
@@ -35,6 +35,9 @@ export async function CustomerSide({ id }: { id: string }) {
   const pay = dataOf(payPart);
   const account = dataOf(accountPart);
   const people = dataOf(peoplePart) ?? [];
+  // Said in Activity, in place of its list (not "Nothing yet").
+  const notes = dataOf(notesPart) ?? [];
+  const notesFailed = failedWhat(notesPart);
   const failed = failedWhat(payPart, accountPart, peoplePart);
   const totals = pay?.totals ?? [];
   const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
@@ -154,7 +157,9 @@ export async function CustomerSide({ id }: { id: string }) {
             <CardHeader title="Activity" />
             <CardBody className="flex flex-col gap-3">
               {canNote && <QuickNote action={addNoteAction.bind(null, { key: "customerId", id: c.id })} people={people} />}
-              {notes.length ? (
+              {notesFailed ? (
+                <CouldNotLoad what={notesFailed} compact />
+              ) : notes.length ? (
                 <ol className="flex flex-col gap-3">
                   {notes.slice(0, 5).map((n) => (
                     <li key={n.id} className="flex gap-2.5">

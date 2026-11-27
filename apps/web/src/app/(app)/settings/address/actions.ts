@@ -6,13 +6,15 @@ import { redirect } from "next/navigation";
 import type { OwnDomainView } from "@kebo/shared";
 import { api, ApiError } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
+import { dataOf, part } from "@/lib/part";
 import type { AddressView } from "./types";
 
 /** Whether a short name is free (the live check while typing). */
 export async function checkAddressAction(slug: string): Promise<AddressView["check"]> {
   const s = slug.trim().toLowerCase();
   if (!s) return null;
-  const r = await api.get<AddressView>("/company/address", { slug: s }).catch(() => null);
+  // Not checked (logged): the field says nothing yet, and saving checks again.
+  const r = dataOf(await part("whether the name is free", () => api.get<AddressView>("/company/address", { slug: s })));
   return r?.check ?? null;
 }
 

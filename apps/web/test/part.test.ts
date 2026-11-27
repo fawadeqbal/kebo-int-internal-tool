@@ -7,7 +7,7 @@ vi.mock("next/navigation", async (real) => await real());
 
 import { redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
-import { dataOf, failedWhat, isFailed, part } from "@/lib/part";
+import { dataOf, failedWhat, isFailed, optional, part } from "@/lib/part";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -57,6 +57,29 @@ describe("part", () => {
     answer(200, JSON.stringify({ n: 1 }));
     expect(await api.get("/x")).toEqual({ n: 1 });
     vi.unstubAllGlobals();
+  });
+
+  it("the API client: an OK answer that broke off is a failure, not nothing", async () => {
+    const { api } = await import("@/lib/api");
+    const cut = new ReadableStream({
+      start: (c) => {
+        c.enqueue(new TextEncoder().encode('{"rows":['));
+        c.error(new Error("socket hang up"));
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(cut, { status: 200 })),
+    );
+    await expect(api.get("/x")).rejects.toMatchObject({ status: 502 });
+    vi.unstubAllGlobals();
+  });
+
+  it("optional: nothing for 403 and 404; any other failure goes on to the error page", async () => {
+    expect(await optional(async () => 5)).toBe(5);
+    expect(await optional(() => Promise.reject(new ApiError(403, "No")))).toBeNull();
+    expect(await optional(() => Promise.reject(new ApiError(404, "Not found")))).toBeNull();
+    await expect(optional(() => Promise.reject(new ApiError(500, "Boom")))).rejects.toMatchObject({ status: 500 });
   });
 
   it("logs a network failure's code (ECONNREFUSED), not just 'fetch failed'", async () => {

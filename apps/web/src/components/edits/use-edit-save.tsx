@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { REASON_CHOICES } from "@kebo/shared";
 import { useClosePanel } from "@/components/common/panel";
-import { recordEditAction } from "@/lib/edit-actions";
+import { editNotes } from "./edit-notes";
 import type { EditCard, EditRef } from "@/lib/types-edits";
 import { ReasonDialog } from "./edits";
 import { useTime } from "@/lib/time-client";
@@ -62,9 +62,9 @@ export function useEditSave({ edit, card, what = "lines" }: { edit?: EditRef; ca
         return;
       }
       if (edit && (why || !card?.first)) {
-        await recordEditAction({ ...edit, kind: why ? "edit" : "first", reason: why, changes: changes.slice(0, 60), keys: keys.slice(0, 500) }).catch(
-          () => undefined,
-        );
+        const notes = editNotes();
+        await notes.keep({ ...edit, kind: why ? "edit" : "first", reason: why, changes: changes.slice(0, 60), keys: keys.slice(0, 500) });
+        notes.tell();
       }
       setBusy(false);
       setAsking(null);

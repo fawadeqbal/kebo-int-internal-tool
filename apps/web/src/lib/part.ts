@@ -11,6 +11,22 @@ export type Failed = { readonly failed: true; readonly what: string };
 export const isFailed = (v: unknown): v is Failed =>
   !!v && typeof v === "object" && (v as { failed?: unknown }).failed === true && typeof (v as { what?: unknown }).what === "string";
 
+/** Not there for this person: 403 (they may not see it) or 404 (it is not there). Left out, never a failure. */
+const missing = (e: unknown) => e instanceof ApiError && (e.status === 403 || e.status === 404);
+
+/**
+ * A read that may be missing (403, 404: null) but never fails quietly: any other failure goes on to the page's
+ * error page. For a page's main read, and what a document cannot be made without (its company's brand).
+ */
+export async function optional<T>(read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch (e) {
+    if (missing(e)) return null;
+    throw e;
+  }
+}
+
 /** The data of a part, or nothing (null and failed alike): for the places that only need what is there. */
 export const dataOf = <T>(v: T | Failed | null): T | null => (v === null || isFailed(v) ? null : v);
 
@@ -26,7 +42,7 @@ export async function part<T>(what: string, read: () => Promise<T>): Promise<T |
     return await read();
   } catch (e) {
     unstable_rethrow(e);
-    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return null;
+    if (missing(e)) return null;
     console.error(`[part] could not load ${what}: ${why(e)}`);
     return { failed: true, what };
   }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { addressCompany, apiFetch, SESSION_COOKIE } from "@/lib/api";
 import type { ActionState } from "@/lib/actions";
 import { localPath } from "@/lib/paths";
+import { bestEffort, bodyOf, type Refusal } from "@/lib/quiet";
 import { REMEMBERED_COOKIE, REMEMBERED_MAX_AGE, rememberValue } from "@/lib/remembered";
 
 const cookieOptions = (maxAge: number | undefined) => ({
@@ -26,7 +27,17 @@ export async function loginAction(_prev: ActionState, form: FormData): Promise<A
     body: JSON.stringify({ email, password: String(form.get("password") ?? ""), company }),
     auth: false,
   });
-  const body = await res.json().catch(() => ({}));
+  const body =
+    (await bodyOf<
+      Refusal & {
+        companies?: unknown;
+        token?: string;
+        expiresInSeconds?: number;
+        user?: { name?: string };
+        twoStepRequired?: boolean;
+        twoStepSetupRequired?: boolean;
+      }
+    >(res)) ?? {};
   // Their email and password fit more than one company: they choose (and type the password again).
   if (res.status === 409 && body.code === "choose_company")
     return { ok: false, code: "choose_company", message: body.error, values: { email }, data: body.companies };
@@ -37,6 +48,7 @@ export async function loginAction(_prev: ActionState, form: FormData): Promise<A
       errors: body.fieldErrors,
       values: { email, ...(company ? { company } : {}) },
     };
+  if (!body.token) return { ok: false, message: "Could not sign in: the server's answer could not be read. Try again.", values: { email } };
   // "Keep me signed in" off: the cookie goes when the browser closes (the session itself still ends on time).
   const keep = form.get("keep") !== null || form.get("keepAsked") === null;
   (await cookies()).set(SESSION_COOKIE, body.token, cookieOptions(keep ? body.expiresInSeconds : undefined));
@@ -54,7 +66,7 @@ export async function loginAction(_prev: ActionState, form: FormData): Promise<A
 
 export async function twoStepAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const res = await apiFetch("/auth/two-step", { method: "POST", body: JSON.stringify({ code: String(form.get("code") ?? "") }) });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   if (res.status === 401 && /password/i.test(body.error ?? "")) redirect("/login");
   if (!res.ok) return { ok: false, message: body.error ?? "That code is not right.", errors: body.fieldErrors };
   redirect(safeNext(form.get("next")));
@@ -67,7 +79,7 @@ export async function forgetAccountAction() {
 }
 
 export async function logoutAction() {
-  await apiFetch("/auth/logout", { method: "POST", body: "{}" }).catch(() => undefined);
+  await bestEffort("signing out at the API (the cookie is cleared anyway)", apiFetch("/auth/logout", { method: "POST", body: "{}" }));
   (await cookies()).set(SESSION_COOKIE, "", cookieOptions(0));
   redirect("/login");
 }

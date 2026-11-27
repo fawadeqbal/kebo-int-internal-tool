@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { can, type Permission, type PlanFeature, type Role } from "@kebo/shared";
 import { api, ApiError } from "./api";
+import { dataOf, optional, part } from "./part";
 import { PAGE_HEADER } from "./page-header";
 
 export interface Me {
@@ -51,8 +52,11 @@ export interface CompanyView {
   notices: { tone: "info" | "warn" | "danger"; text: string }[];
 }
 
-/** The signed-in person's company (once per request). */
-export const getCompany = cache(async (): Promise<CompanyView | null> => api.get<CompanyView>("/company").catch(() => null));
+/**
+ * The signed-in person's company (once per request). Not read (logged): null, and the frame offers every module
+ * (the API still checks each) without the company's notices.
+ */
+export const getCompany = cache(async (): Promise<CompanyView | null> => dataOf(await part("the company", () => api.get<CompanyView>("/company"))));
 
 /** Whether the company's plan includes a feature (no answer: assume yes, the API still checks). */
 export async function hasFeature(feature: PlanFeature) {
@@ -108,9 +112,13 @@ export async function load<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** The company's brand on its documents (Settings → Company: logo, title, the line under it); null when it cannot be read. */
+/**
+ * The company's brand on its documents (Settings → Company: logo, title, the line under it); null when this person
+ * may not read it. Any other failure is the document's error page (Try again): a paper for a customer is not made
+ * without its company's name.
+ */
 export const docBrand = cache(async (): Promise<{ logo: string | null; mark: string; tagline: string | null } | null> => {
-  const b = await api.get<{ logo: string | null; mark: string; tagline: string | null }>("/company/brand").catch(() => null);
+  const b = await optional(() => api.get<{ logo: string | null; mark: string; tagline: string | null }>("/company/brand"));
   return b ? { logo: b.logo, mark: b.mark, tagline: b.tagline } : null;
 });
 

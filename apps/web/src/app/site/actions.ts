@@ -3,6 +3,7 @@
 import { apiFetch } from "@/lib/api";
 import { formValues, type ActionState } from "@/lib/actions";
 import { originFromForm } from "@/lib/origin";
+import { bodyOf } from "@/lib/quiet";
 
 /** "Ask a question" on the marketing page: a lead for the platform admin. */
 export async function contactAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -21,7 +22,7 @@ export async function contactAction(_prev: ActionState, form: FormData): Promise
       origin: originFromForm(form),
     }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   if (!res.ok) return { ok: false, message: body.error ?? "Could not send. Please try again.", errors: body.fieldErrors, values: v };
   return { ok: true, message: "Thank you. We have your question and will answer by email within one working day." };
 }
@@ -30,7 +31,7 @@ export async function contactAction(_prev: ActionState, form: FormData): Promise
 export async function findCompanyAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const res = await apiFetch("/platform/public/find-company", { method: "POST", auth: false, body: JSON.stringify({ email: v.email }) });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   if (!res.ok) return { ok: false, message: body.error ?? "Could not send. Please try again.", errors: body.fieldErrors, values: v };
   return {
     ok: true,

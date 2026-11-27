@@ -1,11 +1,12 @@
 import { apiFetch } from "@/lib/api";
+import { bodyOf } from "@/lib/quiet";
 
 /** The company's export (a zip from the API), passed straight through to the platform admin's browser. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const res = await apiFetch(`/platform/companies/${id}/export`, { platform: true });
   if (!res.ok || !res.body) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    const body = await bodyOf(res);
     return new Response(body?.error ?? "Could not export.", {
       status: res.status || 500,
       headers: { "content-type": "text/plain; charset=utf-8" },

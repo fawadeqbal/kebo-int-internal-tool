@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { bodyOf } from "@/lib/quiet";
 
 /** Only this site's own pages, for someone signed in. Returns a response to send back when not. */
 export async function sheetGuard(req: Request): Promise<Response | null> {
@@ -14,7 +15,7 @@ export async function sheetGuard(req: Request): Promise<Response | null> {
 export async function excelRefusal(): Promise<Response | null> {
   const res = await apiFetch("/company");
   if (!res.ok) return Response.json({ error: "Could not check your company's plan. Try again." }, { status: res.status === 401 ? 401 : 503 });
-  const company = (await res.json().catch(() => null)) as { features?: string[] } | null;
+  const company = await bodyOf<{ features?: string[] }>(res);
   if (!Array.isArray(company?.features) || !company.features.includes("excel")) {
     return Response.json({ error: "Excel is not in your company's plan. Ask the platform admin to switch it on." }, { status: 403 });
   }

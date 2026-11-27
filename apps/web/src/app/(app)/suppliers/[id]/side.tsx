@@ -16,7 +16,7 @@ import { CouldNotLoad } from "@/components/common/could-not-load";
 export async function SupplierSide({ id }: { id: string }) {
   const me = await requireUser();
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
-  const [f, payables, posPart, groupsPart] = await Promise.all([
+  const [f, payablesPart, posPart, groupsPart] = await Promise.all([
     supplierOf(id),
     supplierPayablesOf(id),
     money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
@@ -26,7 +26,9 @@ export async function SupplierSide({ id }: { id: string }) {
   const groups = dataOf(groupsPart);
   const failed = failedWhat(posPart, groupsPart);
   const r = f.record;
-  const toPay = payables.filter((p) => Number(p.toPay) > 0.005);
+  // Not read: said in the money box, in place of "Nothing bought or owed yet".
+  const payablesFailed = failedWhat(payablesPart);
+  const toPay = (dataOf(payablesPart) ?? []).filter((p) => Number(p.toPay) > 0.005);
   const perf = groups?.rows[0] ?? null;
   // Bought, paid and owed, per currency, from its orders.
   const sums = [...new Set((pos?.rows ?? []).map((o) => o.currency))].map((cur) => {
@@ -70,6 +72,8 @@ export async function SupplierSide({ id }: { id: string }) {
                     <strong className="tabular">{whole(p.toPay, p.currency)}</strong>
                   </div>
                 ))
+              ) : payablesFailed ? (
+                <CouldNotLoad what={payablesFailed} compact />
               ) : (
                 <EmptyLine>Nothing bought or owed yet.</EmptyLine>
               )}
