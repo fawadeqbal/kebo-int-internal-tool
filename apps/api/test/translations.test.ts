@@ -2,11 +2,13 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FIRST_COMPANY_ID } from "@kebo/database";
+import { FIRST_COMPANY_ID, type Prisma } from "@kebo/database";
 import { api, signIn, startApp } from "./app";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
 import { CompanyContext } from "../src/common/company/company-context";
+import { orderAccess } from "../src/common/auth/order-access";
+import type { SessionUser } from "../src/common/auth/session-user";
 import { TranslationsService } from "../src/modules/translations/translations.service";
 
 /**
@@ -18,6 +20,8 @@ describe("the translator", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let sana: string;
+  /** Sana as the API knows her: which orders she may open. */
+  let sanaUser: SessionUser;
   let translator: Server;
   const asked: string[] = [];
   let down = false;
@@ -43,6 +47,7 @@ describe("the translator", () => {
     app = await startApp();
     prisma = app.get(PrismaService);
     sana = await signIn(app, "sana@example.com");
+    sanaUser = (await api(app, sana).get("/auth/me").expect(200)).body as SessionUser;
   });
 
   afterAll(async () => {
@@ -72,10 +77,15 @@ describe("the translator", () => {
   };
   /** An order item for a test: a goods line given this description and no Chinese (put back as it was afterwards). */
   const borrowed: { id: string; description: string; descriptionZh: string | null; zhBy: string | null }[] = [];
-  const itemNamed = async (description: string) =>
+  /**
+   * An item of a live order, renamed for a test and put back after. `of`: only of these orders. A test that changes
+   * the item through the API as Sana asks for an order she may open: the tests run side by side on one database, and
+   * a few items are on orders other tests made for someone else (27 Nov: 3 of 117), which answer her "not found".
+   */
+  const itemNamed = async (description: string, of: Prisma.OrderWhereInput = {}) =>
     inCompany(async () => {
       const l = await prisma.db.orderLine.findFirst({
-        where: { type: "goods", order: { status: { not: "cancelled" } }, id: { notIn: borrowed.map((b) => b.id) } },
+        where: { type: "goods", order: { status: { not: "cancelled" }, ...of }, id: { notIn: borrowed.map((b) => b.id) } },
         select: { id: true, description: true, descriptionZh: true, zhBy: true },
         orderBy: { id: "desc" },
       });
@@ -164,7 +174,7 @@ describe("the translator", () => {
 
   it("an item's Chinese typed on the order is remembered for the next order", async () => {
     const description = `Labelling machine ${tag} for round bottles`;
-    const lineId = await itemNamed(description);
+    const lineId = await itemNamed(description, orderAccess(sanaUser));
     await api(app, sana).patch(`/order-lines/${lineId}`, { set: "customs", descriptionZh: `圆瓶贴标机 ${tag}` }).expect(200);
     expect(await zhOfLine(lineId)).toEqual({ descriptionZh: `圆瓶贴标机 ${tag}`, zhBy: "staff" });
     // The memory has it as a person's: a paper, or the same item on the next order, gets it.
