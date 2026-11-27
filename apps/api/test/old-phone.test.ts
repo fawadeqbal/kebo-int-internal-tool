@@ -118,7 +118,7 @@ describe("a phone app from before the rename keeps working", () => {
     expect(offer.factoryTotal).toBe("42000.00");
   });
 
-  it("who says it reads the new names gets them alone: today's web, a newer phone app", async () => {
+  it("who says it reads the new names gets them alone: today's web, and a phone build that says so (none yet)", async () => {
     for (const agent of ["Mozilla/5.0", DART]) {
       const res = await request(app.getHttpServer())
         .get(`/api/inquiries/${inquiryId}/sourcing`)
@@ -228,6 +228,13 @@ describe("a phone app from before the rename keeps working", () => {
       url: "/api/expenses?supplierId=f1",
       body: { supplierIds: ["f1"] },
       asSent: { factoryIds: ["f1"] },
+      sent: { supplierId: "f1" },
+    });
+    // A phone build that says it reads the new names is not an old phone: when a body carries both, the new one wins.
+    expect(run({ "user-agent": DART, "x-names": "supplier" }, "/api/expenses", { supplierQuoteId: "new", factoryQuoteId: "old" })).toEqual({
+      url: "/api/expenses",
+      body: { supplierQuoteId: "new" },
+      asSent: { supplierQuoteId: "new", factoryQuoteId: "old" },
       sent: { supplierId: "f1" },
     });
   });

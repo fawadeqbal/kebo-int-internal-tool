@@ -134,7 +134,7 @@ export class FollowUpsService {
         dueAt: r.dueAt,
         place: r.place,
         note: r.note,
-        /** The record it is on: { type: inquiry | order | customer | supplier, id, label } or null. */
+        /** The record it is on: { type: inquiry | order | customer | factory, id, label } or null. */
         target: t ? { type: t.type, id: t.id, label: ref?.label ?? "" } : null,
         /** Where it opens: the record, or the follow-ups list. */
         link: ref?.link ?? FOLLOW_UPS_LINK,

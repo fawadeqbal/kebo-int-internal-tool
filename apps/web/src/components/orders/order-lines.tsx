@@ -15,7 +15,7 @@ import { ItemsBody, type ItemsPhoneRow } from "@/components/records/items-box";
 
 /**
  * The order's lines, kept once, opened by each step with its own columns:
- * - supplier: the supplier, its price and tax (read only; people who see supplier prices)
+ * - factory: the supplier, its price and tax (read only; people who see supplier prices)
  * - received: how many came in from the supplier, when, and the status (Production)
  * - packing: packed in, packages, gross, net, CBM (Shipping)
  * - delivered: how many reached the customer, in what condition, a note (Delivery & SAT)

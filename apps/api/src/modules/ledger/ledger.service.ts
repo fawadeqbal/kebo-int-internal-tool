@@ -653,7 +653,7 @@ export class LedgerService {
       from,
       to,
       mainCurrency: (await this.settings.get()).sales.currency,
-      /** customer: what they owe us (debit − credit); supplier, staff: what we owe them (credit − debit). */
+      /** customer: what they owe us (debit − credit); factory (a supplier), staff: what we owe them (credit − debit). */
       sign: kind === "customer" ? "they owe us" : "we owe",
       currencies: currencies.map((c) => ({
         currency: c,
