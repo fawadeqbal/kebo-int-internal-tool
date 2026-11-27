@@ -417,7 +417,7 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
         // the same: shipmentLeft, shipmentIn), with the day it happened. Cleared is a day typed on an arrived one.
         const on = (d: string | null | undefined) => (d ? ` ${dayMonth(d)}` : "");
         const word = shipmentIn(s.status ?? "planned")
-          ? s.clearedOn
+          ? s.clearedOn || s.status === "cleared"
             ? { text: `Cleared${on(s.clearedOn)}`, tone: "ok" as const }
             : { text: `Arrived${on(s.arrivedOn)}`, tone: "ok" as const }
           : shipmentLeft(s.status ?? "planned")

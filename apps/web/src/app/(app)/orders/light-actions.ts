@@ -72,9 +72,10 @@ const pick = (v: Record<string, string>, keys: string[]) => Object.fromEntries(k
 const ORDER: ShipmentStatus[] = ["planned", "booked", "loaded", "departed", "arrived", "cleared"];
 const forward = (was: ShipmentStatus | undefined, to: ShipmentStatus) => (ORDER.indexOf(to) > ORDER.indexOf(was ?? "planned") ? to : undefined);
 
-/** The status a shipment's values imply (a booking, a loading date, a sailing date, an arrival date), if further on. */
+/** The status a shipment's values imply (a booking, a loading, sailing, arrival or customs date), if further on. */
 function impliedStatus(was: ShipmentStatus | undefined, v: Record<string, string>): ShipmentStatus | undefined {
   if (v.status) return undefined;
+  if (v.clearedOn) return forward(was, "cleared");
   if (v.arrivedOn) return forward(was, "arrived");
   if (v.departedOn) return forward(was, "departed");
   if (v.loadedOn) return forward(was, "loaded");

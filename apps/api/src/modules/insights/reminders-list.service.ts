@@ -12,6 +12,7 @@ import {
   ORDER_TAB_LABEL,
   sectionReminders,
   LEFT_STATUSES,
+  shipmentLeft,
 } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -406,7 +407,7 @@ export class RemindersListService {
         },
       });
       for (const c of contracts) {
-        const shipped = c.order.shipments.some((s) => !!s.departedOn || ["departed", "arrived", "cleared"].includes(s.status));
+        const shipped = c.order.shipments.some((s) => shipmentLeft(s.status));
         const ship = fromDbDateOrNull(c.latestShipOn);
         const exp = fromDbDateOrNull(c.expiresOn);
         const name = c.number ? `LC ${c.number}` : "the LC";
