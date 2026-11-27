@@ -1,5 +1,5 @@
 import { roundHalfAway, type Minor } from "@kebo/money";
-import { addDays, monthEnd, monthStart, type ISODate } from "@kebo/utils";
+import { addDays, daysBetween, monthEnd, monthStart, type ISODate } from "@kebo/utils";
 
 /*
  * Home's "What stands out" and "Cash in the next four weeks", as plain functions of numbers already read:
@@ -144,7 +144,7 @@ export function weeksAhead(a: {
   const starts = [0, 7, 14, 21].map((n) => addDays(a.today, n));
   const end = addDays(a.today, 27);
   const sums = starts.map(() => ({ in: 0, out: 0 }));
-  const weekOf = (day: string) => (day > end ? -1 : day < a.today ? 0 : Math.min(3, Math.floor((Date.parse(day) - Date.parse(a.today)) / (7 * 86_400_000))));
+  const weekOf = (day: string) => (day > end ? -1 : day < a.today ? 0 : Math.min(3, Math.floor(daysBetween(a.today, day) / 7)));
   for (const p of a.comingIn) {
     const w = weekOf(p.dueOn);
     if (w >= 0) sums[w]!.in += p.minor;

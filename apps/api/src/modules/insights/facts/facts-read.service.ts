@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Prisma, isCustomer, isSupplier, wordFactsByOrder } from "@kebo/database";
 import { fromMinor, roundHalfAway, toMinor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, orderWord, type LostReason } from "@kebo/shared";
-import { ForbiddenError, type ISODate } from "@kebo/utils";
+import { addDays, addMonths, ForbiddenError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../../database/prisma.service";
 import { Clock } from "../../../common/time/clock.service";
 import { LimitsService } from "../../../common/company/limits.service";
@@ -575,8 +575,9 @@ export class FactsReadService {
   async now(user: SessionUser, q: Span, trusted = false) {
     const { seeMoney, seeExpenses, today, currency, ctx } = await this.open(user, trusted);
     const db = this.prisma.db;
-    const week = new Date(Date.parse(`${today}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
-    const yearAgo = new Date(Date.parse(`${today}T00:00:00Z`) - 365 * 86_400_000).toISOString().slice(0, 10);
+    const week = addDays(today, 7);
+    // The same day a year ago (365 days was a day short with a 29 February between).
+    const yearAgo = addMonths(today, -12);
     const [[quotes], [decided], [expiring], overdue, late, [low]] = await Promise.all([
       db.$queryRaw<{ count: number; value: string }[]>`
         select count(*)::int as count, coalesce(sum(f.quoted_value_main), 0)::text as value
