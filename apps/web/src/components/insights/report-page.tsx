@@ -18,6 +18,8 @@ import { CashSection } from "./cash-section";
 import { CustomersSection, SuppliersSection, FunnelSection, PeopleSection } from "./parties-sections";
 import { TargetsView } from "./targets-view";
 import { companyToday } from "@/lib/format";
+import { dataOf, failedWhat } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export type ReportSearch = {
   period?: string;
@@ -198,6 +200,7 @@ async function Body({
       const d = await loadOverview(p, seeMoney, sp.month);
       return (
         <>
+          {d.failed && <CouldNotLoad what={d.failed} />}
           <Missing rates={d.missingRates} />
           <Overview d={d} p={p} href={href} />
         </>
@@ -205,17 +208,22 @@ async function Body({
     }
     case "profit": {
       const sort: ProfitSort = (PROFIT_SORTS as readonly string[]).includes(sp.sort ?? "") ? (sp.sort as ProfitSort) : "low";
-      const [d, s] = await Promise.all([loadProfit(p, sort), spendingOf(p)]);
+      const [d, sPart] = await Promise.all([loadProfit(p, sort), spendingOf(p)]);
+      const s = dataOf(sPart);
+      const failed = failedWhat(sPart);
       const params = { ...keep, sort: sort === "low" ? undefined : sort };
       return (
         <>
+          {failed && <CouldNotLoad what={failed} />}
           <Missing rates={d.missingRates} />
           <ProfitSection d={d} p={p} sort={sort} page={toPage(sp.page)} base={path} params={params} href={(patch) => buildHref(path, params, patch)} running={s ? Number(s.company) : null} />
         </>
       );
     }
     case "cash": {
-      const { report } = await loadCash(p);
+      const { report, failed } = await loadCash(p);
+      // Not "not switched on" when it could not be read.
+      if (failed) return <CouldNotLoad what={failed} />;
       if (!report) return <Notice tone="info">Cash &amp; bank is not switched on for the company, so there are no accounts to report on.</Notice>;
       return (
         <>
@@ -226,16 +234,31 @@ async function Body({
     }
     case "customers": {
       const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
-      const [d, s] = await Promise.all([loadCustomers(p, today), seeMoney ? spendingOf(p) : null]);
+      const [d, sPart] = await Promise.all([loadCustomers(p, today), seeMoney ? spendingOf(p) : null]);
+      const s = dataOf(sPart);
+      const failed = failedWhat(sPart);
       const spent = s ? new Map(s.customers.map((x) => [x.customer.id, Number(x.spent)])) : null;
-      return <CustomersSection d={d} p={p} href={href} chip={chip} page={page} base={path} params={{ ...keep, chip: chip === "all" ? undefined : chip }} spent={spent} />;
+      return (
+        <>
+          {failed && <CouldNotLoad what={failed} />}
+          <CustomersSection d={d} p={p} href={href} chip={chip} page={page} base={path} params={{ ...keep, chip: chip === "all" ? undefined : chip }} spent={spent} />
+        </>
+      );
     }
     case "factories":
       return <SuppliersSection d={await loadSuppliers(p)} p={p} page={page} base={path} params={keep} />;
     case "people": {
-      const [d, s] = await Promise.all([loadPeople(p, today), seeMoney ? spendingOf(p) : null]);
+      const [d, sPart] = await Promise.all([loadPeople(p, today), seeMoney ? spendingOf(p) : null]);
+      const s = dataOf(sPart);
+      // The spending beside it, and the targets inside it.
+      const failed = failedWhat(sPart, ...d.failedParts);
       const spend = s ? new Map(s.people.map((x) => [x.person.id, { spent: Number(x.spent), owed: Number(x.owed) }])) : null;
-      return <PeopleSection d={d} p={p} canSet={seeMoney} href={href} spend={spend} />;
+      return (
+        <>
+          {failed && <CouldNotLoad what={failed} />}
+          <PeopleSection d={d} p={p} canSet={seeMoney} href={href} spend={spend} />
+        </>
+      );
     }
     case "targets": {
       const year = /^\d{4}$/.test(sp.year ?? "") ? Number(sp.year) : Number(today.slice(0, 4));
@@ -245,7 +268,13 @@ async function Body({
       return <FunnelSection d={await loadFunnel(p)} p={p} />;
     case "spending": {
       if (!(await hasFeature("expenses"))) return <Notice tone="info">Expenses are not switched on for the company, so there is no spending to report on.</Notice>;
-      return <SpendingSection d={await loadSpending(p)} p={p} />;
+      const d = await loadSpending(p);
+      return (
+        <>
+          {d.failed && <CouldNotLoad what={d.failed} />}
+          <SpendingSection d={d} p={p} />
+        </>
+      );
     }
   }
 }

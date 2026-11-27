@@ -1,5 +1,5 @@
 import "server-only";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { countryName } from "./countries";
 import { can, EXPENSE_CATEGORY_LABEL, type Permission } from "@kebo/shared";
 import { addDays, isMonth, lastMonths, monthEnd, monthsBetween, monthStart } from "@kebo/utils";
@@ -18,6 +18,7 @@ import type {
   OrderGroups,
 } from "./types-facts";
 import { companyToday } from "@/lib/format";
+import { dataOf, failedWhat, isFailed, part } from "@/lib/part";
 
 /*
  * What each Insights section shows, read from the Insights tables (GET /insights/facts/*) — never worked
@@ -41,8 +42,14 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const prev = { from: p.prevFrom, to: p.prevTo };
   const twelve = { from: monthStart(p.to, -11), to: p.to };
   const drill = isMonth(month) ? { from: monthStart(month), to: monthEnd(month) } : null;
-  /** A list that is only there for some people or plans: without it, its card is left out. */
-  const maybe = <T>(get: () => Promise<T>) => get().catch(() => null);
+  /** A list that is only there for some people or plans: without it (403), its card is left out; one that could not
+   * be read is named in `failed` (the page says so). */
+  const tried: unknown[] = [];
+  const maybe = <T>(what: string, get: () => Promise<T>) =>
+    part(what, get).then((v) => {
+      tried.push(v);
+      return dataOf(v);
+    });
   const [cur, before, cashNow, cashBefore, monthly, monthlyCash, orders, owed, toPay, bills, report, reportBefore, funnelNow, funnelBefore, monthOrders] = await Promise.all([
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
     facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
@@ -51,12 +58,12 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     facts<OrderGroups>("orders/groups", { ...twelve, period: "month" }),
     facts<CashFacts>("cash", twelve),
     facts<FactOrders>("orders", { ...span, limit: 1000 }),
-    maybe(() => api.get<Receivables>("/money/receivables")),
+    maybe("who owes", () => api.get<Receivables>("/money/receivables")),
     // Only the suppliers' parts due in the next 7 days (the list below), not every open one.
-    money ? maybe(() => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
-    money ? maybe(() => api.get<OpenBills>("/money/bills")) : null,
-    money ? maybe(() => api.get<CashReport>("/money/cash-report", span)) : null,
-    money ? maybe(() => api.get<CashReport>("/money/cash-report", prev)) : null,
+    money ? maybe("what is due to suppliers", () => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
+    money ? maybe("the open bills", () => api.get<OpenBills>("/money/bills")) : null,
+    money ? maybe("the cash", () => api.get<CashReport>("/money/cash-report", span)) : null,
+    money ? maybe("the cash of the period before", () => api.get<CashReport>("/money/cash-report", prev)) : null,
     facts<Funnel>("funnel", span),
     facts<Funnel>("funnel", prev),
     drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
@@ -69,8 +76,13 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const company = (x: CashFacts) => sum(x.months, (m) => n(m.company));
   const profitOf = (g: OrderGroupRow | null, x: CashFacts) => (seeProfit ? n(g?.profitExpected) - company(x) : n(g?.profitQuote));
   // Managers: the money that moved (Reports › Cash). Others: what was paid on orders.
-  const collected = { now: report ? n(report.in.amount) : sum(cashNow.months, (m) => n(m.in)), before: reportBefore ? n(reportBefore.in.amount) : sum(cashBefore.months, (m) => n(m.in)) };
-  const paidOut = report ? { now: n(report.out.amount), before: reportBefore ? n(reportBefore.out.amount) : 0 } : null;
+  // The period before measured as now is; its report not read (named in `failed`): no comparison, never one
+  // against another figure or against 0.
+  const collected = {
+    now: report ? n(report.in.amount) : sum(cashNow.months, (m) => n(m.in)),
+    before: report ? (reportBefore ? n(reportBefore.in.amount) : null) : sum(cashBefore.months, (m) => n(m.in)),
+  };
+  const paidOut = report ? { now: n(report.out.amount), before: reportBefore ? n(reportBefore.out.amount) : null } : null;
   const months = lastMonths(p.to).map((m) => {
     const r = monthly.rows.find((x) => x.period === m);
     const own = n(monthlyCash.months.find((x) => x.month === m)?.company);
@@ -197,7 +209,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
         ]
       : []),
   ];
-  return { ...data, sheets };
+  return { ...data, sheets, failed: failedWhat(...tried) };
 }
 
 /* ------------------------------------------------------------------------------------------- Profit */
@@ -293,8 +305,11 @@ export async function loadProfit(p: Period, sort: ProfitSort = "low") {
 
 /** Reports › Cash: the money that moved in the period, by month and by account (GET /money/cash-report). */
 export async function loadCash(p: Period) {
-  const report = await api.get<CashReport>("/money/cash-report", { from: p.from, to: p.to }).catch(() => null);
-  if (!report) return { report: null, sheets: [] as SheetSpec[] };
+  const read = await part("the cash report", () => api.get<CashReport>("/money/cash-report", { from: p.from, to: p.to }));
+  // Null: Cash & bank is not on for the company (or not for them). Could not be read: `failed` says so.
+  if (isFailed(read)) return { report: null, sheets: [] as SheetSpec[], failed: read.what };
+  const report = read;
+  if (!report) return { report: null, sheets: [] as SheetSpec[], failed: null };
   const c = report.currency;
   const sheets: SheetSpec[] = [
     {
@@ -328,7 +343,7 @@ export async function loadCash(p: Period) {
       rows: report.accounts.map((a) => [a.name, a.currency, xl(n(a.start)), xl(n(a.in)), xl(n(a.out)), xl(n(a.end))]),
     },
   ];
-  return { report, sheets };
+  return { report, sheets, failed: null };
 }
 
 /* ------------------------------------------------------------------------------------------- Customers */
@@ -522,14 +537,18 @@ export async function loadPeople(p: Period, today: string) {
   const span = { from: p.from, to: p.to };
   const thisMonth = { from: `${today.slice(0, 7)}-01`, to: today };
   const year = today.slice(0, 4);
-  const [inq, ord, month, company, targets, companyTargets] = await Promise.all([
+  const [inq, ord, month, company, targetsPart, companyTargetsPart] = await Promise.all([
     facts<InquiryGroups>("inquiries/groups", { ...span, period: "all", by: "person" }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" }),
     facts<OrderGroups>("orders/groups", { ...thisMonth, period: "all", by: "person" }),
     facts<OrderGroups>("orders/groups", { ...thisMonth, period: "all" }),
-    api.get<PeopleTargets>("/insights/targets/people", { year }).catch(() => ({ people: [], targets: [] }) as PeopleTargets),
-    api.get<{ month: string; amount: string }[]>("/insights/targets", { year }).catch(() => []),
+    part("each person's targets", () => api.get<PeopleTargets>("/insights/targets/people", { year })),
+    part("the company's targets", () => api.get<{ month: string; amount: string }[]>("/insights/targets", { year })),
   ]);
+  const targets = dataOf(targetsPart) ?? ({ people: [], targets: [] } as PeopleTargets);
+  const companyTargets = dataOf(companyTargetsPart) ?? [];
+  // The parts that could not be read, for the page to name once with its own (failedWhat).
+  const failedParts = [targetsPart, companyTargetsPart].filter(isFailed);
   const c = ord.currency;
   const ym = today.slice(0, 7);
   const keys = new Set([
@@ -601,13 +620,13 @@ export async function loadPeople(p: Period, today: string) {
       ]),
     },
   ];
-  return { ...data, sheets };
+  return { ...data, sheets, failedParts };
 }
 
 /* ------------------------------------------------------------------------------------------- Funnel */
 
 /** The spending figures other Reports tabs show beside their own (People: spent and owed back; Customers: spent on them; Profit: running the company). Null without expenses. */
-export const spendingOf = (p: Period) => api.get<SpendingReport>("/reports/spending", { from: p.from, to: p.to }).catch(() => null);
+export const spendingOf = (p: Period) => part("the spending", () => api.get<SpendingReport>("/reports/spending", { from: p.from, to: p.to }));
 
 /**
  * Reports › Spending (design "spending"): what was spent to sell and by whom (GET /reports/spending), against what
@@ -616,21 +635,28 @@ export const spendingOf = (p: Period) => api.get<SpendingReport>("/reports/spend
  */
 export async function loadSpending(p: Period) {
   const span = { from: p.from, to: p.to };
-  const [s, byPerson, byMonth, leaks] = await Promise.all([
+  const [s, byPersonPart, byMonthPart, leaksPart] = await Promise.all([
     api.get<SpendingReport>("/reports/spending", { ...span, prevFrom: p.prevFrom, prevTo: p.prevTo }),
-    facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" }).catch(() => null),
-    facts<OrderGroups>("orders/groups", { ...span, period: "month" }).catch(() => null),
-    api.get<LeaksReport>("/reports/leaks", span).catch(() => null),
+    part("what each person sold", () => facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" })),
+    part("the sales by month", () => facts<OrderGroups>("orders/groups", { ...span, period: "month" })),
+    part("the customers who cost more than they bring", () => api.get<LeaksReport>("/reports/leaks", span)),
   ]);
+  const byPerson = dataOf(byPersonPart);
+  const byMonth = dataOf(byMonthPart);
+  const leaks = dataOf(leaksPart);
   const soldBy = new Map((byPerson?.rows ?? []).map((r) => [r.key, n(r.sales)]));
   const soldIn = new Map((byMonth?.rows ?? []).map((r) => [r.period.slice(0, 7), n(r.sales)]));
-  const sold = [...soldIn.values()].reduce((t, v) => t + v, 0);
+  // What was sold, beside what was spent: null where it could not be read (a dash and the notice, never "0 sold").
+  const sold = byMonth ? [...soldIn.values()].reduce((t, v) => t + v, 0) : null;
   return {
     ...s,
     sold,
-    people: s.people.map((x) => ({ ...x, sold: soldBy.get(x.person.id) ?? 0 })),
-    months: s.months.map((m) => ({ ...m, sold: soldIn.get(m.month) ?? 0 })),
+    people: s.people.map((x) => ({ ...x, sold: byPerson ? (soldBy.get(x.person.id) ?? 0) : null })),
+    months: s.months.map((m) => ({ ...m, sold: byMonth ? (soldIn.get(m.month) ?? 0) : null })),
     costing: leaks?.customers.costing ?? null,
+    failed: failedWhat(byPersonPart, byMonthPart, leaksPart),
+    // What its Excel file needs (the customers who cost more are on the page only).
+    exportFailed: failedWhat(byPersonPart, byMonthPart),
   };
 }
 
@@ -708,29 +734,46 @@ export async function loadFunnel(p: Period) {
 /* ------------------------------------------------------------------------------------------- Excel */
 
 /** "Excel" on an Insights section: the tables that section shows, for the same period (one tab each). */
+/**
+ * An export is the whole report or none: a part that could not be read stops it with what failed (the export
+ * route says it, as any refusal), since a workbook missing a sheet or a figure looks complete.
+ */
+function allOrNothing(d: { sheets: SheetSpec[]; failed?: string | null; failedParts?: unknown[] }): SheetSpec[] {
+  const failed = d.failed ?? failedWhat(...(d.failedParts ?? []));
+  if (failed) throw new ApiError(503, `Could not load ${failed}, so the file was not made. Try again in a minute.`);
+  return d.sheets;
+}
+
 export async function insightsSheets(q: Record<string, string | undefined>): Promise<SheetSpec[]> {
   const me = await api.get<{ permissions: Permission[] }>("/auth/me");
   const today = companyToday();
   const p = periodOf(q, today);
   // The Spending report, as the other reports (review 24 Nov, M-32: it had no Excel).
-  if (q.report === "spending") return spendingSheets(await loadSpending(p));
+  if (q.report === "spending") {
+    const s = await loadSpending(p);
+    return allOrNothing({ sheets: spendingSheets(s), failed: s.exportFailed });
+  }
   const section: Section = (SECTIONS as readonly string[]).includes(q.section ?? "") ? (q.section as Section) : "overview";
   const money = can(me, "expenses.manage");
   switch (section) {
     case "overview":
-      return (await loadOverview(p, money)).sheets;
+      return allOrNothing(await loadOverview(p, money));
     case "money":
-      return (await loadProfit(p)).sheets;
-    case "cash":
-      return (await loadCash(p)).sheets;
+      return allOrNothing(await loadProfit(p));
+    case "cash": {
+      const d = await loadCash(p);
+      // Cash & bank off (or not theirs): said, not an empty file (the route has no first sheet to name it by).
+      if (!d.report && !d.failed) throw new ApiError(404, "Cash & bank is not switched on, so there is no cash report to export.");
+      return allOrNothing(d);
+    }
     case "customers":
-      return (await loadCustomers(p, today)).sheets;
+      return allOrNothing(await loadCustomers(p, today));
     case "factories":
-      return (await loadSuppliers(p)).sheets;
+      return allOrNothing(await loadSuppliers(p));
     case "people":
-      return (await loadPeople(p, today)).sheets;
+      return allOrNothing(await loadPeople(p, today));
     case "funnel":
-      return (await loadFunnel(p)).sheets;
+      return allOrNothing(await loadFunnel(p));
   }
 }
 

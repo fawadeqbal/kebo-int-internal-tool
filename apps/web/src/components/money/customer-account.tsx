@@ -3,6 +3,8 @@ import { LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
 import { Notice } from "@kebo/ui";
 import { api } from "@/lib/api";
 import type { CustomerAccount } from "@/lib/types-money";
+import { isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const lostReasonLabel = (r: LostReason | "not_said") => (r === "not_said" ? "No reason given" : LOST_REASON_LABEL[r]);
 
@@ -12,7 +14,8 @@ export const lostReasonLabel = (r: LostReason | "not_said") => (r === "not_said"
  * (or their other inquiries and why we lost them, before any order).
  */
 export async function CustomerHistoryNote({ customerId, dealId }: { customerId: string; dealId: string }) {
-  const a = await api.get<CustomerAccount>(`/customers/${customerId}/account`).catch(() => null);
+  const a = await part("the customer's history with us", () => api.get<CustomerAccount>(`/customers/${customerId}/account`));
+  if (isFailed(a)) return <CouldNotLoad compact what={a.what} />;
   if (!a) return null;
   const others = a.rows.filter((r) => r.id !== dealId);
   if (others.length === 0) return null;

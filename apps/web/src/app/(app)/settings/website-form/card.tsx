@@ -2,6 +2,8 @@ import { Card, CardBody, CardHeader, Notice, RULES, capsClass } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { CopyBlock, NewKeyButton } from "./form";
 import type { WebsiteFormView } from "./types";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /** The snippet for a form on the company's website: it posts with the company's key. */
 function snippet(v: WebsiteFormView) {
@@ -24,7 +26,9 @@ document.getElementById("rfq-form").addEventListener("submit", function (e) {
 
 /** Settings → Website form: the key and the ready-made snippet (Super Admin). */
 export async function WebsiteFormCard() {
-  const view = await api.get<WebsiteFormView>("/company/website-form").catch(() => null);
+  // Null: they may not see the key (a Super Admin may). A Failed: it could not be read (not "only a Super Admin").
+  const read = await part("the website form's key", () => api.get<WebsiteFormView>("/company/website-form"));
+  const view = dataOf(read);
   return (
     // The key and a long snippet: across both columns on a big screen.
     <Card className={RULES.page.across}>
@@ -34,7 +38,9 @@ export async function WebsiteFormCard() {
         actions={view ? <NewKeyButton /> : undefined}
       />
       <CardBody className="flex flex-col gap-5">
-        {!view ? (
+        {isFailed(read) ? (
+          <CouldNotLoad what={read.what} />
+        ) : !view ? (
           <Notice tone="info">Only a Super Admin can see the website form&apos;s key.</Notice>
         ) : (
           <>

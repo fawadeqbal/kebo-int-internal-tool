@@ -16,6 +16,8 @@ import { MailCards } from "@/components/common/mail-cards";
 import { InboxCard } from "@/components/platform/inbox-card";
 import { MoreMenu } from "@/components/common/more-menu";
 import { removePlatformMailAction, savePlatformInboxAction, savePlatformMailAction, testPlatformMailAction } from "./actions";
+import { isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Settings" };
 
@@ -47,7 +49,7 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
   const mail = section === "emails" ? await platformApi.get<PlatformMailView>("/mail") : null;
   const [site, numbers] =
     section === "website"
-      ? await Promise.all([platformApi.get<SiteEditorView>("/site"), platformApi.get<SiteNumbers>("/site/numbers").catch(() => null)])
+      ? await Promise.all([platformApi.get<SiteEditorView>("/site"), part("the visitors and leads", () => platformApi.get<SiteNumbers>("/site/numbers"))])
       : [null, null];
   const live = s.baseDomain ? marketingOrigin(s.baseDomain, "") : "/site";
   const counts: Partial<Record<Section, number>> = {
@@ -119,7 +121,7 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
               </CardBody>
             </Card>
             <SiteEditor key={site.updatedAt ?? "new"} initial={site.draft} plans={site.plans} />
-            {numbers && <SiteNumbersCard n={numbers} title="Visitors and leads" edit={null} />}
+            {isFailed(numbers) ? <CouldNotLoad what={numbers.what} /> : numbers && <SiteNumbersCard n={numbers} title="Visitors and leads" edit={null} />}
           </>
         )}
 

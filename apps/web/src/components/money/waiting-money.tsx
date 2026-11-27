@@ -6,6 +6,8 @@ import { date, dateTime, money } from "@/lib/format";
 import type { Submission, SubmissionList } from "@/lib/types-approvals";
 import { ApproveButtons, WithdrawButton } from "@/components/money/approval-actions";
 import { approveAction, sendBackAction, withdrawAction } from "@/app/(app)/approvals/actions";
+import { isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const amountOf = (s: Submission) => (s.amount && s.currency ? money(s.amount, s.currency) : "—");
 const whatOf = (s: Submission) =>
@@ -32,7 +34,9 @@ export async function WaitingToVerify({
   /** Show this many (Home); the rest are behind one link to the whole list. */
   limit?: number;
 }) {
-  const list = await api.get<SubmissionList>("/submissions", { status: "all", orderId, mine: verifies ? undefined : "true", pageSize: 100 }).catch(() => null);
+  const list = await part("the money waiting for approval", () => api.get<SubmissionList>("/submissions", { status: "all", orderId, mine: verifies ? undefined : "true", pageSize: 100 }));
+  // Not read: it says so (money waiting is easy to forget, and a missing box looks like none waiting).
+  if (isFailed(list)) return <CouldNotLoad what={list.what} />;
   const rows = (list?.rows ?? []).filter((s) => s.status === "pending" || s.status === "sent_back");
   if (rows.length === 0) return null;
   const shown = limit ? rows.slice(0, limit) : rows;

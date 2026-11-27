@@ -16,6 +16,8 @@ import { DUE, paymentsTabTarget } from "@/lib/old-addresses";
 import { opensPayments, paymentHref } from "../shared";
 import { moneyTile } from "@/lib/money-tile";
 import { getSettings } from "@/lib/loaders";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Payments" };
 
@@ -80,13 +82,16 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const canRecord = Object.values(list.canRecord).some(Boolean);
   // Money added by the team for a manager to verify (or sent back to the person who added it): it opens from here.
   const approver = can(me, "payments.record") || (can(me, "expenses.manage") && (await hasFeature("expenses")));
-  const waiting =
+  // Not read: the box says so (a missing box would look like none waiting), with its way to the list.
+  const waitingPart =
     approver || can(me, "money.submit")
-      ? await api
-          .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approver ? undefined : "true", pageSize: 1 })
-          .then((r) => (approver ? r.counts.pending : r.counts.sent_back))
-          .catch(() => 0)
-      : 0;
+      ? await part(approver ? "the money waiting to be verified" : "the money sent back to you", () =>
+          api
+            .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approver ? undefined : "true", pageSize: 1 })
+            .then((r) => (approver ? r.counts.pending : r.counts.sent_back)),
+        )
+      : null;
+  const waiting = dataOf(waitingPart) ?? 0;
   const t = list.totals;
   const when = allDates ? "" : pr.period === pr.thisMonth ? " this month" : ` · ${pr.name}`;
   // The month filter: this month, the eleven before it, this year and last year.
@@ -126,6 +131,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
       />
+      {isFailed(waitingPart) && <CouldNotLoad what={waitingPart.what} />}
       {waiting > 0 && (
         <Notice
           tone="todo"

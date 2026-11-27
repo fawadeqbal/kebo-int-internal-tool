@@ -2,12 +2,13 @@ import Link from "next/link";
 import { Card, CardBody, PageHeader, RULES, linkClass } from "@kebo/ui";
 import { newCompanyData } from "./data";
 import { NewCompanyForm } from "./form";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "New company or demo" };
 
 /** New company or demo as its own page (a new tab or a reload); from a button it opens as a window (@window/(.)companies/new). */
 export default async function NewCompanyPage({ searchParams }: { searchParams: Promise<{ lead?: string; kind?: string }> }) {
-  const { plans, lead, prefill } = await newCompanyData(await searchParams);
+  const { plans, lead, prefill, leadFailed } = await newCompanyData(await searchParams);
   return (
     <div className={RULES.page.column}>
       <PageHeader
@@ -28,6 +29,7 @@ export default async function NewCompanyPage({ searchParams }: { searchParams: P
       />
       <Card>
         <CardBody>
+          {leadFailed && <CouldNotLoad what={leadFailed} className="mb-4" />}
           <NewCompanyForm plans={plans} prefill={prefill} />
         </CardBody>
       </Card>

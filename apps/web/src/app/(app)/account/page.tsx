@@ -9,6 +9,8 @@ import { PanelButton } from "@/components/orders/step-view";
 import { changePasswordAction, confirmTwoStepAction, endMySessionAction, newRecoveryCodesAction, renameSelfAction, signOutOthersAction, startTwoStepAction, turnOffTwoStepAction } from "./actions";
 import { PasswordCardForm, ProfileForm, TwoStepPanel } from "./forms";
 import { RecordBody } from "@/components/records/record-frame";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "My account" };
 
@@ -19,11 +21,13 @@ export const metadata = { title: "My account" };
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const me = await requireUser();
   const sp = await searchParams;
-  const [status, sessions, profile] = await Promise.all([
+  const [status, sessions, profilePart] = await Promise.all([
     api.get<TwoStepStatus>("/me/two-step"),
     api.get<SessionRow[]>("/me/sessions"),
-    api.get<{ phone: string | null; language: string }>("/me/profile").catch(() => null),
+    part("your phone and language", () => api.get<{ phone: string | null; language: string }>("/me/profile")),
   ]);
+  const profile = dataOf(profilePart);
+  // Not read: the profile form is not offered (it saves the phone with the name, and would save it empty).
   const twoStep = (
     <TwoStepPanel
       status={status}
@@ -133,12 +137,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <Card>
             <CardHeader title="Profile" />
             <div className="p-5">
-              <ProfileForm
-                action={renameSelfAction}
-                name={me.name}
-                email={me.email}
-                phone={profile?.phone}
-              />
+              {isFailed(profilePart) ? (
+                <CouldNotLoad what={profilePart.what} />
+              ) : (
+                <ProfileForm action={renameSelfAction} name={me.name} email={me.email} phone={profile?.phone} />
+              )}
             </div>
           </Card>
           <Card>

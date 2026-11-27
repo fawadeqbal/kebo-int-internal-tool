@@ -10,20 +10,25 @@ import { OpenPanelButton } from "@/components/common/panel";
 import { createRoleAction } from "../actions";
 import { RolePanel } from "../role-form";
 import { AccessMapCard, type AccessRoute } from "./access-map";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Roles" };
 
 /** How people stand (signed in, two-step sign-in, failed attempts) and the roles: what each allows and whether it needs two-step sign-in. */
 export default async function RolesPage({ searchParams }: { searchParams: Promise<{ page?: string; size?: string }> }) {
   const sp = await searchParams;
-  const [o, roles, company, me, custom, access] = await Promise.all([
+  const [o, roles, company, me, custom, accessPart] = await Promise.all([
     api.get<SecurityOverview>("/security/overview"),
     api.get<RoleRow[]>("/roles"),
     getCompany(),
     requireUser(),
     hasFeature("custom_roles"),
-    api.get<AccessRoute[]>("/security/access-map").catch(() => null),
+    part("who can open which page", () => api.get<AccessRoute[]>("/security/access-map")),
   ]);
+  const access = dataOf(accessPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(accessPart);
   const superAdmin = !!roles.find((x) => x.key === me.role)?.superAdmin;
   // Permissions follow the company's plan: what it leaves out nobody has, and it is not counted.
   const available = PERMISSIONS.filter((p) => permissionInPlan(p, company?.features ?? null)).length;
@@ -35,6 +40,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
   return (
     <Stack>
       <PageHeader kind="list" crumbs={crumbsFor("/access/roles")} title="Roles" />
+      {failed && <CouldNotLoad what={failed} />}
       <div className={RULES.page.stack}>
       <StatRow facts>
         <StatTile label="Signed in now" value={o.liveSessions} sub="Browsers and phones" href="/access/sessions" />

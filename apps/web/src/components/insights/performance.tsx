@@ -6,6 +6,9 @@ import { hasFeature } from "@/lib/session";
 import type { Aging, SupplierGroups, FactOrders, InquiryGroups, OrderGroups } from "@/lib/types-facts";
 import type { PersonSpending } from "@/lib/types-money";
 import { PerformanceView, type PerfFigure } from "./performance-view";
+import { isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
+import { optional } from "@/components/print/data";
 
 const facts = <T,>(path: string, q: Record<string, string | number | undefined>) => api.get<T>(`/insights/facts/${path}`, q);
 const sinceMonth = (d: string | null | undefined) =>
@@ -37,8 +40,9 @@ export async function PerformanceCard({
   const yearFrom = `${today.slice(0, 4)}-01-01`;
   // A person's spending, for managers with expenses: Spent, Profit after all costs, Owed back.
   const spend = kind === "user" && can(me, "expenses.manage") && (await hasFeature("expenses"));
-  // Insights unreachable: the page works without it.
-  const both = await Promise.all([figures(kind, id, { from: yearFrom, to: today }, today, spend), figures(kind, id, {}, today, spend)]).catch(() => null);
+  // Insights could not be read: the card says so, and the rest of the page works.
+  const both = await part("the performance figures", () => Promise.all([figures(kind, id, { from: yearFrom, to: today }, today, spend), figures(kind, id, {}, today, spend)]));
+  if (isFailed(both)) return <CouldNotLoad what={both.what} />;
   if (!both) return null;
   const [year, all] = balances ? both : both.map((f) => f.filter((t) => !t.now));
   const description =
@@ -164,9 +168,10 @@ async function figures(kind: Kind, id: string, span: { from?: string; to?: strin
     facts<InquiryGroups>("inquiries/groups", { ...span, period: "all", personId: id }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all", personId: id }),
     span.from
-      ? api.get<{ targets: { month: string; userId: string; amount: string }[] }>("/insights/targets/people", { year }).catch(() => null)
+      ? optional(() => api.get<{ targets: { month: string; userId: string; amount: string }[] }>("/insights/targets/people", { year }))
       : Promise.resolve(null),
-    spend ? api.get<PersonSpending>(`/people/${id}/spending`, { from: span.from ?? "2000-01-01", to: span.to ?? today }).catch(() => null) : Promise.resolve(null),
+    // Not theirs to see: left out; any other failure is the card's ("Could not load the performance figures").
+    spend ? optional(() => api.get<PersonSpending>(`/people/${id}/spending`, { from: span.from ?? "2000-01-01", to: span.to ?? today })) : Promise.resolve(null),
   ]);
   const q = i.rows[0];
   const r = o.rows[0];

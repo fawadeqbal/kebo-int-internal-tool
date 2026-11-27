@@ -18,6 +18,8 @@ import { RememberColours } from "./remember-colours";
 import { getSettings } from "@/lib/loaders";
 import { RowClicks } from "@/components/common/row-clicks";
 import { AppFileViewer } from "@/components/files/viewer";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /** The company's own logo (Settings → Company), at a link that changes when the logo does; none: the app's icon. */
 function logoUrl(logo: string | undefined) {
@@ -35,21 +37,25 @@ export default async function AppLayout({ children, window: win }: { children: R
   // Money received and expenses sent for approval: approvers see how many wait for them; those who add them, how many were sent back.
   const approvesIn = (c: Awaited<typeof companyP>) => has("payments.record") || (has("expenses.manage") && featureOf(c)("expenses"));
   // Everything the frame needs, asked for at the same time rather than one after another.
-  const [{ unread }, settings, company, accounts, approvals] = await Promise.all([
+  const [{ unread }, settings, company, accountsPart, approvals] = await Promise.all([
     api.get<{ unread: number }>("/notifications", { take: 1 }),
     getSettings(),
     companyP,
     // Our money accounts, for every form that records money (payments, supplier payments, expenses): the list to choose from only.
-    has("payments.record") || has("expenses.manage") || has("money.submit") ? api.get<AccountOption[]>("/money/accounts", { choose: "true" }).catch(() => []) : [],
+    has("payments.record") || has("expenses.manage") || has("money.submit") ? part("the money accounts to choose from", () => api.get<AccountOption[]>("/money/accounts", { choose: "true" })) : [],
     companyP.then((c) => {
       const approves = approvesIn(c);
       if (!approves && !has("money.submit")) return null;
-      return api
-        .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approves ? undefined : "true", pageSize: 1 })
-        .then((r) => (approves ? r.counts.pending : r.counts.sent_back))
-        .catch(() => 0);
+      // The menu's count only: not read, it is left out (and logged).
+      return part("the count waiting for approval", () =>
+        api
+          .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approves ? undefined : "true", pageSize: 1 })
+          .then((r) => (approves ? r.counts.pending : r.counts.sent_back)),
+      ).then((v) => dataOf(v) ?? 0);
     }),
   ]);
+  // Every form that records money chooses from these: not read, the forms have none to offer, and the frame says so.
+  const accounts = dataOf(accountsPart) ?? [];
   const feature = featureOf(company);
   const approves = approvesIn(company);
 
@@ -94,6 +100,7 @@ export default async function AppLayout({ children, window: win }: { children: R
             </button>
           </form>
         )}
+        {isFailed(accountsPart) && <CouldNotLoad what={accountsPart.what} className="no-print" />}
         {company?.notices.map((n) => (
           <Notice key={n.text} tone={n.tone === "danger" ? "bad" : n.tone === "warn" ? "todo" : "info"} className="no-print">
             {n.text}
@@ -105,7 +112,13 @@ export default async function AppLayout({ children, window: win }: { children: R
           </Notice>
         )}
         <FeaturesProvider features={company?.features ?? null}>
-          <AccountsProvider accounts={accounts} me={me.name} meId={me.id} canAdd={has("expenses.manage") && feature("cash_book")}>
+          <AccountsProvider
+            accounts={accounts}
+            failed={isFailed(accountsPart)}
+            me={me.name}
+            meId={me.id}
+            canAdd={has("expenses.manage") && feature("cash_book")}
+          >
             {children}
             {win}
           </AccountsProvider>
