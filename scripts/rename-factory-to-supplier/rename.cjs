@@ -23,12 +23,9 @@ const PROTECT = [
   /FAT at the factory/gi,
   /EXW factory/gi,
   /ex[- ]factory/gi,
-  /at (?:their|the|a) factory/gi,
-  /factory visits?/gi,
+  /factory visits?\b/gi,
   /visits? to the factory/gi,
-  /(?:from|to) the (?:film )?factory/gi,
   /film factory/gi,
-  /factory[- ]borne/gi,
   /\b[A-Z][a-z]+ (?:[A-Z][a-z]+ )*Factory\b(?! (?:test|Test))/g, // a company's name: "Jinan Filling Factory"
 ];
 const WORD = /[A-Za-z0-9_$]*(?:factory|Factory|FACTORY|factories|Factories|FACTORIES)[A-Za-z0-9_$]*/g;
@@ -54,8 +51,29 @@ function shielded(text, fn) {
   t = fn(t);
   return t.replace(/\u0001(\d+)\u0002/g, (_, i) => kept[Number(i)]);
 }
-/** Prose (comments, docs): every form of the word, but not snake_case names, NEVER, or the protected phrases. */
-const prose = (text) => shielded(text, (t) => t.replace(WORD, (w) => renIdent(w)));
+/**
+ * Prose (comments, docs): every form of the word, but not snake_case names, NEVER, or the protected phrases.
+ * The bare word stays where the comment is quoting code that this step does not change: an address or a query
+ * (/factories/…, ?factory=, factory-quotes), a property (.factory, factory.name) or a quoted key (`factory`, "factory").
+ */
+const prose = (text) =>
+  shielded(text, (t) =>
+    t.replace(WORD, (w, at) => {
+      if (!isBare(w)) return renIdent(w);
+      const before = t[at - 1] || "";
+      const after = t[at + w.length] || "";
+      const next = t[at + w.length + 1] || "";
+      // A file that moved is named by its new name (a route's folder is an address: it stays).
+      const fileName = (t.slice(at).match(/^[A-Za-z0-9_.-]+/) || [""])[0];
+      if (/\.(tsx?|mjs|cjs|json)$/.test(fileName.replace(/[.,;:)]+$/, ""))) return renIdent(w);
+      if (/[\/?&.\-`"'#[=]/.test(before)) return w;
+      const possessive = after === "'" && ((next === "s" && !/[A-Za-z0-9_]/.test(t[at + w.length + 2] || "")) || (/s$/.test(w) && !/[A-Za-z0-9_`"]/.test(next)));
+      if (/[\-/=`"'\]]/.test(after) && !possessive) return w;
+      if (after === "." && /[A-Za-z_]/.test(next)) return w;
+      if (after === ":" && /\S/.test(next) && next !== " ") return w;
+      return renIdent(w);
+    }),
+  );
 /** Inside a string: compound names only (factoryId, FactoryQuoteView, FACTORY_FIELDS); the bare word stays. */
 const compound = (text) => shielded(text, (t) => t.replace(WORD, (w) => (isBare(w) || NEVER.has(w) || isSnake(w) ? w : ren(w))));
 
@@ -178,10 +196,12 @@ function tsEdits(file, text) {
     const to = prose(raw);
     if (to !== raw) edits.push([pos, end, to]), report.comments++;
   };
+  // Every token too (getChildren), so a comment before a closing brace or inside JSX braces is not missed.
   const trivia = (n) => {
     for (const r of ts.getLeadingCommentRanges(text, n.getFullStart()) || []) comment(r.pos, r.end);
     for (const r of ts.getTrailingCommentRanges(text, n.getEnd()) || []) comment(r.pos, r.end);
-    ts.forEachChild(n, trivia);
+    if (n.kind === ts.SyntaxKind.JsxText) return;
+    for (const c of n.getChildren(sf)) trivia(c);
   };
   trivia(sf);
   for (const r of ts.getLeadingCommentRanges(text, sf.endOfFileToken.getFullStart()) || []) comment(r.pos, r.end);
