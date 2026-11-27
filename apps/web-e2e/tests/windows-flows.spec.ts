@@ -69,7 +69,6 @@ const WINDOWS: Window[] = [
       await paper.click();
       return paper;
     },
-    gap: "there it is a page of its own: closing it goes back, and the focus starts again at the top of the page",
   },
   {
     name: "the phone's Filters sheet",

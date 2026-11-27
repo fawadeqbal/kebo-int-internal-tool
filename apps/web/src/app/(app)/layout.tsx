@@ -11,6 +11,7 @@ import { demoMode } from "@/lib/demo";
 import { AppShell, type NewItem } from "@/components/shell/nav";
 import { buildModules, FOLD_COOKIE, MODULE_PAGES, OPEN_COOKIE, type ModuleKey } from "@/lib/nav";
 import { KeyboardShortcuts } from "@/components/shell/shortcuts";
+import { FocusReturn } from "@/components/window/focus-return";
 import { AccountsProvider, type AccountOption } from "@/components/money/accounts";
 import { CompanyTime } from "@/lib/time-client";
 import { RememberColours } from "./remember-colours";
@@ -115,6 +116,7 @@ export default async function AppLayout({ children, window: win }: { children: R
         <RowClicks />
       </Suspense>
       <KeyboardShortcuts canCreate={has("inquiries.create")} />
+      <FocusReturn />
       </AppFileViewer>
     </CompanyTime>
   );
