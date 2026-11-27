@@ -86,4 +86,16 @@ describe("person spending", () => {
     expect(r.customers).toEqual([{ customer: { id: customerId, name: `Quetta Fruits ${tag}` }, spent: "140.00" }]);
     expect(r.months).toEqual([{ month: day.slice(0, 7), toSell: "140.00" }]);
   });
+
+  it("Reports › Spending stops at today: an end far ahead; a period that starts after its end has nothing in it", async () => {
+    const far = (await api(app, manager).get(`/reports/spending?from=${day}&to=9999-12-31`).expect(200)).body;
+    const today = new Date().toISOString().slice(0, 10);
+    // Today in the company's time zone: the API's day can be a day either side of UTC's.
+    expect(Math.abs(Date.parse(far.to) - Date.parse(today))).toBeLessThanOrEqual(86_400_000);
+    expect(far.months.at(-1).month).toBe(far.to.slice(0, 7));
+    const ahead = (await api(app, manager).get(`/reports/spending?from=9999-01-01&to=9999-12-31`).expect(200)).body;
+    expect(ahead).toMatchObject({ toSell: "0.00", company: "0.00", months: [] });
+    const backwards = (await api(app, manager).get(`/reports/spending?from=${far.to}&to=${day}`).expect(200)).body;
+    expect(backwards).toMatchObject({ toSell: "0.00", months: [] });
+  });
 });
