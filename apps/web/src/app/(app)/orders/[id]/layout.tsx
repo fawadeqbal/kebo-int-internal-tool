@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Eye } from "lucide-react";
-import { can, dayMonth, ORDER, ORDER_TABS, orderNextStep, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
+import { can, ORDER_TABS, orderNextStep, orderStanding, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
 import { ButtonLink, cn, Notice } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
@@ -47,20 +47,21 @@ export default async function OrderLayout({ children, params }: { children: Reac
     optional(() => api.get<CustomerDetail>(`/customers/${o.customer.id}`)),
   ]);
   const contact = customer?.contacts.find((c) => c.isPrimary) ?? customer?.contacts[0] ?? null;
-  // Where the order stands, in words: the one word worked out from what is stored, then the next two dates.
+  // Where the order stands, in words: the one word worked out from what is stored, then what orderStanding
+  // (packages/shared) says beside it: the next two dates, or that it is paid.
   const now = today();
-  const ready = flow?.factory.readyOn ?? o.readyOn;
-  const left = o.word !== "Confirmed" && o.word !== "In production";
-  // Every item in from the supplier (Production "received"): no longer "In production · ready …" but ready to ship.
-  const goodsIn = sections?.tabs.production === "received";
-  const notes =
-    o.status !== "open"
-      ? []
-      : left
-        ? [o.money && Number(o.money.due) <= 0 ? "paid in full" : null]
-        : [goodsIn ? "goods in" : ready ? `ready ${dayMonth(ready)}` : null, o.shipBy ? `ship by ${dayMonth(o.shipBy)}` : null];
-  const late = o.status === "open" && !left && !!o.shipBy && o.shipBy < now;
-  const tone = o.status === "cancelled" ? "bad" : o.status === "closed" ? "neutral" : late ? "bad" : ORDER.states[o.word].tone;
+  const { notes, tone } = orderStanding(
+    {
+      status: o.status,
+      word: o.word,
+      readyOn: flow?.factory.readyOn ?? o.readyOn,
+      shipBy: o.shipBy,
+      // Every item in from the supplier (Production "received"): no longer "In production · ready …" but ready to ship.
+      goodsIn: sections?.tabs.production === "received",
+      due: o.money ? Number(o.money.due) : null,
+    },
+    now,
+  );
   const statusText = (
     <span
       className={cn(
@@ -70,7 +71,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
     >
       {/* The one word, as in the list and on the board ("goods in" is a note beside it, not another word). */}
       {o.status === "closed" ? `${o.word}${o.stageSince ? ` · closed ${date(o.stageSince)}` : ""}` : o.word}
-      {notes.filter(Boolean).map((x) => ` · ${x}`)}
+      {notes.map((x) => ` · ${x}`)}
     </span>
   );
   const ship = flow?.shipping?.shipments[0];
