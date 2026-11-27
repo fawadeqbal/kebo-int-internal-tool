@@ -14,6 +14,8 @@ import { getSettings } from "@/lib/loaders";
 import { SendCost as SendCostButton } from "@/components/money/cost-window";
 import { WaitingToVerify } from "@/components/money/waiting-money";
 import { CustomersOwe, InquiriesNow, MonthFigures, NeedsYou, NextWeeks, OrdersNow, SoldByMonth, StandsOut, ThinProfit } from "@/components/home/board";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Dashboard" };
 
@@ -101,12 +103,14 @@ export default async function DashboardPage() {
 
 /** Staff's "Add a cost": their open orders to choose from, and the company's currency. */
 async function SendCost({ today }: { today: string }) {
-  const [orders, settings] = await Promise.all([api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1, pageSize: 100 }).catch(() => null), getSettings()]);
+  const [orders, settings] = await Promise.all([part("your open orders", () => api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1, pageSize: 100 })), getSettings()]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
+  // Their open orders could not be read: the button still sends a cost on the company; the Order field says so.
   return (
     <SendCostButton
       setup={{ mainCurrency: fx.main, fx, today, people: [], for: null }}
-      orders={(orders?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))}
+      orders={(dataOf(orders)?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))}
+      ordersFailed={isFailed(orders)}
     />
   );
 }
@@ -116,14 +120,16 @@ const block = (h: string) =>
   h === "h-[92px]" ? <TilesSkeleton count={4} /> : <CardSkeleton lines={h === "h-[340px]" ? 6 : 4} className={h} />;
 
 // One request each per page view, however many cards use them.
-const getFigures = cache(() => api.get<HomeFigures>("/insights/home").catch(() => null));
-const getReminders = cache(() => api.get<Reminders>("/reminders").catch(() => null));
-const getOwed = cache(() => api.get<Receivables>("/money/receivables").catch(() => null));
+const getFigures = cache(() => part("the month's figures", () => api.get<HomeFigures>("/insights/home")));
+const getReminders = cache(() => part("what needs you", () => api.get<Reminders>("/reminders")));
+const getOwed = cache(() => part("who owes", () => api.get<Receivables>("/money/receivables")));
 
 /** " · 7 things need you today" after the date, once the list is in. */
 async function HowMany() {
-  const r = await getReminders();
-  const n = r?.counts.total ?? 0;
+  const r = dataOf(await getReminders());
+  // Could not be read: the "What needs you" card says so.
+  if (!r) return null;
+  const n = r.counts.total;
   if (n === 0) return <> · nothing needs you right now</>;
   return (
     <>
@@ -180,19 +186,22 @@ function Board() {
 
 async function Figures() {
   const h = await getFigures();
+  if (isFailed(h)) return <CouldNotLoad what={h.what} />;
   return h ? <MonthFigures h={h} /> : null;
 }
-/** A card made from the figures, once they are in (nothing when they could not be read). */
+/** A card made from the figures, once they are in (nothing when they could not be read: the figures' row says so once). */
 async function With({ figures }: { figures: (h: HomeFigures) => ReactNode }) {
-  const h = await getFigures();
+  const h = dataOf(await getFigures());
   return h ? figures(h) : null;
 }
 async function Needs() {
   const r = await getReminders();
+  if (isFailed(r)) return <CouldNotLoad what={r.what} />;
   return r ? <NeedsYou r={r} /> : null;
 }
 async function Owed() {
   const r = await getOwed();
+  if (isFailed(r)) return <CouldNotLoad what={r.what} />;
   return r ? <CustomersOwe r={r} /> : null;
 }
 
@@ -261,7 +270,8 @@ function Pipeline({ counts }: { counts: Dashboard["counts"] }) {
 
 /** The latest open sales orders (the board's "Recent sales orders"): what each is worth, what is still due, where it is. */
 async function RecentOrders() {
-  const data = await api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1 }).catch(() => null);
+  const data = await part("the latest orders", () => api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1 }));
+  if (isFailed(data)) return <CouldNotLoad what={data.what} />;
   if (!data || !data.rows.length) return null;
   const rows = data.rows.slice(0, 5);
   return (
