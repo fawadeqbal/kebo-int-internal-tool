@@ -110,3 +110,33 @@ test.describe("an inquiry and the orders with their side reads failing", () => {
     await expect(page.getByText("This page could not load")).toHaveCount(0);
   });
 });
+
+test.describe("reports, the account and settings with a read failing", () => {
+  test.use({
+    userAgent: "Mozilla/5.0 (failed parts check) fail-api:/money/cash-report,/me/profile,/company/website-form,/reports/spending",
+  });
+
+  test("Reports › Cash says it could not load the cash report, not that Cash & bank is off", async ({ page }) => {
+    await page.goto("/reports/cash");
+    await expect(page.getByText("Could not load the cash report")).toBeVisible();
+    await expect(page.getByText(/not switched on/)).toHaveCount(0);
+    // Profit shows its figures, and says the spending beside it could not be read.
+    await page.goto("/reports/profit");
+    await expect(page.getByText("Could not load the spending")).toBeVisible();
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
+  });
+
+  test("the account page offers no profile form it could not fill (it would save the phone empty)", async ({ page }) => {
+    await page.goto("/account");
+    await expect(page.getByText("Could not load your phone and language")).toBeVisible();
+    await expect(page.getByLabel(/^Phone/)).toHaveCount(0);
+    // The password form still works.
+    await expect(page.getByRole("heading", { name: "Password" })).toBeVisible();
+  });
+
+  test("the website form's card says it could not load the key, not that only a Super Admin may see it", async ({ page }) => {
+    await page.goto("/settings/website-form");
+    await expect(page.getByText("Could not load the website form's key")).toBeVisible();
+    await expect(page.getByText(/Only a Super Admin can see/)).toHaveCount(0);
+  });
+});

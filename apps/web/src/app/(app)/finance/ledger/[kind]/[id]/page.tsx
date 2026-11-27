@@ -32,6 +32,8 @@ import type { CustomerDetail, SupplierDetail } from "@/lib/types-people";
 import { AgeingTiles, day, LedgerFilters, PARTY_PATH, periodOf, span, TypeBadge } from "@/components/ledger/ledger-parts";
 import type { LedgerEntry, LedgerParty } from "@/lib/types-ledger";
 import { UUID } from "@/lib/ids";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const KIND: Record<string, LedgerPartyKind> = { customers: "customer", factories: "factory", staff: "staff" };
 
@@ -54,7 +56,8 @@ type Search = { period?: string; from?: string; to?: string; open?: string; remo
 export async function generateMetadata({ params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
   if (!KIND[kind] || !UUID.test(id)) return { title: "Ledger" };
-  const p = await api.get<LedgerParty>(`/ledger/parties/${KIND[kind]}/${id}`).catch(() => null);
+  // The tab's title only: not read, it says "Ledger" (the page says what it could not read).
+  const p = dataOf(await part("the ledger's name", () => api.get<LedgerParty>(`/ledger/parties/${KIND[kind]}/${id}`)));
   return { title: p ? `${p.party.name} · Ledger` : "Ledger" };
 }
 
@@ -89,8 +92,8 @@ export default async function PartyLedgerPage({
   const recipient = await recipientOf(kind, id);
   const base = `/finance/ledger/${path}/${id}`;
   const all = sp as Record<string, string | undefined>;
-  const entry =
-    sp.panel === "entry" && sp.id && UUID.test(sp.id) ? await api.get<LedgerEntry>(`/ledger/entries/${sp.id}`).catch(() => null) : null;
+  const entryPart = sp.panel === "entry" && sp.id && UUID.test(sp.id) ? await part("the entry", () => api.get<LedgerEntry>(`/ledger/entries/${sp.id}`)) : null;
+  const entry = dataOf(entryPart);
   const main = p.mainCurrency;
   const rows = sp.cur ? p.rows.filter((r) => r.currency === sp.cur) : p.rows;
   const currencies = p.currencies.filter((c) => !sp.cur || c.currency === sp.cur);
@@ -304,6 +307,7 @@ export default async function PartyLedgerPage({
           {sp.removed === "1" ? "Hide removed" : "Show removed"}
         </Link>
       </p>
+      {isFailed(entryPart) && <CouldNotLoad what={entryPart.what} />}
       {entry && (
         <EntryPanel
           title={`${entry.ref || `Entry ${entry.entryNo}`} · ${entry.typeLabel}`}

@@ -18,6 +18,7 @@ import type {
   OrderGroups,
 } from "./types-facts";
 import { companyToday } from "@/lib/format";
+import { dataOf, failedWhat, isFailed, part } from "@/lib/part";
 
 /*
  * What each Insights section shows, read from the Insights tables (GET /insights/facts/*) — never worked
@@ -41,8 +42,14 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const prev = { from: p.prevFrom, to: p.prevTo };
   const twelve = { from: monthStart(p.to, -11), to: p.to };
   const drill = isMonth(month) ? { from: monthStart(month), to: monthEnd(month) } : null;
-  /** A list that is only there for some people or plans: without it, its card is left out. */
-  const maybe = <T>(get: () => Promise<T>) => get().catch(() => null);
+  /** A list that is only there for some people or plans: without it (403), its card is left out; one that could not
+   * be read is named in `failed` (the page says so). */
+  const tried: unknown[] = [];
+  const maybe = <T>(what: string, get: () => Promise<T>) =>
+    part(what, get).then((v) => {
+      tried.push(v);
+      return dataOf(v);
+    });
   const [cur, before, cashNow, cashBefore, monthly, monthlyCash, orders, owed, toPay, bills, report, reportBefore, funnelNow, funnelBefore, monthOrders] = await Promise.all([
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
     facts<OrderGroups>("orders/groups", { ...prev, period: "all" }),
@@ -51,12 +58,12 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     facts<OrderGroups>("orders/groups", { ...twelve, period: "month" }),
     facts<CashFacts>("cash", twelve),
     facts<FactOrders>("orders", { ...span, limit: 1000 }),
-    maybe(() => api.get<Receivables>("/money/receivables")),
+    maybe("who owes", () => api.get<Receivables>("/money/receivables")),
     // Only the suppliers' parts due in the next 7 days (the list below), not every open one.
-    money ? maybe(() => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
-    money ? maybe(() => api.get<OpenBills>("/money/bills")) : null,
-    money ? maybe(() => api.get<CashReport>("/money/cash-report", span)) : null,
-    money ? maybe(() => api.get<CashReport>("/money/cash-report", prev)) : null,
+    money ? maybe("what is due to suppliers", () => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
+    money ? maybe("the open bills", () => api.get<OpenBills>("/money/bills")) : null,
+    money ? maybe("the cash", () => api.get<CashReport>("/money/cash-report", span)) : null,
+    money ? maybe("the cash", () => api.get<CashReport>("/money/cash-report", prev)) : null,
     facts<Funnel>("funnel", span),
     facts<Funnel>("funnel", prev),
     drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
@@ -197,7 +204,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
         ]
       : []),
   ];
-  return { ...data, sheets };
+  return { ...data, sheets, failed: failedWhat(...tried) };
 }
 
 /* ------------------------------------------------------------------------------------------- Profit */
@@ -293,8 +300,11 @@ export async function loadProfit(p: Period, sort: ProfitSort = "low") {
 
 /** Reports › Cash: the money that moved in the period, by month and by account (GET /money/cash-report). */
 export async function loadCash(p: Period) {
-  const report = await api.get<CashReport>("/money/cash-report", { from: p.from, to: p.to }).catch(() => null);
-  if (!report) return { report: null, sheets: [] as SheetSpec[] };
+  const read = await part("the cash report", () => api.get<CashReport>("/money/cash-report", { from: p.from, to: p.to }));
+  // Null: Cash & bank is not on for the company (or not for them). Could not be read: `failed` says so.
+  if (isFailed(read)) return { report: null, sheets: [] as SheetSpec[], failed: read.what };
+  const report = read;
+  if (!report) return { report: null, sheets: [] as SheetSpec[], failed: null };
   const c = report.currency;
   const sheets: SheetSpec[] = [
     {
@@ -328,7 +338,7 @@ export async function loadCash(p: Period) {
       rows: report.accounts.map((a) => [a.name, a.currency, xl(n(a.start)), xl(n(a.in)), xl(n(a.out)), xl(n(a.end))]),
     },
   ];
-  return { report, sheets };
+  return { report, sheets, failed: null };
 }
 
 /* ------------------------------------------------------------------------------------------- Customers */
@@ -522,14 +532,17 @@ export async function loadPeople(p: Period, today: string) {
   const span = { from: p.from, to: p.to };
   const thisMonth = { from: `${today.slice(0, 7)}-01`, to: today };
   const year = today.slice(0, 4);
-  const [inq, ord, month, company, targets, companyTargets] = await Promise.all([
+  const [inq, ord, month, company, targetsPart, companyTargetsPart] = await Promise.all([
     facts<InquiryGroups>("inquiries/groups", { ...span, period: "all", by: "person" }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" }),
     facts<OrderGroups>("orders/groups", { ...thisMonth, period: "all", by: "person" }),
     facts<OrderGroups>("orders/groups", { ...thisMonth, period: "all" }),
-    api.get<PeopleTargets>("/insights/targets/people", { year }).catch(() => ({ people: [], targets: [] }) as PeopleTargets),
-    api.get<{ month: string; amount: string }[]>("/insights/targets", { year }).catch(() => []),
+    part("each person's targets", () => api.get<PeopleTargets>("/insights/targets/people", { year })),
+    part("the company's targets", () => api.get<{ month: string; amount: string }[]>("/insights/targets", { year })),
   ]);
+  const targets = dataOf(targetsPart) ?? ({ people: [], targets: [] } as PeopleTargets);
+  const companyTargets = dataOf(companyTargetsPart) ?? [];
+  const failed = failedWhat(targetsPart, companyTargetsPart);
   const c = ord.currency;
   const ym = today.slice(0, 7);
   const keys = new Set([
@@ -601,13 +614,13 @@ export async function loadPeople(p: Period, today: string) {
       ]),
     },
   ];
-  return { ...data, sheets };
+  return { ...data, sheets, failed };
 }
 
 /* ------------------------------------------------------------------------------------------- Funnel */
 
 /** The spending figures other Reports tabs show beside their own (People: spent and owed back; Customers: spent on them; Profit: running the company). Null without expenses. */
-export const spendingOf = (p: Period) => api.get<SpendingReport>("/reports/spending", { from: p.from, to: p.to }).catch(() => null);
+export const spendingOf = (p: Period) => part("the spending", () => api.get<SpendingReport>("/reports/spending", { from: p.from, to: p.to }));
 
 /**
  * Reports › Spending (design "spending"): what was spent to sell and by whom (GET /reports/spending), against what
@@ -616,12 +629,15 @@ export const spendingOf = (p: Period) => api.get<SpendingReport>("/reports/spend
  */
 export async function loadSpending(p: Period) {
   const span = { from: p.from, to: p.to };
-  const [s, byPerson, byMonth, leaks] = await Promise.all([
+  const [s, byPersonPart, byMonthPart, leaksPart] = await Promise.all([
     api.get<SpendingReport>("/reports/spending", { ...span, prevFrom: p.prevFrom, prevTo: p.prevTo }),
-    facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" }).catch(() => null),
-    facts<OrderGroups>("orders/groups", { ...span, period: "month" }).catch(() => null),
-    api.get<LeaksReport>("/reports/leaks", span).catch(() => null),
+    part("what each person sold", () => facts<OrderGroups>("orders/groups", { ...span, period: "all", by: "person" })),
+    part("the sales by month", () => facts<OrderGroups>("orders/groups", { ...span, period: "month" })),
+    part("the customers who cost more than they bring", () => api.get<LeaksReport>("/reports/leaks", span)),
   ]);
+  const byPerson = dataOf(byPersonPart);
+  const byMonth = dataOf(byMonthPart);
+  const leaks = dataOf(leaksPart);
   const soldBy = new Map((byPerson?.rows ?? []).map((r) => [r.key, n(r.sales)]));
   const soldIn = new Map((byMonth?.rows ?? []).map((r) => [r.period.slice(0, 7), n(r.sales)]));
   const sold = [...soldIn.values()].reduce((t, v) => t + v, 0);
@@ -631,6 +647,7 @@ export async function loadSpending(p: Period) {
     people: s.people.map((x) => ({ ...x, sold: soldBy.get(x.person.id) ?? 0 })),
     months: s.months.map((m) => ({ ...m, sold: soldIn.get(m.month) ?? 0 })),
     costing: leaks?.customers.costing ?? null,
+    failed: failedWhat(byPersonPart, byMonthPart, leaksPart),
   };
 }
 

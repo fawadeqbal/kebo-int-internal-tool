@@ -25,9 +25,13 @@ import { opensPayments } from "../../shared";
 import { cache } from "react";
 import { RecordShell } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
+import { optional } from "@/components/print/data";
 
-/** One payment, read once per request (the page and its tab title). */
-const paymentOf = cache((kind: PaymentRecordKind, id: string) => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`).catch(() => null));
+/** One payment, read once per request (the page and its tab title). Null: not there, or not theirs (the page says
+ * "not found"); any other failure is the error page (it said "not found" for a server that was down). */
+const paymentOf = cache((kind: PaymentRecordKind, id: string) => optional(() => api.get<PaymentView>(`/treasury/payments/${kind}/${id}`)));
 const NOUN: Partial<Record<PaymentRecordKind, string>> = { customer: "Receipt", supplier: "Supplier payment", expense: "Expense", transfer: "Transfer", refund: "Refund", credit: "From credit" };
 /** Its title is its name in words (design rule 3: never its number); what it is and its number go under it. */
 const titleOf = (p: PaymentView) => p.title;
@@ -76,7 +80,9 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
   const order = p.for.find((f) => f.href?.startsWith("/orders/"));
   // A cost (an expense) its managers can change: Change, Add again and Stop repeating are in its ⋯ (they were in
   // the Expenses list's fold-open row, review 26 Nov).
-  const expense = p.kind === "expense" && !p.voided && can(me, "expenses.manage") ? await api.get<ExpenseView>(`/expenses/${p.id}`).catch(() => null) : null;
+  const expensePart = p.kind === "expense" && !p.voided && can(me, "expenses.manage") ? await part("the cost's details (to change it)", () => api.get<ExpenseView>(`/expenses/${p.id}`)) : null;
+  // Not read: the payment is shown, without Change, Add again and Stop repeating, and it says why.
+  const expense = dataOf(expensePart);
   const change = await changeOf(me, p, expense);
   const paper = paperOf(p);
   const fileKind = p.kind === "customer" || p.kind === "supplier" || p.kind === "expense" ? p.kind : null;
@@ -234,6 +240,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
           </Card>
         }
       >
+        {isFailed(expensePart) && <CouldNotLoad what={expensePart.what} />}
         <MoneyHero
           kind={HERO_KIND[p.kind] ?? kindOf(p)}
           direction={p.direction}

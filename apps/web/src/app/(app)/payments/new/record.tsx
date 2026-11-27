@@ -22,6 +22,8 @@ import { RecordBody } from "@/components/records/record-frame";
 import { customerReceiptAction, paymentAction } from "../../orders/actions";
 import { supplierPaymentAction } from "../../money/actions";
 import { opensPayments } from "../shared";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 
 type Kind = "in" | "out" | "expense" | "transfer";
@@ -122,9 +124,12 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
     expense: <>The expense counts on its order or inquiry; one paid from someone&rsquo;s own money is owed back to them.</>,
     transfer: <>Both accounts change at once; a transfer between currencies keeps the rate you enter.</>,
   };
-  const plan = orderId && (kind === "in" || kind === "out") ? await orderMoneyOf(orderId).catch(() => null) : null;
+  const planPart = orderId && (kind === "in" || kind === "out") ? await part("the order's payment plan", () => orderMoneyOf(orderId)) : null;
+  // Not read: the payment can still be recorded; what is due on the order is not shown, and it says so.
+  const plan = dataOf(planPart);
   return (
     <>
+      {isFailed(planPart) && <CouldNotLoad what={planPart.what} />}
       {plan && kind === "in" && plan.plan.items.length > 0 && (
         <Card>
           <CardHeader

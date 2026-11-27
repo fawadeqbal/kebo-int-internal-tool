@@ -23,6 +23,8 @@ import { resetTwoStepAction, setActiveAction, setPasswordAction, updateUserActio
 import { EditUserPanel, PasswordPanel } from "../forms";
 import { cache } from "react";
 import { EmailText } from "@/components/common/email-text";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /** The company's people, read once per request (the page and its tab title). */
 const usersOf = cache(() => api.get<UserRow[]>("/users"));
@@ -64,13 +66,18 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   // What they spent and what is owed back to them: managers with expenses.
   const seeSpending = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const today = companyToday();
-  const [users, all, inquiries, audit, spending] = await Promise.all([
+  const [users, all, inquiriesPart, auditPart, spendingPart] = await Promise.all([
     usersOf(),
     api.get<RoleRow[]>("/roles"),
-    api.get<Paged<DealRow>>("/inquiries", { assignee: id, stage: "open", pageSize: ROWS }).catch(() => null),
-    seeAudit ? api.get<Paged<AuditRow>>("/audit", { entityType: "user", entityId: id, pageSize: 50 }).catch(() => null) : null,
-    seeSpending ? api.get<PersonSpending>(`/people/${id}/spending`).catch(() => null) : null,
+    part("their open inquiries", () => api.get<Paged<DealRow>>("/inquiries", { assignee: id, stage: "open", pageSize: ROWS })),
+    seeAudit ? part("what they did", () => api.get<Paged<AuditRow>>("/audit", { entityType: "user", entityId: id, pageSize: 50 })) : null,
+    seeSpending ? part("what they spent", () => api.get<PersonSpending>(`/people/${id}/spending`)) : null,
   ]);
+  const inquiries = dataOf(inquiriesPart);
+  const audit = dataOf(auditPart);
+  const spending = dataOf(spendingPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(inquiriesPart, auditPart, spendingPart);
   const u = users.find((x) => x.id === id);
   if (!u) notFound();
   // Frozen roles (custom roles, not in the company's plan) cannot be given; the person's own stays listed.
@@ -136,6 +143,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   return (
     <div>
       <RecordLanding />
+        {failed && <CouldNotLoad what={failed} />}
         <RecordShell
           top={
             <RecordTop

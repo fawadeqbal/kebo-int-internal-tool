@@ -13,6 +13,8 @@ import { EntryBody } from "@/components/ledger/entry-body";
 import { AgeingTiles, amount, entryCells, LedgerFilters, partyHref, periodOf } from "@/components/ledger/ledger-parts";
 import type { LedgerAccounts, LedgerAgeing, LedgerEntries, LedgerEntry } from "@/lib/types-ledger";
 import type { OrderRow } from "@/lib/types-orders";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Ledger" };
 
@@ -61,10 +63,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
   const view: View = VIEWS.some((v) => v.key === sp.view) ? (sp.view as View) : entriesAsked ? "all" : "balances";
   const period = periodOf(sp, today);
   const all = sp as Record<string, string | undefined>;
-  const entry =
-    sp.panel === "entry" && sp.id && /^[0-9a-f-]{36}$/i.test(sp.id)
-      ? await api.get<LedgerEntry>(`/ledger/entries/${sp.id}`).catch(() => null)
-      : null;
+  const entryPart = sp.panel === "entry" && sp.id && /^[0-9a-f-]{36}$/i.test(sp.id) ? await part("the entry", () => api.get<LedgerEntry>(`/ledger/entries/${sp.id}`)) : null;
+  const entry = dataOf(entryPart);
   const main = (await api.get<LedgerAccounts>("/ledger/accounts")).mainCurrency;
 
   return (
@@ -107,6 +107,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       ) : (
         <Parties side={view === "customers" ? "receivable" : view === "factories" ? "payable" : "staff"} />
       )}
+      {isFailed(entryPart) && <CouldNotLoad what={entryPart.what} />}
       {entry && (
         <EntryPanel
           title={`${entry.ref || `Entry ${entry.entryNo}`} · ${entry.typeLabel}`}

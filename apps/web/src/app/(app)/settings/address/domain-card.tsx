@@ -3,10 +3,13 @@ import { THead, Th, Card, CardBody, CardHeader, Scroll, StatusBadge, linkClass, 
 import { api } from "@/lib/api";
 import { CheckDomain, ConnectDomain, CopyValue, RemoveDomain } from "./domain-forms";
 import { date } from "@/lib/format";
+import { isFailed, part, type Failed } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export type DomainView = OwnDomainView & { enabled: boolean };
 /** The company's own domain as the API has it (null: not offered here, or it cannot be read). */
-export const domainView = () => api.get<DomainView>("/company/domain").catch(() => null);
+/** The company's own domain (null: not offered here; a Failed: it could not be read, and the card says so). */
+export const domainView = () => part("the company's own domain", () => api.get<DomainView>("/company/domain"));
 
 const day = (iso: string) => date(iso);
 
@@ -58,7 +61,9 @@ function Record({ view }: { view: DomainView }) {
  * connects a domain it owns. Not connected; waiting for the record (the record to add, Check now);
  * connected; lost (the record went away: the team is back at our address until it returns).
  */
-export async function DomainCard({ view }: { view: DomainView | null }) {
+export async function DomainCard({ view: read }: { view: DomainView | Failed | null }) {
+  if (isFailed(read)) return <CouldNotLoad what={read.what} />;
+  const view = read;
   if (!view?.enabled) return null;
   const { domain, status, ours } = view;
   const actions = !view.canChange ? undefined : !domain ? (

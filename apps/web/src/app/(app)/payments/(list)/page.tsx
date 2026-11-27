@@ -16,6 +16,7 @@ import { DUE, paymentsTabTarget } from "@/lib/old-addresses";
 import { opensPayments, paymentHref } from "../shared";
 import { moneyTile } from "@/lib/money-tile";
 import { getSettings } from "@/lib/loaders";
+import { dataOf, part } from "@/lib/part";
 
 export const metadata = { title: "Payments" };
 
@@ -82,10 +83,14 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const approver = can(me, "payments.record") || (can(me, "expenses.manage") && (await hasFeature("expenses")));
   const waiting =
     approver || can(me, "money.submit")
-      ? await api
-          .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approver ? undefined : "true", pageSize: 1 })
-          .then((r) => (approver ? r.counts.pending : r.counts.sent_back))
-          .catch(() => 0)
+      ? // The tab's count only: not read, it is left out (and logged).
+        (dataOf(
+          await part("the count waiting for approval", () =>
+            api
+              .get<{ counts: { pending: number; sent_back: number } }>("/submissions", { mine: approver ? undefined : "true", pageSize: 1 })
+              .then((r) => (approver ? r.counts.pending : r.counts.sent_back)),
+          ),
+        ) ?? 0)
       : 0;
   const t = list.totals;
   const when = allDates ? "" : pr.period === pr.thisMonth ? " this month" : ` · ${pr.name}`;

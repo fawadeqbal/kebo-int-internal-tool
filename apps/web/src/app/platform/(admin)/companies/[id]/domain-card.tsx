@@ -5,6 +5,8 @@ import { platformApi } from "@/lib/api";
 import { date, timeAgo } from "@/lib/format";
 import { CopyText, PlatformCheckDomain, PlatformConnectDomain, PlatformRemoveDomain } from "./domain-forms";
 import type { PlatformDomainView } from "./domain-types";
+import { isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const STATUS = {
   waiting: { meaning: "warn", label: "Waiting for the record" },
@@ -36,7 +38,9 @@ function instructions(v: PlatformDomainView, d: DomainDiagnosis | null) {
  * step by step), Check now, the ready message for the client, add and remove. Only where own domains are on.
  */
 export async function CompanyDomainCard({ id, name, live }: { id: string; name: string; live: boolean }) {
-  const v = await platformApi.get<PlatformDomainView>(`/companies/${id}/domain`).catch(() => null);
+  const read = await part("their own domain", () => platformApi.get<PlatformDomainView>(`/companies/${id}/domain`));
+  if (isFailed(read)) return <CouldNotLoad what={read.what} />;
+  const v = read;
   if (!v?.enabled) return null;
   const { domain, status, ours, diagnosis: d } = v;
   const s = status ? STATUS[status] : null;
