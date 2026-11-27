@@ -106,7 +106,7 @@ export class LeaksService {
           amount: true,
           rate: true,
           orderId: true,
-          factory: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true } },
         },
       }),
@@ -319,11 +319,11 @@ export class LeaksService {
     /* ----- suppliers: what visits and costs there came to */
     const suppliers = new Map<string, { factory: { id: string; name: string }; spent: number; count: number }>();
     for (const e of periodExpenses) {
-      if (!e.factory) continue;
-      const f = suppliers.get(e.factory.id) ?? { factory: e.factory, spent: 0, count: 0 };
+      if (!e.supplier) continue;
+      const f = suppliers.get(e.supplier.id) ?? { factory: e.supplier, spent: 0, count: 0 };
       f.spent += inMain(e);
       f.count += 1;
-      suppliers.set(e.factory.id, f);
+      suppliers.set(e.supplier.id, f);
     }
 
     /* ----- amounts not on an account (the cash book cannot match the bank) */

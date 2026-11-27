@@ -220,7 +220,7 @@ export class RemindersListService {
         select: {
           id: true,
           validUntil: true,
-          factory: { select: { name: true } },
+          supplier: { select: { name: true } },
           inquiry: { select: { id: true, refNo: true, assignee: { select: { name: true } } } },
         },
       });
@@ -230,7 +230,7 @@ export class RemindersListService {
           key: `offer:${f.id}:${until}`,
           kind: "offer",
           level: until < today ? "warn" : "info",
-          title: `${f.inquiry.refNo}: ${f.factory.name}'s price ${until < today ? "ran out" : "runs out"} ${until === today ? "today" : `on ${until}`}`,
+          title: `${f.inquiry.refNo}: ${f.supplier.name}'s price ${until < today ? "ran out" : "runs out"} ${until === today ? "today" : `on ${until}`}`,
           detail: "Confirm it with the supplier, or get a new price",
           due: until,
           href: `/inquiries/${f.inquiry.id}/sourcing`,
@@ -305,7 +305,7 @@ export class RemindersListService {
           sentOn: true,
           replyBy: true,
           supplierId: true,
-          factory: { select: { name: true } },
+          supplier: { select: { name: true } },
           inquiry: {
             select: {
               id: true,
@@ -325,7 +325,7 @@ export class RemindersListService {
           key: `request:${r.id}`,
           kind: "offer",
           level: replyBy && replyBy < today ? "warn" : "info",
-          title: `${r.factory.name} hasn't answered ${r.inquiry.refNo} for ${days(sent)} days`,
+          title: `${r.supplier.name} hasn't answered ${r.inquiry.refNo} for ${days(sent)} days`,
           detail: replyBy && replyBy < today ? `They were to reply by ${replyBy}` : "A short message usually gets the price",
           due: replyBy ?? addDays(sent, 3),
           href: `/inquiries/${r.inquiry.id}#factories-asked`,
@@ -347,7 +347,7 @@ export class RemindersListService {
         where: {
           ...orders,
           OR: [
-            ...(withProduction ? [{ factories: { some: { OR: [{ readyOn: before }, { fatPlannedOn: before, fatDoneOn: null }] } } }] : []),
+            ...(withProduction ? [{ suppliers: { some: { OR: [{ readyOn: before }, { fatPlannedOn: before, fatDoneOn: null }] } } }] : []),
             ...(withShipping ? [{ shipBy: before }] : []),
           ],
         },
@@ -356,7 +356,7 @@ export class RemindersListService {
           refNo: true,
           shipBy: true,
           ...handler,
-          factories: { select: { supplierId: true, readyOn: true, fatPlannedOn: true, fatDoneOn: true, factory: { select: { name: true } } } },
+          suppliers: { select: { supplierId: true, readyOn: true, fatPlannedOn: true, fatDoneOn: true, supplier: { select: { name: true } } } },
           lines: { where: { type: "goods" }, select: { quantity: true, receivedQty: true, supplierId: true } },
           shipments: { select: { status: true, departedOn: true } },
         },
@@ -367,7 +367,7 @@ export class RemindersListService {
           {
             readyOn: readyOnOf(o),
             goods: { lines: o.lines.length, received: o.lines.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length },
-            fat: o.factories.map((f) => ({ factory: f.factory?.name ?? null, plannedOn: fromDbDateOrNull(f.fatPlannedOn), doneOn: fromDbDateOrNull(f.fatDoneOn), result: null })),
+            fat: o.suppliers.map((f) => ({ factory: f.supplier?.name ?? null, plannedOn: fromDbDateOrNull(f.fatPlannedOn), doneOn: fromDbDateOrNull(f.fatDoneOn), result: null })),
             shipments: o.shipments.map((sh) => ({ status: sh.status, departedOn: fromDbDateOrNull(sh.departedOn) })),
             shipBy: fromDbDateOrNull(o.shipBy),
           },

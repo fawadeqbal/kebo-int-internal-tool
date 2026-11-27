@@ -115,7 +115,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
     it("each order's money is its money page and Costs page, at the order's rate", async () => {
       const fx = await main();
       const orders = await db().order.findMany({
-        select: { id: true, status: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true, factories: true, lines: { select: { supplierId: true } }, shipments: { select: { departedOn: true } } },
+        select: { id: true, status: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true, suppliers: true, lines: { select: { supplierId: true } }, shipments: { select: { departedOn: true } } },
       });
       for (const o of orders) {
         const f = await stored(o.id);

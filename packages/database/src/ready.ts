@@ -12,13 +12,13 @@ import type { Prisma } from "./generated/prisma/client";
 
 /** What the ready dates are worked out from: each supplier's row, and the suppliers on the lines. */
 export const readySelect = {
-  factories: { select: { supplierId: true, readyOn: true } },
+  suppliers: { select: { supplierId: true, readyOn: true } },
 } satisfies Prisma.OrderSelect;
 
-export type ReadyOrder = { factories: { supplierId: string | null; readyOn: Date | null }[]; lines: { supplierId: string | null }[] };
+export type ReadyOrder = { suppliers: { supplierId: string | null; readyOn: Date | null }[]; lines: { supplierId: string | null }[] };
 
 const rowsOf = (o: ReadyOrder): SupplierReadyRow[] =>
-  o.factories.map((f) => ({ supplierId: f.supplierId, readyOn: fromDbDateOrNull(f.readyOn) }));
+  o.suppliers.map((f) => ({ supplierId: f.supplierId, readyOn: fromDbDateOrNull(f.readyOn) }));
 const idsOf = (o: ReadyOrder) => [...new Set(o.lines.flatMap((l) => (l.supplierId ? [l.supplierId] : [])))];
 
 /** The order's ready date: the latest of its suppliers', once each has given one. */

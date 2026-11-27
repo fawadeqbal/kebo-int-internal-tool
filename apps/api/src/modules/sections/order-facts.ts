@@ -26,11 +26,11 @@ export const factsInclude = {
   delivery: { select: { deliveredOn: true, satDoneOn: true, satSignedBy: true } },
   claims: { select: { status: true } },
   lines: {
-    select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, supplierId: true, factory: { select: { name: true } } },
+    select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, supplierId: true, supplier: { select: { name: true } } },
   },
   // Each supplier's ready date (the order's is the latest of them), and its factory test.
   ...readySelect,
-  factories: { select: { ...readySelect.factories.select, fatPlannedOn: true, fatDoneOn: true, fatResult: true, factory: { select: { name: true } } } },
+  suppliers: { select: { ...readySelect.suppliers.select, fatPlannedOn: true, fatDoneOn: true, fatResult: true, supplier: { select: { name: true } } } },
 } satisfies Prisma.OrderInclude;
 
 export type FactsOrderRow = Prisma.OrderGetPayload<{ include: typeof factsInclude }>;
@@ -79,7 +79,7 @@ export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["factorie
     routeFromQuotation: routeFromQuotation(termsOf(o), o.balanceTerms),
     readyOn: readyOnOf(o),
     // Each supplier's own date (production items per supplier); one row when the lines name no supplier.
-    readyBy: readyByOf(o).map((r) => ({ factory: o.lines.find((l) => l.supplierId === r.supplierId)?.factory?.name ?? null, readyOn: r.readyOn })),
+    readyBy: readyByOf(o).map((r) => ({ factory: o.lines.find((l) => l.supplierId === r.supplierId)?.supplier?.name ?? null, readyOn: r.readyOn })),
     goods: { lines: goods.length, received },
     packedAt: o.packedAt ? dateIn(o.packedAt, timeZone) : null,
     packing: o.packedAt
@@ -122,10 +122,10 @@ export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["factorie
     closedOn: o.status === "closed" ? (o.closedAt ? dateIn(o.closedAt, timeZone) : fromDbDate(o.orderedOn)) : null,
     // What the sections added.
     shipBy: fromDbDateOrNull(o.shipBy),
-    fat: o.factories
+    fat: o.suppliers
       .filter((f) => f.fatPlannedOn || f.fatDoneOn || f.fatResult)
       .map((f) => ({
-        factory: f.factory?.name ?? null,
+        factory: f.supplier?.name ?? null,
         plannedOn: fromDbDateOrNull(f.fatPlannedOn),
         doneOn: fromDbDateOrNull(f.fatDoneOn),
         result: (f.fatResult as FatResult | null) ?? null,

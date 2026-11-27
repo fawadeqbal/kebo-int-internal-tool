@@ -149,7 +149,7 @@ export class OrderFilesService {
       seeCosts
         ? db.supplierQuote.findMany({
             where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId } } } } } } },
-            select: { id: true, factory: { select: { name: true } } },
+            select: { id: true, supplier: { select: { name: true } } },
           })
         : Promise.resolve([]),
       // Proof of money in is kept on its payment entry (one per transfer, shown on each order it pays).
@@ -293,7 +293,7 @@ export class OrderFilesService {
         note: a.note,
         attachedTo: {
           link: "offer",
-          label: `Supplier offer · ${offers.find((q) => q.id === a.supplierQuoteId)?.factory.name ?? "factory"}`,
+          label: `Supplier offer · ${offers.find((q) => q.id === a.supplierQuoteId)?.supplier.name ?? "factory"}`,
           href: `/inquiries/${inquiry.id}/sourcing`,
         },
         step: null,

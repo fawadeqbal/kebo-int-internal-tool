@@ -114,7 +114,7 @@ const orderSelect = {
     },
   },
   supplierPaid: supplierPaidRelation,
-  factories: { select: { supplierId: true, readyOn: true } },
+  suppliers: { select: { supplierId: true, readyOn: true } },
   _count: { select: { claims: true } },
 } satisfies Prisma.OrderSelect;
 

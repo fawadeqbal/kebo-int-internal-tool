@@ -438,7 +438,7 @@ export class LedgerService {
         include: {
           files: liveFile,
           order: { select: { refNo: true } },
-          factory: { select: { name: true } },
+          supplier: { select: { name: true } },
           paidBy: { select: { name: true } },
           recordedBy: { select: { name: true } },
         },
@@ -448,8 +448,8 @@ export class LedgerService {
       const settles =
         e.borneBy === "customer" && e.order
           ? `Charged to the customer on ${e.order.refNo}`
-          : e.borneBy === "factory" && e.factory
-            ? `Taken off what we owe ${e.factory.name}`
+          : e.borneBy === "factory" && e.supplier
+            ? `Taken off what we owe ${e.supplier.name}`
             : e.ownMoney && e.paidBy
               ? e.repaidOn
                 ? `Repaid to ${e.paidBy.name} on ${fromDbDate(e.repaidOn)}`

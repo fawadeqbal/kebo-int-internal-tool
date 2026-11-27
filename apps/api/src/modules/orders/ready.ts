@@ -19,7 +19,7 @@ export async function setReadyDates(tx: Db, orderId: string, changes: { supplier
   for (const c of changes) {
     // Only the order's own suppliers (or the goods' one date when the lines name none).
     if (c.supplierId ? !ids.includes(c.supplierId) : ids.length > 0) continue;
-    const row = o.factories.find((f) => f.supplierId === c.supplierId);
+    const row = o.suppliers.find((f) => f.supplierId === c.supplierId);
     if ((fromDbDateOrNull(row?.readyOn ?? null) ?? null) === c.readyOn) continue;
     changed = true;
     const existing = await tx.orderSupplier.findFirst({ where: { orderId, supplierId: c.supplierId }, select: { id: true } });

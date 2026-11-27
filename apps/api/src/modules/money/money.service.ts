@@ -47,7 +47,7 @@ const person = { select: { id: true, name: true } } as const;
 /** Lines of an order with the supplier price frozen on them when it was made (for what we owe each supplier). */
 const linesWithSupplier = {
   orderBy: { sortOrder: "asc" },
-  include: { factory: { select: { id: true, name: true, owner: person } } },
+  include: { supplier: { select: { id: true, name: true, owner: person } } },
 } satisfies Prisma.Order$linesArgs;
 
 type SupplierRow = { id: string; name: string; owner: { id: string; name: string } | null };
@@ -57,7 +57,7 @@ const expenseInclude = {
   order: { select: { id: true, refNo: true } },
   customer: { select: { id: true, name: true } },
   inquiry: { select: { id: true, refNo: true, title: true, stage: true } },
-  factory: { select: { id: true, name: true } },
+  supplier: { select: { id: true, name: true } },
   account: { select: { id: true, name: true } },
   repaidAccount: { select: { id: true, name: true } },
   /** Its receipt or ticket (one live file). */
@@ -191,7 +191,7 @@ export class MoneyService {
     const supplierPaid = o.supplierPaid.map((a) => ({ ...asSupplierPayment(a), factory: a.movement.party!, paidBy: a.movement.paidBy, account: a.movement.account }));
     const livePaid = supplierPaid.filter((p) => !p.voidedAt);
     const supplierRows = supplierPositionOf(o, fx);
-    const supplierOf = new Map<string, SupplierRow>(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+    const supplierOf = new Map<string, SupplierRow>(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : [])));
     for (const r of supplierRows)
       if (!supplierOf.has(r.supplierId))
         supplierOf.set(r.supplierId, await this.prisma.db.party.findUniqueOrThrow({ where: { ...isSupplier, id: r.supplierId }, select: { id: true, name: true, owner: person } }));
@@ -418,7 +418,7 @@ export class MoneyService {
       orderId: e.orderId,
       customer: e.customer ?? null,
       deal: e.inquiry ?? null,
-      factory: e.factory ?? null,
+      factory: e.supplier ?? null,
       account: e.account ?? null,
       category: e.category,
       description: e.description,
@@ -769,7 +769,7 @@ export class MoneyService {
           order: e.order?.refNo ?? null,
           deal: e.inquiry?.refNo ?? null,
           customer: e.customer?.name ?? null,
-          factory: e.factory?.name ?? null,
+          factory: e.supplier?.name ?? null,
           description: e.description,
           borneBy: e.borneBy,
         },
@@ -782,7 +782,7 @@ export class MoneyService {
           order: order?.refNo ?? null,
           deal: updated.inquiry?.refNo ?? null,
           customer: updated.customer?.name ?? null,
-          factory: updated.factory?.name ?? null,
+          factory: updated.supplier?.name ?? null,
           description: data.description,
         },
       });
@@ -844,7 +844,7 @@ export class MoneyService {
         id,
         e.order,
         e.payLater
-          ? `paid ${e.payee ?? e.factory?.name ?? "the bill"} ${formatMinor(toMinor(e.amount), e.currency)} for "${e.description}"`
+          ? `paid ${e.payee ?? e.supplier?.name ?? "the bill"} ${formatMinor(toMinor(e.amount), e.currency)} for "${e.description}"`
           : `repaid ${e.paidBy?.name ?? "the person"} ${formatMinor(toMinor(e.amount), e.currency)} for "${e.description}"`,
         "expense_repay",
         { newValues: { step: e.step, [e.payLater ? "paidOn" : "repaidOn"]: input.repaidOn, account: updated.repaidAccount?.name ?? null } },
@@ -941,7 +941,7 @@ export class MoneyService {
         reference: true,
         source: true,
         paidBy: person,
-        factory: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
         order: { select: { id: true, refNo: true } },
       },
     });
@@ -958,7 +958,7 @@ export class MoneyService {
         id: e.id,
         /** A bill to pay, or a person to pay back. */
         kind: e.payLater ? ("bill" as const) : ("repay" as const),
-        owedTo: e.payLater ? (e.payee ?? e.factory?.name ?? null) : (e.paidBy?.name ?? null),
+        owedTo: e.payLater ? (e.payee ?? e.supplier?.name ?? null) : (e.paidBy?.name ?? null),
         category: e.category as ExpenseCategory,
         description: e.description,
         reference: e.reference,
