@@ -22,7 +22,10 @@ export const ORDER = recordType<OrderWord>({
 });
 
 /** Each word's colour, as the order's states above say it (one place for both: review 27 Nov). */
-export const ORDER_WORD_TONE = Object.fromEntries(Object.entries(ORDER.states).map(([word, s]) => [word, s.tone])) as Record<OrderWord, Tone>;
+export const ORDER_WORD_TONE = Object.fromEntries(Object.entries(ORDER.states).map(([word, s]) => [word, s.tone])) as Record<
+  OrderWord,
+  Tone
+>;
 
 /** What the order's header reads to say where the order stands. */
 export interface OrderStandingFacts {
