@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { livePurchase, livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, toDbDate, type Prisma, isCustomer, isSupplier } from "@kebo/database";
 import { fromMinor, orderMoney, roundHalfAway } from "@kebo/money";
 import { can, shippedOnOf, type ExpenseCategory, type LostReason } from "@kebo/shared";
-import { addDays, dateIn, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { addDays, dateIn, ForbiddenError, monthsBetween, NotFoundError, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -563,8 +563,7 @@ export class AccountsService {
     }
     for (const e of owedRows) personOf(e.paidById!).owed += inMain(e);
     const total = (k: "spent" | "toSell" | "lost" | "owed") => [...byPerson.values()].reduce((t, p) => t + p[k], 0);
-    const monthList: string[] = [];
-    for (let m = from.slice(0, 7); m <= to.slice(0, 7); m = addDays(`${m}-28`, 4).slice(0, 7)) monthList.push(m);
+    const monthList = monthsBetween(from, to);
     return {
       currency: sales.currency,
       from,

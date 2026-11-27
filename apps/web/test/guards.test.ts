@@ -63,10 +63,10 @@ const GUARDS: Record<keyof typeof known.counts, Guard> = {
     // (An attribute in the markup, not the same words in a selector: '[role="dialog"]'.)
     count: times(/(?<!\[)role="(?:dialog|alertdialog)"/g),
   },
-  handMonth: {
-    what: "month worked out by hand (.setUTCMonth, .setMonth)",
-    use: "monthStart, monthEnd, monthOf, lastMonths or addMonths from @kebo/utils: the rule is written once, and tested for month ends and leap years",
-    count: times(/\.set(?:UTC)?Month\(/g),
+  handDate: {
+    what: "date worked out by hand (.setUTCMonth, .setMonth, Date.UTC)",
+    use: "addDays, addMonths, monthStart, monthEnd, monthOf, lastMonths or monthsBetween from @kebo/utils: each rule is written once, and tested for month ends and leap years (a new rule about dates goes there too)",
+    count: times(/\.set(?:UTC)?Month\(|\bDate\.UTC\(/g),
   },
   apiOutsideData: {
     what: "page, layout or component that calls the API client itself",

@@ -8,6 +8,7 @@ import {
   monthEnd,
   monthOf,
   monthStart,
+  monthsBetween,
   startOfDayIn,
   formatReference,
   isISODate,
@@ -75,6 +76,27 @@ describe("dates", () => {
     ]);
     expect(lastMonths("2026-03-31", 3)).toEqual(["2026-01", "2026-02", "2026-03"]); // the 31st does not skip February
     expect(lastMonths("2026-01", 1)).toEqual(["2026-01"]);
+    const eighteen = lastMonths("2026-02-28", 18); // over two year ends
+    expect([eighteen.length, eighteen[0], eighteen[3], eighteen[4], eighteen[15], eighteen[16], eighteen[17]]).toEqual([
+      18,
+      "2024-09",
+      "2024-12",
+      "2025-01",
+      "2025-12",
+      "2026-01",
+      "2026-02",
+    ]);
+    expect(lastMonths("2026-11", 0)).toEqual([]);
+  });
+  it("lists the months from one day to another, both in", () => {
+    expect(monthsBetween("2026-09-30", "2026-11-01")).toEqual(["2026-09", "2026-10", "2026-11"]);
+    expect(monthsBetween("2025-11-15", "2026-02-03")).toEqual(["2025-11", "2025-12", "2026-01", "2026-02"]);
+    expect(monthsBetween("2026-11-01", "2026-11-30")).toEqual(["2026-11"]);
+    expect(monthsBetween("2026-12-01", "2026-11-30")).toEqual([]); // the end is before the start
+  });
+  it("refuses what is not a day or a month", () => {
+    expect(() => monthStart("2026-13")).toThrow(RangeError);
+    expect(() => monthEnd("soon")).toThrow(RangeError);
   });
   it("validates dates", () => {
     expect(isISODate("2026-02-28")).toBe(true);

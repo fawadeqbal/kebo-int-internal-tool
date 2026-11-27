@@ -19,7 +19,7 @@ import {
   COMPANY_LOG_KINDS,
   type CompanyLogKind,
 } from "@kebo/shared";
-import { addDays, ConflictError, daysBetween, DomainError, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
+import { addDays, ConflictError, daysBetween, DomainError, monthStart, NotFoundError, todayIn, type ISODate } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { CompaniesService, toInfo } from "../common/company/companies.service";
@@ -629,12 +629,8 @@ export class PlatformCompaniesService {
    * renewals within 30 days.
    */
   private async dashboard(today: ISODate) {
-    const month = today.slice(0, 7);
-    const monthStart = `${month}-01` as ISODate;
-    const lastStart = (() => {
-      const [y, m] = month.split("-").map(Number) as [number, number];
-      return `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}-01` as ISODate;
-    })();
+    const thisStart = monthStart(today);
+    const lastStart = monthStart(today, -1);
     const in30 = addDays(today, 30);
     const week = new Date(Date.now() + 7 * DAY);
     const monday = (() => {
@@ -689,9 +685,9 @@ export class PlatformCompaniesService {
     for (const c of renewing) if (c.plan?.priceMinor) due.set(c.plan.currency, (due.get(c.plan.currency) ?? 0) + c.plan.priceMinor);
     return {
       paying: clients.length,
-      payingNewThisMonth: clients.filter((c) => c.createdAt >= new Date(`${monthStart}T00:00:00Z`)).length,
-      incomeThisMonth: sum(monthStart, null),
-      incomeLastMonth: sum(lastStart, monthStart),
+      payingNewThisMonth: clients.filter((c) => c.createdAt >= new Date(`${thisStart}T00:00:00Z`)).length,
+      incomeThisMonth: sum(thisStart, null),
+      incomeLastMonth: sum(lastStart, thisStart),
       renewals: renewing.length,
       renewalsDue: [...due].map(([currency, amountMinor]) => ({ currency, amountMinor })),
       trials: trials.length,
