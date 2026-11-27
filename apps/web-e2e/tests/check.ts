@@ -59,6 +59,25 @@ export async function accessibilityProblems(page: Page, within?: string): Promis
   });
 }
 
+/**
+ * Waits for the page an address lands on. An address may send on to another once its first page has come
+ * (a new role → the roles with its panel open): the first page says so in its head and the browser follows
+ * a moment later. Read in that moment, a check failed now and then ("execution context was destroyed", or a
+ * page with nothing on it): so the page that is read is the one it lands on.
+ */
+export async function landed(page: Page) {
+  await page.waitForLoadState("networkidle");
+  const from = page.url();
+  // Asked while it is already moving on: that is a yes.
+  const forwards = await page
+    .locator("meta#__next-page-redirect")
+    .count()
+    .catch(() => 1);
+  if (!forwards) return;
+  await page.waitForURL((u) => u.toString() !== from);
+  await page.waitForLoadState("networkidle");
+}
+
 /** Wider than the screen: the page scrolls sideways (a table or a long word that does not wrap). */
 export async function sidewaysBy(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { landed } from "./check";
 import { appRoutes, foundPages } from "./routes";
 
 /**
@@ -35,7 +36,7 @@ test.describe("every page loads in its own shape", () => {
       const address = r.dynamic ? foundPages()[r.route] : r.route;
       test.skip(!address, "no link to this page in the demo data");
       await page.goto(address!);
-      await page.waitForLoadState("networkidle");
+      await landed(page);
       const real = await partsOf(page);
       await page.goto(`/loading-preview?path=${encodeURIComponent(address!)}`);
       // The preview itself streams in behind the app's own loading screen: read it once it is there.

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { cutOffOnPhone, expectSoundPage, watchErrors } from "./check";
+import { cutOffOnPhone, expectSoundPage, landed, watchErrors } from "./check";
 import { appRoutes, foundPages } from "./routes";
 
 /**
@@ -25,7 +25,7 @@ async function open(page: Page, address: string) {
   const started = Date.now();
   const res = await page.goto(address);
   expect(res?.status() ?? 0, `${address} answered`).toBeLessThan(400);
-  await page.waitForLoadState("networkidle");
+  await landed(page);
   test.info().annotations.push({ type: "load", description: `${Date.now() - started} ms` });
   await expectSoundPage(page, errors);
   // A phone: nothing cut off at the edge (a table is one card per row; facts go to a second line).
