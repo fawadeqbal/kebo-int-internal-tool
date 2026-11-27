@@ -78,6 +78,18 @@ export async function landed(page: Page) {
   await page.waitForLoadState("networkidle");
 }
 
+/**
+ * A shortcut key pressed until it does what it should. A key handler only listens once the page's scripts have
+ * run, a moment after the page shows; a key pressed in that moment does nothing for a person too, who presses
+ * again. Still fails when the key never works (`within`).
+ */
+export async function pressUntil(page: Page, key: string, works: () => Promise<void>, within = 15_000) {
+  await expect(async () => {
+    await page.keyboard.press(key);
+    await works();
+  }).toPass({ timeout: within, intervals: [250, 500, 1000] });
+}
+
 /** Wider than the screen: the page scrolls sideways (a table or a long word that does not wrap). */
 export async function sidewaysBy(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

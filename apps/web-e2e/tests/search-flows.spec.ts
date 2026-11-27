@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { accessibilityProblems, watchErrors } from "./check";
+import { accessibilityProblems, pressUntil, watchErrors } from "./check";
 
 /** Search everything (design "search everything"), done in a browser: the top bar's box, Search, and a phone. */
 
@@ -10,9 +10,8 @@ test("the top bar finds every kind as you type; ↓ and Enter open one; a number
   const refNo = ((await page.locator("tr[data-href]").first().locator("td").first().textContent()) ?? "").match(/[A-Z]+-\d{4}-\d{3,}/)![0];
 
   await page.goto("/dashboard");
-  await page.keyboard.press("/");
   const box = page.getByRole("combobox", { name: "Search everything" });
-  await expect(box).toBeFocused();
+  await pressUntil(page, "/", () => expect(box).toBeFocused({ timeout: 1000 }));
   await box.fill("Al-Shifa");
   const list = page.getByRole("listbox", { name: "Results for Al-Shifa" });
   const customers = list.getByRole("group", { name: "Customers" });
@@ -45,8 +44,8 @@ test("the top bar finds every kind as you type; ↓ and Enter open one; a number
 test("Search: every result with a tab per kind, kept in the address", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/dashboard");
-  await page.keyboard.press("/");
   const box = page.getByRole("combobox", { name: "Search everything" });
+  await pressUntil(page, "/", () => expect(box).toBeFocused({ timeout: 1000 }));
   await box.fill("pharma");
   await page.getByRole("option", { name: /^See all results for/ }).click();
   await expect(page).toHaveURL(/\/search\?q=pharma$/);
