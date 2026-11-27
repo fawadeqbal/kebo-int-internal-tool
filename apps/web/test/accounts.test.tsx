@@ -19,9 +19,12 @@ const accounts = [
   { id: "a3", name: "ICBC CNY", kind: "bank" as const, currency: "CNY", archived: false },
   { id: "a4", name: "Old USD", kind: "bank" as const, currency: "USD", archived: true },
 ];
-const field = (props: Partial<Parameters<typeof AccountSelect>[0]> = {}, desk: { list?: typeof accounts; canAdd?: boolean } = {}) =>
+const field = (
+  props: Partial<Parameters<typeof AccountSelect>[0]> = {},
+  desk: { list?: typeof accounts; canAdd?: boolean; failed?: boolean } = {},
+) =>
   render(
-    <AccountsProvider accounts={desk.list ?? accounts} me="Fawad Iqbal" canAdd={desk.canAdd ?? false}>
+    <AccountsProvider accounts={desk.list ?? accounts} me="Fawad Iqbal" canAdd={desk.canAdd ?? false} failed={desk.failed}>
       <form>
         <AccountSelect id="acc" label="Into account" currency="USD" {...props} />
       </form>
@@ -49,6 +52,21 @@ describe("the account on a money window", () => {
     expect(options()).toEqual(["Not said"]);
     expect(screen.getByText(/No USD account yet/).textContent).toContain("A manager adds accounts on Cash & bank.");
     expect(screen.queryByRole("button", { name: "Add one" })).toBeNull();
+  });
+
+  it("the accounts not read: it says so, and offers no 'Add one' (there may well be one)", () => {
+    field({}, { list: [], canAdd: true, failed: true });
+    expect(screen.getByText("Could not load the accounts. It can still be recorded without one.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Add (one|another account)/ })).toBeNull();
+    expect(options()).toEqual(["Not said"]);
+  });
+
+  it("the accounts not read on Change: the record keeps the account it has (Not said would clear it on save)", () => {
+    field({ defaultValue: "a1" }, { list: [], canAdd: true, failed: true });
+    expect(select().value).toBe("a1");
+    expect(options()).toEqual(["Not said", "Its account, kept as it is"]);
+    expect(new FormData(select().form!).get("accountId")).toBe("a1");
+    expect(screen.getByText("Could not load the accounts. Its account is kept as it is.")).toBeTruthy();
   });
 
   it("starts with the account used last for that currency, and remembers a new choice", async () => {

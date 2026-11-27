@@ -115,7 +115,10 @@ export function AccountSelect({
 }) {
   const { accounts, canAdd, failed } = useContext(DeskContext);
   const fits = accounts.filter((a) => a.currency === currency && (!a.archived || a.id === defaultValue));
-  const given = fits.some((a) => a.id === defaultValue) ? (defaultValue ?? "") : "";
+  // The accounts not read: a record that has one keeps it (it cannot be chosen again here, and "Not said" would
+  // clear it on save).
+  const kept = failed && defaultValue ? defaultValue : null;
+  const given = kept ?? (fits.some((a) => a.id === defaultValue) ? (defaultValue ?? "") : "");
   // The account used last for this currency on this computer (the browser's storage, read after the page is drawn).
   const last = useSyncExternalStore(
     noStore,
@@ -134,7 +137,7 @@ export function AccountSelect({
     remember(currency, id);
   };
   // An account just added is in the list only once the page has read it again: until then the choice waits.
-  const shown = fits.some((a) => a.id === value) ? value : "";
+  const shown = value === kept || fits.some((a) => a.id === value) ? value : "";
   const clash = methodAccountClash(method, fits.find((a) => a.id === shown));
   return (
     <Field
@@ -145,7 +148,7 @@ export function AccountSelect({
       className={className}
       hint={
         adding ? undefined : failed ? (
-          "Could not load the accounts. It can still be recorded without one."
+          kept ? "Could not load the accounts. Its account is kept as it is." : "Could not load the accounts. It can still be recorded without one."
         ) : fits.length === 0 ? (
           <>
             No {currency} account yet.{" "}
@@ -171,6 +174,7 @@ export function AccountSelect({
         onChange={(e) => choose(e.target.value)}
       >
         <option value="">Not said</option>
+        {kept && <option value={kept}>Its account, kept as it is</option>}
         {fits.map((a) => (
           <option key={a.id} value={a.id}>
             {a.name}

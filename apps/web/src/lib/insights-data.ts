@@ -655,6 +655,8 @@ export async function loadSpending(p: Period) {
     months: s.months.map((m) => ({ ...m, sold: byMonth ? (soldIn.get(m.month) ?? 0) : null })),
     costing: leaks?.customers.costing ?? null,
     failed: failedWhat(byPersonPart, byMonthPart, leaksPart),
+    // What its Excel file needs (the customers who cost more are on the page only).
+    exportFailed: failedWhat(byPersonPart, byMonthPart),
   };
 }
 
@@ -749,7 +751,7 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
   // The Spending report, as the other reports (review 24 Nov, M-32: it had no Excel).
   if (q.report === "spending") {
     const s = await loadSpending(p);
-    return allOrNothing({ sheets: spendingSheets(s), failed: s.failed });
+    return allOrNothing({ sheets: spendingSheets(s), failed: s.exportFailed });
   }
   const section: Section = (SECTIONS as readonly string[]).includes(q.section ?? "") ? (q.section as Section) : "overview";
   const money = can(me, "expenses.manage");
@@ -758,8 +760,12 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
       return allOrNothing(await loadOverview(p, money));
     case "money":
       return allOrNothing(await loadProfit(p));
-    case "cash":
-      return allOrNothing(await loadCash(p));
+    case "cash": {
+      const d = await loadCash(p);
+      // Cash & bank off (or not theirs): said, not an empty file (the route has no first sheet to name it by).
+      if (!d.report && !d.failed) throw new ApiError(404, "Cash & bank is not switched on, so there is no cash report to export.");
+      return allOrNothing(d);
+    }
     case "customers":
       return allOrNothing(await loadCustomers(p, today));
     case "factories":
