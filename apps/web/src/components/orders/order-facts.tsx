@@ -58,7 +58,7 @@ export function keyDates(o: OrderView, flow: OrderFlow | null, now: string): { l
 export function orderPeople(o: OrderView, flow: OrderFlow | null): { role: string; name: string; sub?: string | null; href?: string }[] {
   const ship = flow?.shipping?.shipments[0] ?? null;
   const contract = flow?.payment.bankContract ?? null;
-  const suppliers = flow?.factory.factories ?? [];
+  const suppliers = flow?.factory.suppliers ?? [];
   return [
     // The customer is named in the header: here, who to talk to there.
     ...(o.contactName ? [{ role: "Contact", name: o.contactName, href: `/customers/${o.customer.id}` }] : []),
@@ -106,7 +106,7 @@ export function orderStepFacts(
     production: uses("factory") && (flow?.modules.production ?? true),
     poSent: !!flow?.factory.orderedOn || o.word !== "Confirmed",
     // The supplier's part due when we order, still open (people who see supplier money only).
-    supplierDepositDue: (more.money?.factories?.plans ?? [])
+    supplierDepositDue: (more.money?.suppliers?.plans ?? [])
       .flatMap((p) => p.rows)
       .filter((r) => r.dueRule === "on_order" && r.status !== "paid" && r.status !== "later")
       .reduce((t, r) => t + Number(r.open), 0),
@@ -123,7 +123,7 @@ export function orderStepFacts(
     balanceBeforeShipment: flow?.payment.balanceWhen === "before_shipment" ? balanceDue : 0,
     // A request sent and not paid yet (a paid one says "Paid"): the balance was asked for.
     balanceAsked: (more.requests ?? []).some((r) => r.stateLabel === "Sent"),
-    supplierBalanceDue: (more.money?.factories?.plans ?? [])
+    supplierBalanceDue: (more.money?.suppliers?.plans ?? [])
       .flatMap((p) => p.rows)
       .filter((r) => r.dueRule === "on_ready" && r.status !== "paid" && r.status !== "later")
       .reduce((t, r) => t + Number(r.open), 0),

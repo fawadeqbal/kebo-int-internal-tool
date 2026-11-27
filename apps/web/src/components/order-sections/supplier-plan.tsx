@@ -123,7 +123,7 @@ export function SupplierPlanTable({
   return (
     <div className="flex flex-col gap-3">
       {/* Phones: one block per part, so where it stands and what to do are never off the screen. */}
-      <PhoneList label={`Parts to pay ${plan.factory.name}`} className="border-b border-line">
+      <PhoneList label={`Parts to pay ${plan.supplier.name}`} className="border-b border-line">
         {plan.rows.map((r, i) => (
           <PhoneRow
             key={r.id ?? i}

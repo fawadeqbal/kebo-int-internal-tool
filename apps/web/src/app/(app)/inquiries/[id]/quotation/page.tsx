@@ -145,7 +145,7 @@ export default async function QuotationPage({
               const facts = termsFacts(c);
               const checks = showCosts ? checksOf(c, o) : [];
               const problem = checks.find((k) => !k.ok);
-              const from = o?.factory ? shortName(o.factory.name) : o && !o.supplierQuoteId ? "Own prices" : null;
+              const from = o?.supplier ? shortName(o.supplier.name) : o && !o.supplierQuoteId ? "Own prices" : null;
               return (
                 <li key={x.id} className="border-b border-line last:border-b-0">
                   <Link

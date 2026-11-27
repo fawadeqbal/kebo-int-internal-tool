@@ -15,7 +15,7 @@ const fresh = (more: Partial<SectionFacts> = {}): SectionFacts => ({
   due: "184200.00",
   paidInFullOn: null,
   supplierOrderedOn: null,
-  factories: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "0.00", toPay: "950000.00" }],
+  suppliers: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "0.00", toPay: "950000.00" }],
   readyOn: null,
   goods: { lines: 4, received: 0 },
   packedAt: null,
@@ -92,7 +92,7 @@ describe("where each stage stands", () => {
         depositOn: "2026-11-16",
         due: "128940.00",
         supplierOrderedOn: "2026-11-16",
-        factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
+        suppliers: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
         readyOn: "2026-12-05",
         shipments: [ship({ status: "booked", forwarder: "Sino-Africa Logistics", bookingNo: "SAL-88213" })],
         documents: [{ kind: "packing_list", status: "ready", number: "PL-0412", issuedOn: null }],
@@ -128,7 +128,7 @@ describe("where each stage stands", () => {
         due: "0.00",
         paidInFullOn: "2026-12-10",
         supplierOrderedOn: "2026-11-16",
-        factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
+        suppliers: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
         deliveredOn: "2027-01-26",
       }),
       TODAY,
@@ -140,7 +140,7 @@ describe("where each stage stands", () => {
   });
 
   it("a person who may not see supplier money still reads PO sent", () => {
-    expect(stageWords(fresh({ supplierOrderedOn: "2026-11-16", factories: null }), TODAY).factory.word).toBe("PO sent");
+    expect(stageWords(fresh({ supplierOrderedOn: "2026-11-16", suppliers: null }), TODAY).factory.word).toBe("PO sent");
   });
 
   it("by LC: the open LC is the word until the money is in; the documents are seven", () => {
@@ -188,9 +188,9 @@ describe("the Overview's lines", () => {
       due: "128940.00",
       supplierOrderedOn: "2026-11-16",
       supplierOrderNo: "JF-26-1107",
-      factories: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
+      suppliers: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
       readyOn: "2026-12-05",
-      fat: [{ factory: null, plannedOn: "2026-12-03", doneOn: null, result: null }],
+      fat: [{ supplier: null, plannedOn: "2026-12-03", doneOn: null, result: null }],
       shipments: [ship({ status: "booked", forwarder: "Sino-Africa Logistics", bookingNo: "SAL-88213", etd: "2026-12-14", eta: "2027-01-18" })],
       documents: [{ kind: "packing_list", status: "ready", number: "PL-0412", issuedOn: null }],
     });
@@ -208,10 +208,10 @@ describe("the Overview's lines", () => {
       due: "0.00",
       paidInFullOn: "2026-12-10",
       supplierOrderedOn: "2026-11-16",
-      factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
+      suppliers: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
       readyOn: "2026-12-05",
       goods: { lines: 4, received: 4 },
-      fat: [{ factory: null, plannedOn: "2026-12-03", doneOn: "2026-12-03", result: "passed" }],
+      fat: [{ supplier: null, plannedOn: "2026-12-03", doneOn: "2026-12-03", result: "passed" }],
       shipments: [ship({ status: "cleared", forwarder: "Sino-Africa Logistics", vessel: "MSC Aurora", blNo: "MEDUSH887120", containerNo: "MSCU 448120 7", departedOn: "2026-12-14", arrivedOn: "2027-01-19" })],
       deliveredOn: "2027-01-26",
       satDoneOn: "2027-02-04",
@@ -243,11 +243,11 @@ describe("what the sections say is late", () => {
   });
 
   it("a factory test planned and not done", () => {
-    const r = sectionReminders(fresh({ fat: [{ factory: "Jiangsu", plannedOn: "2026-11-22", doneOn: null, result: null }] }), TODAY);
+    const r = sectionReminders(fresh({ fat: [{ supplier: "Jiangsu", plannedOn: "2026-11-22", doneOn: null, result: null }] }), TODAY);
     expect(r.map((x) => x.key)).toEqual(["fat_late"]);
     expect(r[0]!.text).toBe("Factory test planned 22 Nov at Jiangsu: no result yet");
-    expect(sectionReminders(fresh({ fat: [{ factory: null, plannedOn: "2026-11-22", doneOn: "2026-11-22", result: "passed" }] }), TODAY)).toEqual([]);
-    expect(sectionReminders(fresh({ fat: [{ factory: null, plannedOn: "2026-12-03", doneOn: null, result: null }] }), TODAY)).toEqual([]);
+    expect(sectionReminders(fresh({ fat: [{ supplier: null, plannedOn: "2026-11-22", doneOn: "2026-11-22", result: "passed" }] }), TODAY)).toEqual([]);
+    expect(sectionReminders(fresh({ fat: [{ supplier: null, plannedOn: "2026-12-03", doneOn: null, result: null }] }), TODAY)).toEqual([]);
   });
 
   it("our ship-by date passed and nothing has left", () => {

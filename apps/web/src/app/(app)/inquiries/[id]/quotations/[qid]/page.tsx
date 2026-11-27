@@ -142,10 +142,10 @@ export default async function QuotationOwnPage({
         };
   const checks = isDraft ? draftChecks(r) : [];
   // The supplier's offer changed after this was quoted (people who see costs; not once the customer answered).
-  const changed = isDraft || r.status === "sent" ? r.options.flatMap((opt) => (opt.factory && opt.offerChanged?.length ? [{ opt, lines: opt.offerChanged }] : [])) : [];
+  const changed = isDraft || r.status === "sent" ? r.options.flatMap((opt) => (opt.supplier && opt.offerChanged?.length ? [{ opt, lines: opt.offerChanged }] : [])) : [];
   // A quotation from one offer says when the supplier's prices end, beside its own Valid until.
   const endOf = r.options.length === 1 ? r.options[0] : null;
-  const ends = endOf?.factory && endOf.supplierValidUntil ? { who: endOf.factory.name, on: endOf.supplierValidUntil } : null;
+  const ends = endOf?.supplier && endOf.supplierValidUntil ? { who: endOf.supplier.name, on: endOf.supplierValidUntil } : null;
   const prev = at > 0 ? q.quotations[at - 1] : null;
   const next = at < q.quotations.length - 1 ? q.quotations[at + 1] : null;
 
@@ -289,7 +289,7 @@ export default async function QuotationOwnPage({
       }}
       panel={{
         label: "About this quotation",
-        summary: [`R${r.number} ${REVISION_STATUS_LABEL[r.status].toLowerCase()}`, o?.factory ? `from ${o.factory.name}` : o ? "own prices" : null].filter(Boolean).join(" · "),
+        summary: [`R${r.number} ${REVISION_STATUS_LABEL[r.status].toLowerCase()}`, o?.supplier ? `from ${o.supplier.name}` : o ? "own prices" : null].filter(Boolean).join(" · "),
         sections: quoteSide({ x, r, here, base, offers: showCosts ? offers : null }),
       }}
     >
@@ -298,7 +298,7 @@ export default async function QuotationOwnPage({
         <Notice
           key={opt.id}
           tone="todo"
-          title={`${opt.factory!.name} changed its offer after this quotation was made`}
+          title={`${opt.supplier!.name} changed its offer after this quotation was made`}
           action={
             isDraft && manage ? (
               <span className="flex flex-wrap gap-2">
@@ -455,7 +455,7 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
               if (!o.supplierQuoteId) return <Fragment key={o.id}>{row(`${prefix}Prices`, "Own prices")}</Fragment>;
               return (
                 <Fragment key={o.id}>
-                  {row(`${prefix}Supplier`, o.factory?.name ?? "—")}
+                  {row(`${prefix}Supplier`, o.supplier?.name ?? "—")}
                   {offer && row("Received", date(offer.receivedOn))}
                   {offer?.leadTime && row("Lead time", offer.leadTime)}
                 </Fragment>
@@ -484,10 +484,10 @@ function draftChecks(r: RevisionView): string[] {
     // A part is priced in its item; an item priced in its parts is priced (the one rule, unpricedItems).
     const unpriced = unpricedItems(o.lines.map((l) => ({ id: l.no, parentId: l.no.includes(".") ? l.no.slice(0, l.no.lastIndexOf(".")) : null, price: l.unitPrice })));
     if (unpriced) out.push(`${who}: ${unpriced} item${unpriced === 1 ? "" : "s"} without a price.`);
-    if (o.factory && o.coverage.missing.length)
+    if (o.supplier && o.coverage.missing.length)
       out.push(`${who} does not include item${o.coverage.missing.length === 1 ? "" : "s"} ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
     // People who see costs: the costs to reach our basis (freight…) are part of the price, so a missing one makes the margin look better than it is.
-    if (o.costing && o.factory) {
+    if (o.costing && o.supplier) {
       if (o.supplierBasis === null) out.push(`${who}: the supplier's Incoterm is not said, so the costs to reach ${r.incoterm} are not in its cost.`);
       else if (o.gap) {
         const have = new Set((o.costs ?? []).map((c) => c.step));
@@ -499,8 +499,8 @@ function draftChecks(r: RevisionView): string[] {
     }
     if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
     // Never valid longer than the supplier's prices (canvas "From the supplier offer to the quotation").
-    if (o.factory && o.supplierValidUntil && r.validUntil > o.supplierValidUntil)
-      out.push(`${who} is valid until ${date(r.validUntil)}, after ${o.factory.name}'s prices end (${date(o.supplierValidUntil)}).`);
+    if (o.supplier && o.supplierValidUntil && r.validUntil > o.supplierValidUntil)
+      out.push(`${who} is valid until ${date(r.validUntil)}, after ${o.supplier.name}'s prices end (${date(o.supplierValidUntil)}).`);
     // What we promise against what the supplier gives (people who see costs): lead time, payment, warranty.
     for (const c of checksOf({ ...r, options: [o] }, o)) if (!c.ok) out.push(`${who}: ${c.text}`);
     return out;

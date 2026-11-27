@@ -81,7 +81,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
           <Card>
             <CardHeader title="Accepted quotation" />
             <CardBody className="flex flex-col gap-2 text-sm">
-              {opt && row("Accepted", `R${rev!.number} · Option ${opt.letter}${opt.factory ? ` · ${shortName(opt.factory.name)}` : ""}`)}
+              {opt && row("Accepted", `R${rev!.number} · Option ${opt.letter}${opt.supplier ? ` · ${shortName(opt.supplier.name)}` : ""}`)}
               {row("Sale", money(opt?.total ?? order.total, c))}
               {costing && row("Planned cost", money(costing.cost, c))}
               {costing && row("Planned profit", `${money(costing.profit, c)}${costing.marginPercent != null ? ` · ${costing.marginPercent.toFixed(1)}%` : ""}`)}
@@ -96,11 +96,11 @@ export default async function DealOverview({ params, searchParams }: { params: P
                   <RefCode>{order.refNo}</RefCode>
                 </Link>
               </div>
-              {opt?.factory && (
+              {opt?.supplier && (
                 <div>
                   <span className="block text-xs text-muted">Purchase order</span>
                   <Link href={`/orders/${order.id}/factory`} className="text-text hover:underline">
-                    {opt.factory.name}
+                    {opt.supplier.name}
                   </Link>
                 </div>
               )}

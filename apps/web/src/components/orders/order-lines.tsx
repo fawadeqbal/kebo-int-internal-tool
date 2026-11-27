@@ -67,7 +67,7 @@ function valuesOf(l: OrderLineView): LineValues {
     model: l.model ?? "",
     quantity: raw(l.quantity),
     unit: l.unit,
-    factory: l.factory?.name ?? "",
+    factory: l.supplier?.name ?? "",
     supplierPrice: l.supplierPrice ? raw(l.supplierPrice.unitPrice) : "",
     supplierCurrency: l.supplierPrice?.currency ?? "",
     taxRate: l.supplierPrice ? raw(l.supplierPrice.taxRate) : "",

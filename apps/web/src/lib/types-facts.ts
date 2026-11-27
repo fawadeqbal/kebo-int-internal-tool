@@ -124,7 +124,7 @@ export interface Aging {
   d90: string;
   older: string;
   over60: string;
-  orders: { orderId: string; refNo: string; customer: string; factory: string | null; amount: string }[] | null;
+  orders: { orderId: string; refNo: string; customer: string; supplier: string | null; amount: string }[] | null;
 }
 
 export interface CashFacts {
@@ -134,7 +134,7 @@ export interface CashFacts {
   seeMoney: boolean;
   seeExpenses: boolean;
   /** `company`: the company's own costs dated in the month (no order), what comes off the orders' profit. */
-  months: { month: string; in: string; out: string | null; factories: string | null; expenses: string | null; company: string | null; net: string | null }[];
+  months: { month: string; in: string; out: string | null; suppliers: string | null; expenses: string | null; company: string | null; net: string | null }[];
   byKind: { category: string; amount: string; orders: number }[] | null;
   missingRates: string[];
 }

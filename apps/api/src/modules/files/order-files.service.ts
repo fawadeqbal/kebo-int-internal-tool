@@ -170,7 +170,7 @@ export class OrderFilesService {
               },
               orderBy: [{ on: "asc" }, { createdAt: "asc" }],
             })
-            .then((parts) => parts.map((a) => ({ ...a.movement, ...fileOf(a.movement.files), id: a.id, factory: a.movement.party!, paidOn: a.on })))
+            .then((parts) => parts.map((a) => ({ ...a.movement, ...fileOf(a.movement.files), id: a.id, supplier: a.movement.party!, paidOn: a.on })))
         : Promise.resolve([]),
       seeExpenses
         ? db.expense
@@ -355,7 +355,7 @@ export class OrderFilesService {
         kind: null,
         kindLabel: "Proof of payment",
         note: null,
-        attachedTo: { link: "factory_payment", label: `Paid to ${p.factory.name} · ${day(p.paidOn)}`, href: stepHref("factory") },
+        attachedTo: { link: "factory_payment", label: `Paid to ${p.supplier.name} · ${day(p.paidOn)}`, href: stepHref("factory") },
         step: "factory",
         stepLabel: FLOW_STEP_LABEL.factory,
         section: "factory_payments",

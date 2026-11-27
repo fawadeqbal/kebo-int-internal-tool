@@ -47,7 +47,7 @@ export interface OrderFlow {
     readyOn: string | null;
     /** Each supplier's own ready date (supplierId null: the goods of an order whose lines name no supplier). */
     readyBy?: { supplierId: string | null; name: string | null; readyOn: string | null }[];
-    factories: { id: string; name: string }[];
+    suppliers: { id: string; name: string }[];
   };
   shipping: { shipments: ShipmentView[] } | null;
   documents: { set: FlowDocument[]; bankSteps: BankStepView[] } | null;
@@ -188,7 +188,7 @@ export interface DeliveryView {
 export interface SupplierRequests {
   items: {
     id: string;
-    factory: { id: string; name: string };
+    supplier: { id: string; name: string };
     status: SupplierRequestStatus;
     statusLabel: string;
     sentOn: string;

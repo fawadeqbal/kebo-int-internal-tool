@@ -264,7 +264,7 @@ export class BillingService {
     const bySupplier = new Map<
       string,
       {
-        factory: SupplierRow;
+        supplier: SupplierRow;
         currency: string;
         owedMinor: Minor;
         paidMinor: Minor;
@@ -290,11 +290,11 @@ export class BillingService {
         // Only orders with something still to pay count, so "paid X of Y" is about those.
         if (f.toPayMinor <= 0 || (supplierId && f.supplierId !== supplierId)) continue;
         const supplier = supplierOf.get(f.supplierId)!;
-        const row = bySupplier.get(f.key) ?? { factory: supplier, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
+        const row = bySupplier.get(f.key) ?? { supplier: supplier, currency: f.currency, owedMinor: 0, paidMinor: 0, orders: [] };
         row.owedMinor += f.owedMinor;
         row.paidMinor += f.settledMinor;
         // The next part of its payment plan (advance, balance on the ready date…): when it is due.
-        const plan = plans.get(o.id)?.find((p) => `${p.factory.id}:${p.currency}` === f.key);
+        const plan = plans.get(o.id)?.find((p) => `${p.supplier.id}:${p.currency}` === f.key);
         row.orders.push({
           id: o.id,
           refNo: o.refNo,
@@ -308,10 +308,10 @@ export class BillingService {
       }
     }
     return [...bySupplier.values()]
-      .filter((r) => r.orders.length && (!mine || r.factory.owner?.id === user.id))
+      .filter((r) => r.orders.length && (!mine || r.supplier.owner?.id === user.id))
       .map((r) => ({
-        factory: { id: r.factory.id, name: r.factory.name },
-        lookedAfterBy: r.factory.owner,
+        supplier: { id: r.supplier.id, name: r.supplier.name },
+        lookedAfterBy: r.supplier.owner,
         currency: r.currency,
         owed: fromMinor(r.owedMinor),
         paid: fromMinor(r.paidMinor),
@@ -771,7 +771,7 @@ export class BillingService {
       for (const o of orders) {
         const owners = new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier.owner] as const] : [])));
         for (const f of plans.get(o.id) ?? []) {
-          const owner = owners.get(f.factory.id) ?? null;
+          const owner = owners.get(f.supplier.id) ?? null;
           if (mine && owner?.id !== user.id) continue;
           for (const r of f.rows) {
             if (Number(r.open) <= 0) continue;
@@ -780,7 +780,7 @@ export class BillingService {
               number: r.supplierRef,
               label: r.label,
               order: { id: o.id, refNo: o.refNo },
-              party: f.factory,
+              party: f.supplier,
               lookedAfterBy: owner,
               currency: f.currency,
               amount: r.amount,
@@ -858,21 +858,21 @@ export class BillingService {
       const route = termsOf(o).route;
       const theirs = customerMoney({ totalMinor: pos.owedMinor, receivedMinor: pos.settledMinor, depositMinor: pos.depositMinor, route });
       for (const f of plans.get(o.id) ?? []) {
-        const owner = owners.get(f.factory.id) ?? null;
+        const owner = owners.get(f.supplier.id) ?? null;
         if (mine && owner?.id !== user.id) continue;
         for (const [n, r] of f.rows.entries()) {
           if (Number(r.open) <= 0) continue;
           rows.push({
-            key: `${o.id}:${f.factory.id}:${f.currency}:${n}`,
+            key: `${o.id}:${f.supplier.id}:${f.currency}:${n}`,
             ref: r.id,
             label: r.label,
             supplierRef: r.supplierRef,
             part: r.dueRule === "on_order" ? "deposit" : "balance",
-            supplier: f.factory,
+            supplier: f.supplier,
             lookedAfterBy: owner,
             order: { id: o.id, refNo: o.refNo },
             customer: o.customer,
-            po: o.purchaseOrders.find((p) => p.supplierId === f.factory.id)?.number ?? null,
+            po: o.purchaseOrders.find((p) => p.supplierId === f.supplier.id)?.number ?? null,
             currency: f.currency,
             amount: r.amount,
             paid: r.paid,

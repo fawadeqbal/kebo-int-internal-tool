@@ -67,8 +67,8 @@ export default async function SourcingPage({
   const requestsPart = await requestsOf(d.id);
   const requests = dataOf(requestsPart);
   const askedSuppliers = (requests?.items ?? []).flatMap((r) =>
-    r.factory
-      ? [{ id: r.factory.id, name: r.factory.name, contactPerson: null, note: [r.sentOn ? `asked ${dayMonth(r.sentOn)}` : "asked", r.supplierQuoteId ? "offer in" : "no offer yet"].join(" · ") }]
+    r.supplier
+      ? [{ id: r.supplier.id, name: r.supplier.name, contactPerson: null, note: [r.sentOn ? `asked ${dayMonth(r.sentOn)}` : "asked", r.supplierQuoteId ? "offer in" : "no offer yet"].join(" · ") }]
       : [],
   );
   const addOffer = (props: { variant?: "primary" | "secondary" | "ghost"; size?: "xs" | "sm" | "md"; label?: string; open?: boolean }) =>
@@ -153,7 +153,7 @@ export default async function SourcingPage({
     return coverText(x, s.items, "cell");
   };
   const more = (r: (typeof others)[number]) =>
-    canEdit && <RequestMore name={r.factory.name} status={r.status} setStatus={supplierRequestStatusAction.bind(null, d.id, r.id)} remove={removeSupplierRequestAction.bind(null, d.id, r.id)} />;
+    canEdit && <RequestMore name={r.supplier.name} status={r.status} setStatus={supplierRequestStatusAction.bind(null, d.id, r.id)} remove={removeSupplierRequestAction.bind(null, d.id, r.id)} />;
   const dash = <Dash />;
   const two = (v: { main: string; sub: string | null } | null) =>
     v ? (
@@ -198,7 +198,7 @@ export default async function SourcingPage({
             view={s}
             status={status}
             dealId={d.id}
-            waiting={others.map((r) => (r.status === "sent" ? `${r.factory.name} has not answered yet (asked ${dayMonth(r.sentOn)}).` : `${r.factory.name}: ${r.statusLabel.toLowerCase()}.`))}
+            waiting={others.map((r) => (r.status === "sent" ? `${r.supplier.name} has not answered yet (asked ${dayMonth(r.sentOn)}).` : `${r.supplier.name}: ${r.statusLabel.toLowerCase()}.`))}
           />
         ) : (
           <>
@@ -210,7 +210,7 @@ export default async function SourcingPage({
                   <li key={x.id}>
                     <Link href={`/inquiries/${d.id}/offers/${x.id}`} className="block px-4 py-3 text-md leading-[18px] active:bg-surface-2">
                       <span className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">{x.factory.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">{x.supplier.name}</span>
                         {status(x)}
                       </span>
                       <span className="mt-1 block font-semibold text-text tabular">
@@ -226,8 +226,8 @@ export default async function SourcingPage({
                 <li key={r.id} className="flex items-start gap-2 px-4 py-3 text-md leading-[18px]">
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <Link href={`/suppliers/${r.factory.id}`} className="min-w-0 flex-1 truncate text-sm font-semibold text-text">
-                        {r.factory.name}
+                      <Link href={`/suppliers/${r.supplier.id}`} className="min-w-0 flex-1 truncate text-sm font-semibold text-text">
+                        {r.supplier.name}
                       </Link>
                       {requestStatus(r)}
                     </span>
@@ -261,7 +261,7 @@ export default async function SourcingPage({
                       <Tr key={x.id} href={href}>
                         <td className={td}>
                           <Link href={href} className="font-semibold text-text hover:text-primary">
-                            {x.factory.name}
+                            {x.supplier.name}
                           </Link>
                           <span className="block text-xs text-text-2">{offerLine(x)}</span>
                         </td>
@@ -292,10 +292,10 @@ export default async function SourcingPage({
                     );
                   })}
                   {others.map((r) => (
-                    <Tr key={r.id} href={`/suppliers/${r.factory.id}`}>
+                    <Tr key={r.id} href={`/suppliers/${r.supplier.id}`}>
                       <td className={td}>
-                        <Link href={`/suppliers/${r.factory.id}`} className="font-semibold text-text hover:text-primary">
-                          {r.factory.name}
+                        <Link href={`/suppliers/${r.supplier.id}`} className="font-semibold text-text hover:text-primary">
+                          {r.supplier.name}
                         </Link>
                         <span className={cn("block text-xs text-text-2", r.late && "text-bad")}>{askedLine(r)}</span>
                       </td>

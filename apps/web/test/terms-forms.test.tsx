@@ -18,7 +18,7 @@ const offers: QuoteOffers = {
   offers: [
     {
       supplierQuoteId: "J",
-      factory: { id: "fj", name: "Jinan Pharma Machinery" },
+      supplier: { id: "fj", name: "Jinan Pharma Machinery" },
       currency: "CNY",
       basis: "FOB",
       basisPlace: "Qingdao",

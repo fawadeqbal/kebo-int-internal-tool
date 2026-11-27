@@ -75,7 +75,7 @@ export interface CompanyDetail extends Omit<CompanyRow, "plan"> {
     orders: number;
     openOrders: number;
     customers: number;
-    factories: number;
+    suppliers: number;
     twoStepOff: number;
     people: {
       id: string;

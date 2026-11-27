@@ -155,7 +155,7 @@ export class SupplierPaymentsService {
       include: { movement: { include: { party: { select: { name: true } }, files: liveFile } } },
     });
     if (!part) throw new NotFoundError("Payment");
-    const p = { ...asSupplierPayment(part), factory: part.movement.party! };
+    const p = { ...asSupplierPayment(part), supplier: part.movement.party! };
     const o = await this.orders.load(user, p.orderId);
     if (p.voidedAt) throw new DomainError("This payment was removed.");
     return { p, o };
@@ -198,7 +198,7 @@ export class SupplierPaymentsService {
         entityId: o.id,
         summary: `${o.refNo}: changed the payment to ${supplierName}`,
         oldValues: {
-          factory: p.factory.name,
+          supplier: p.supplier.name,
           amount: `${formatMinor(toMinor(p.amount), p.currency)}`,
           paidOn: fromDbDate(p.paidOn),
           rate: Number(p.rate),
@@ -207,7 +207,7 @@ export class SupplierPaymentsService {
         newValues: {
           // Its page reads its own changes by this (the order's history keeps them too).
           paymentId: p.id,
-          factory: supplierName,
+          supplier: supplierName,
           amount: `${formatMinor(toMinor(data.amount), data.currency)}`,
           paidOn: input.paidOn,
           rate: data.rate,
@@ -232,7 +232,7 @@ export class SupplierPaymentsService {
         action: "payment_out_void",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: removed the payment of ${formatMinor(toMinor(p.amount), p.currency)} to ${p.factory.name}`,
+        summary: `${o.refNo}: removed the payment of ${formatMinor(toMinor(p.amount), p.currency)} to ${p.supplier.name}`,
         reason,
       });
       await this.ledger.post(tx, [{ type: "movement", id: p.movementId }, { type: "order", id: o.id }], { userId: user.id, reason });

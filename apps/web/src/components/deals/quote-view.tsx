@@ -24,11 +24,11 @@ export const optionOf = (r: RevisionView): OptionView | undefined => r.options.f
 
 /** What we promise against what the option's supplier gives (people who see costs): lead time, payment, warranty. */
 export function checksOf(r: RevisionView, o: OptionView | undefined): TermsCheck[] {
-  if (!o?.factory || !o.supplierTerms) return [];
+  if (!o?.supplier || !o.supplierTerms) return [];
   const supplierMinor = o.costing ? o.costing.costMinor - o.costing.extraCostMinor : 0;
   return termsChecks(
     { leadDays: o.leadDays, leadFrom: o.leadFrom, parts: r.paymentParts, warrantyMonths: r.warrantyMonths, warrantyFrom: r.warrantyFrom, totalMinor: toMinor(o.total), currency: r.currency },
-    { factory: shortName(o.factory.name), ...o.supplierTerms, costMinor: supplierMinor > 0 ? supplierMinor : null },
+    { factory: shortName(o.supplier.name), ...o.supplierTerms, costMinor: supplierMinor > 0 ? supplierMinor : null },
   );
 }
 
@@ -66,7 +66,7 @@ export function quoteCount(o: OptionView) {
 
 /** An option's name over its prices when the quotation offers several ("Option A · Jinan · accepted"). */
 export function optionTitle(o: OptionView) {
-  return `Option ${o.letter}${o.factory ? ` · ${shortName(o.factory.name)}` : ""}${o.status === "accepted" ? " · accepted" : o.status === "not_chosen" ? " · not chosen" : ""}`;
+  return `Option ${o.letter}${o.supplier ? ` · ${shortName(o.supplier.name)}` : ""}${o.status === "accepted" ? " · accepted" : o.status === "not_chosen" ? " · not chosen" : ""}`;
 }
 
 const marginOf = (price: string, cost: string | null | undefined) => {

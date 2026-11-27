@@ -91,21 +91,21 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
     what: "offer",
     at,
     of: s.quotes.length,
-    prev: prev ? { href: `${base}/offers/${prev.id}`, name: prev.factory.name } : null,
-    next: next ? { href: `${base}/offers/${next.id}`, name: next.factory.name } : null,
+    prev: prev ? { href: `${base}/offers/${prev.id}`, name: prev.supplier.name } : null,
+    next: next ? { href: `${base}/offers/${next.id}`, name: next.supplier.name } : null,
   };
 
   return (
     <RecordPage
       pager={pager}
       header={{
-        crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.factory.name }],
+        crumbs: [{ label: "Sales" }, { label: "Inquiries", href: "/inquiries" }, { label: d.refNo, href: base }, { label: x.supplier.name }],
         back: { href: `${base}/sourcing`, label: `${d.refNo} · Supplier offers` },
-        title: x.factory.name,
+        title: x.supplier.name,
         record: { kind: RECORD_KIND.offer, number: d.refNo },
         summary: summary.length ? <p className="min-w-0">{summary.join(" · ")}</p> : undefined,
         // One strong button (design rules 2 and 3), the rest in ⋯ (canvas board "Actions: one list per record type").
-        ...recordActions(`More for ${x.factory.name}’s offer`, [
+        ...recordActions(`More for ${x.supplier.name}’s offer`, [
           {
             id: "quote",
             place: "primary",
@@ -117,7 +117,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
             ),
           },
           { id: "edit", place: "more", when: canEdit, label: "Edit offer", href: `${base}/offers/${x.id}?panel=edit-offer` },
-          { id: "supplier", place: "more", label: `Open the supplier ${x.factory.name}`, href: `/suppliers/${x.factory.id}` },
+          { id: "supplier", place: "more", label: `Open the supplier ${x.supplier.name}`, href: `/suppliers/${x.supplier.id}` },
           { id: "compare", place: "more", label: "Compare the offers side by side", href: `${base}/sourcing?view=compare` },
           { id: "link", place: "more", label: "Copy link to this offer", copy: `${base}/offers/${x.id}` },
         ]),

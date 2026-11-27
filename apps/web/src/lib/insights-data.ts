@@ -832,7 +832,7 @@ function spendingSheets(s: Awaited<ReturnType<typeof loadSpending>>): SheetSpec[
         { header: "Visits", kind: "number", width: 10 },
         { header: `Spent (${c})`, kind: "number", width: 16 },
       ],
-      rows: s.factories.map((x) => [x.factory.name, x.visits, xl(n(x.spent))]),
+      rows: s.suppliers.map((x) => [x.supplier.name, x.visits, xl(n(x.spent))]),
     },
   ];
 }

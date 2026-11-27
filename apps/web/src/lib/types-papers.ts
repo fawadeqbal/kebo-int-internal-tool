@@ -57,7 +57,7 @@ export interface PaperChecks {
   madeFrom: string;
   number: string;
   ref: string | null;
-  factories: { id: string; name: string }[] | null;
+  suppliers: { id: string; name: string }[] | null;
   live: boolean;
   canMake: boolean;
   state: PaperState;

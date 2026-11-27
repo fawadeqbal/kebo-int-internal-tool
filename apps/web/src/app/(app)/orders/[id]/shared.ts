@@ -61,7 +61,7 @@ export const goodsOf = (o: OrderView): GoodsLine[] =>
       model: l.model,
       quantity: l.quantity,
       unit: l.unit,
-      factory: l.factory?.name ?? null,
+      factory: l.supplier?.name ?? null,
       receivedQty: l.receivedQty,
       receivedOn: l.receivedOn ? date(l.receivedOn) : null,
       packing: l.packing,

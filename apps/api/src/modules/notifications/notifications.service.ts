@@ -345,7 +345,7 @@ export class NotificationsService implements OnModuleInit {
     if (!o || !po) return;
     const s = await this.settings.get();
     const plan = (await supplierPlansOf(this.prisma.db, o.id, s.sales.supplierAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")))).find(
-      (f) => f.factory.id === po.supplierId,
+      (f) => f.supplier.id === po.supplierId,
     );
     const c = po.supplier.contacts[0];
     const owed = plan ? toMinor(plan.owed) : 0;

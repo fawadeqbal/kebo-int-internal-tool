@@ -185,7 +185,7 @@ function NewQuotationsForm({
                           </td>
                           <td className="border-b border-line px-3 py-2.5 max-sm:pr-1">
                             <label htmlFor={box} className="block cursor-pointer font-semibold [overflow-wrap:anywhere]">
-                              {o.factory.name}
+                              {o.supplier.name}
                             </label>
                             <span className="block text-xs text-text-2">
                               {[date(o.receivedOn), o.basis ? `${o.basis}${o.basisPlace ? ` ${o.basisPlace}` : ""}` : null, o.leadTime].filter(Boolean).join(" · ")}
@@ -262,7 +262,7 @@ function NewQuotationsForm({
                         return (
                           <tr key={id} className="last:[&>td]:border-b-0">
                             <td className="border-b border-line px-3 py-2 font-semibold">{next[i]}</td>
-                            <td className="border-b border-line px-3 py-2">{o ? shortName(o.factory.name) : "Own prices"}</td>
+                            <td className="border-b border-line px-3 py-2">{o ? shortName(o.supplier.name) : "Own prices"}</td>
                             <td className="border-b border-line px-3 py-2 text-right whitespace-nowrap tabular">
                               {id === "own" ? "To price" : total === null ? "—" : money(total, offers?.currency ?? currency)}
                             </td>

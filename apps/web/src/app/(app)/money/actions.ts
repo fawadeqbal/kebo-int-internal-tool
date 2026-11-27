@@ -135,13 +135,13 @@ export async function supplierPaymentAction(
   const d = r.data as
     | {
         createdId?: string;
-        factories?: {
-          payments?: { id: string; factory?: { name?: string }; after?: { toPay?: string } | null; currency?: string }[];
+        suppliers?: {
+          payments?: { id: string; supplier?: { name?: string }; after?: { toPay?: string } | null; currency?: string }[];
         } | null;
       }
     | undefined;
-  const p = d?.factories?.payments?.find((x) => x.id === (paymentId ?? d.createdId));
-  const name = p?.factory?.name;
+  const p = d?.suppliers?.payments?.find((x) => x.id === (paymentId ?? d.createdId));
+  const name = p?.supplier?.name;
   const left =
     p?.after?.toPay && p.currency
       ? Number(p.after.toPay) > 0

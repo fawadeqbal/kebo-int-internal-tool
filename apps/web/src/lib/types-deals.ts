@@ -115,7 +115,7 @@ export interface OfferFile {
 
 export interface SupplierQuoteView {
   id: string;
-  factory: { id: string; name: string };
+  supplier: { id: string; name: string };
   reference: string | null;
   receivedOn: string;
   validUntil: string | null;
@@ -159,7 +159,7 @@ export interface SupplierQuoteView {
 }
 
 export interface SourcingOption extends SupplierQuoteLineView {
-  factory: { id: string; name: string };
+  supplier: { id: string; name: string };
   quoteId: string;
   currency: string;
 }
@@ -251,7 +251,7 @@ export interface OptionView {
   letter: string;
   status: OptionStatus;
   /** Internal: whose offer it is (people who see costs). */
-  factory: { id: string; name: string } | null;
+  supplier: { id: string; name: string } | null;
   supplierQuoteId: string | null;
   leadTime: string | null;
   /** The lead time we promise as days from a moment (null: only its words). */
@@ -421,7 +421,7 @@ export interface QuoteOffers {
   rates: Record<string, number>;
   offers: {
     supplierQuoteId: string;
-    factory: { id: string; name: string };
+    supplier: { id: string; name: string };
     currency: string;
     basis: Incoterm | null;
     basisPlace: string | null;

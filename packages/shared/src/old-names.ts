@@ -74,3 +74,26 @@ export function withOldNamesToo<T>(value: T, depth = 0): T {
   }
   return Object.fromEntries(entries) as T;
 }
+
+/**
+ * Step B of the rename (28 Nov 2026): the bare word as a field of an answer the code builds itself, `factory` →
+ * `supplier` and `factories` → `suppliers`. Only answers get the old twin: in bodies and saved JSON the bare word is
+ * also a key of tables looked up by a stored value (Terms' sides, who bears a cost, ledger party kinds), so it is
+ * never read as "supplier" there. Kept until the stored values are renamed (R3) and the old phone apps are gone.
+ */
+const BARE_OLD: Readonly<Record<string, string>> = { supplier: "factory", suppliers: "factories" };
+
+/** Each `supplier` / `suppliers` with its old twin `factory` / `factories` beside it, all the way down (an answer). */
+export function withBareOldNamesToo<T>(value: T, depth = 0): T {
+  if (depth > DEEPEST) return value;
+  if (Array.isArray(value)) return value.map((v) => withBareOldNamesToo(v, depth + 1)) as T;
+  if (!plain(value)) return value;
+  const entries: [string, unknown][] = [];
+  for (const [key, v] of Object.entries(value)) {
+    const w = withBareOldNamesToo(v, depth + 1);
+    entries.push([key, w]);
+    const old = Object.hasOwn(BARE_OLD, key) ? BARE_OLD[key]! : null;
+    if (old && !Object.hasOwn(value, old)) entries.push([old, w]);
+  }
+  return Object.fromEntries(entries) as T;
+}

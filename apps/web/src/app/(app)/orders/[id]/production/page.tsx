@@ -49,14 +49,14 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
       .filter((x): x is string => !!x)
       .sort()
       .at(-1) ?? null;
-  const first = rows[0]?.factory?.id ?? null;
+  const first = rows[0]?.supplier?.id ?? null;
 
   return (
     <OrderPage id={id}>
       {rows.map((r) => {
-        const fid = r.factory?.id ?? null;
-        const of = many && r.factory ? ` · ${r.factory.name}` : "";
-        const sub = `${o.refNo} · ${r.factory?.name ?? "the supplier"}`;
+        const fid = r.supplier?.id ?? null;
+        const of = many && r.supplier ? ` · ${r.supplier.name}` : "";
+        const sub = `${o.refNo} · ${r.supplier?.name ?? "the supplier"}`;
         const left = r.readyOn ? Math.round((Date.parse(r.readyOn) - Date.parse(now)) / DAY) : null;
         // What the supplier's lead time works out to (their offer or the PO), until they give a date of their own.
         const agreed = pos?.items.find((x) => x.supplier.id === fid)?.agreed;

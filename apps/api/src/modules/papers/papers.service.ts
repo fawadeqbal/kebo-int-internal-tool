@@ -453,7 +453,7 @@ export class PapersService implements OnModuleInit {
       madeFrom: PAPER_MADE_FROM[kind],
       number: latest?.number ?? doc.number,
       ref: ref || null,
-      factories: PER_SUPPLIER_PAPERS.includes(kind) ? suppliersOf(o).map((f) => ({ id: f.id, name: f.name })) : null,
+      suppliers: PER_SUPPLIER_PAPERS.includes(kind) ? suppliersOf(o).map((f) => ({ id: f.id, name: f.name })) : null,
       live: LIVE_PAPERS.includes(kind),
       canMake: can(user, "documents.manage") && o.status !== "cancelled" && !LIVE_PAPERS.includes(kind) && !SENT_PAPERS.includes(kind),
       state: this.stateOf(latest, ready),

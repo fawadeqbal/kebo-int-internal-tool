@@ -46,7 +46,7 @@ const agreed = (a: Partial<NonNullable<OrderView["agreed"]>> = {}): NonNullable<
 });
 
 const supplierTerms = (t: Partial<NonNullable<OrderView["supplierTerms"]>[number]> = {}): NonNullable<OrderView["supplierTerms"]>[number] => ({
-  factory: { id: "fj", name: "Jinan Pharma Machinery" },
+  supplier: { id: "fj", name: "Jinan Pharma Machinery" },
   offer: { id: "q1", reference: "JP-2611-08", receivedOn: "2026-11-12" },
   basis: "FOB",
   basisPlace: "Qingdao",

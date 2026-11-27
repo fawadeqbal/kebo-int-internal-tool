@@ -75,7 +75,7 @@ export class AccountsService {
         customer: d.customer.name,
       })),
       orders: orders.map((o) => ({ id: o.id, refNo: o.refNo, dealId: o.inquiryId, customerId: o.customer.id, customer: o.customer.name })),
-      factories: suppliers,
+      suppliers: suppliers,
     };
   }
 
@@ -528,7 +528,7 @@ export class AccountsService {
     const kinds = new Map<string, number>();
     const reasons = new Map<string, { deals: Set<string>; spent: number }>();
     const months = new Map<string, number>();
-    const suppliers = new Map<string, { factory: { id: string; name: string }; visits: number; spent: number }>();
+    const suppliers = new Map<string, { supplier: { id: string; name: string }; visits: number; spent: number }>();
     const customers = new Map<string, { customer: { id: string; name: string }; spent: number }>();
     let company = 0;
     let onWon = 0;
@@ -552,7 +552,7 @@ export class AccountsService {
         reasons.set(key, r);
       }
       if (e.supplier && VISITS.has(e.category)) {
-        const f = suppliers.get(e.supplier.id) ?? { factory: e.supplier, visits: 0, spent: 0 };
+        const f = suppliers.get(e.supplier.id) ?? { supplier: e.supplier, visits: 0, spent: 0 };
         f.visits += 1;
         f.spent += v;
         suppliers.set(e.supplier.id, f);
@@ -586,7 +586,7 @@ export class AccountsService {
       lostReasons: [...reasons]
         .map(([reason, r]) => ({ reason: reason as LostReason | "not_said", deals: r.deals.size, spent: fromMinor(r.spent) }))
         .sort((a, b) => Number(b.spent) - Number(a.spent)),
-      factories: [...suppliers.values()].map((f) => ({ factory: f.factory, visits: f.visits, spent: fromMinor(f.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
+      suppliers: [...suppliers.values()].map((f) => ({ supplier: f.supplier, visits: f.visits, spent: fromMinor(f.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
       /** Everything spent on each customer in the period (on them, their inquiries and their orders). */
       customers: [...customers.values()].map((c) => ({ customer: c.customer, spent: fromMinor(c.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
       months: monthList.map((m) => ({ month: m, toSell: fromMinor(months.get(m) ?? 0) })),

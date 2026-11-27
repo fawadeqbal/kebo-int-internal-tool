@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { newName, newNames, oldName, readSettings, withNewNames, withOldNamesToo } from "../src";
+import { newName, newNames, oldName, readSettings, withBareOldNamesToo, withNewNames, withOldNamesToo } from "../src";
 import { RENAMED } from "../src/old-names.renamed";
 
 describe("old names: JSON saved before the rename, and phone apps installed before it", () => {
@@ -115,5 +115,29 @@ describe("old names: JSON saved before the rename, and phone apps installed befo
     const saved = withOldNamesToo(read.sales) as Record<string, unknown>;
     expect(saved).toMatchObject({ supplierAdvancePercent: 40, factoryAdvancePercent: 40, supplierTaxRate: 13, factoryTaxRate: 13 });
     expect(readSettings({ sales: saved }).sales).toEqual(read.sales);
+  });
+});
+
+describe("the bare word in answers (step B, 28 Nov)", () => {
+  it("puts factory / factories beside supplier / suppliers, all the way down, with the same value", () => {
+    const v = { supplier: { id: "f1", name: "Jinan" }, rows: [{ suppliers: [{ id: "f2" }] }] };
+    expect(withBareOldNamesToo(v)).toEqual({
+      supplier: { id: "f1", name: "Jinan" },
+      factory: { id: "f1", name: "Jinan" },
+      rows: [{ suppliers: [{ id: "f2" }], factories: [{ id: "f2" }] }],
+    });
+  });
+
+  it("never overwrites a factory key that is there (a table keyed by the stored value), and leaves values alone", () => {
+    const v = { supplier: "The supplier", factory: "taken off what we owe them", note: "supplier", at: new Date(0) };
+    expect(withBareOldNamesToo(v)).toEqual(v);
+  });
+
+  it("is not part of reading bodies or saved JSON: the bare word there may be a stored value's key", () => {
+    expect(withNewNames({ borneBy: { factory: "x" }, factory: { id: "f1" } })).toEqual({
+      borneBy: { factory: "x" },
+      factory: { id: "f1" },
+    });
+    expect(withOldNamesToo({ supplier: { id: "f1" } })).toEqual({ supplier: { id: "f1" } });
   });
 });

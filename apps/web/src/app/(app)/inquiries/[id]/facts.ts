@@ -23,6 +23,6 @@ export async function offerFactsOf(id: string): Promise<OfferFacts | Failed> {
     offers: s?.quotes.length ?? 0,
     asked: asked.length,
     answered: asked.length - waiting.length,
-    waiting: waiting.map((x) => ({ name: x.factory.name, replyBy: x.replyBy })),
+    waiting: waiting.map((x) => ({ name: x.supplier.name, replyBy: x.replyBy })),
   };
 }

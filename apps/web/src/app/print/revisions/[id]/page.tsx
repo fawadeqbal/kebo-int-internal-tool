@@ -121,7 +121,7 @@ export default async function QuotationPrint({
 
   // Each option: its lines and its own total. Subtotal and discount: always on the internal copy, on the customer's only when there is a discount.
   const groups = options.map((o) => ({
-    heading: single ? "" : `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.factory ? ` (${o.factory.name})` : ""}`,
+    heading: single ? "" : `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.supplier ? ` (${o.supplier.name})` : ""}`,
     rows: rowsOf(o),
     sums:
       internal || Number(o.discount)
@@ -180,7 +180,7 @@ export default async function QuotationPrint({
               title="Costing (internal)"
               head={single ? undefined : ["", ...options.map((o) => `Option ${o.letter}`)]}
               rows={[
-                ["Supplier", ...options.map((o) => o.factory?.name ?? "—")],
+                ["Supplier", ...options.map((o) => o.supplier?.name ?? "—")],
                 ["Supplier's Incoterm", ...options.map((o) => basisText(o.supplierBasis ?? null, o.supplierBasisPlace ?? null) ?? "—")],
                 ["Sales (after discount)", ...options.map((o) => (o.costing ? docMoney(o.costing.sales, c) : "—"))],
                 ...(options.some((o) => o.costing && o.costing.extraCostMinor > 0)

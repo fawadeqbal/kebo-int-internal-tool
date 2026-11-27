@@ -1,4 +1,4 @@
-import { isMobileApp, newName, withNewNames, withOldNamesToo } from "@kebo/shared";
+import { isMobileApp, newName, withBareOldNamesToo, withNewNames, withOldNamesToo } from "@kebo/shared";
 
 /**
  * The API's side of the old names (see @kebo/shared old-names): history rows saved before "factory" became
@@ -23,8 +23,14 @@ interface NamedResponse {
   json(body: unknown): unknown;
 }
 
-/** Says it reads the new names: `x-names: supplier`. Today's web does; no phone build does yet (the next release will). */
-const knowsNewNames = (headers: NamedRequest["headers"]): boolean => headers["x-names"] === "supplier";
+/**
+ * Says it reads the new names. `x-names: supplier`: the compound ones (`supplierId`), the web from 27 Nov.
+ * `x-names: supplier.2`: the bare word too (`supplier` for `factory`), the web from step B (28 Nov). No phone build
+ * says either yet (the next release will).
+ */
+const namesOf = (headers: NamedRequest["headers"]) => String(headers["x-names"] ?? "");
+const knowsNewNames = (headers: NamedRequest["headers"]): boolean => ["supplier", "supplier.2"].includes(namesOf(headers));
+const knowsBareNames = (headers: NamedRequest["headers"]): boolean => namesOf(headers) === "supplier.2";
 
 /** A phone app from before the change: the phone app's user agent, and no word that it knows the new names. */
 export const isOldPhone = (headers: NamedRequest["headers"]): boolean =>
@@ -50,9 +56,13 @@ export function oldNames() {
       for (const [key, v] of query) renamed.append(newName(key), v);
       req.url = `${req.url.slice(0, at)}?${renamed.toString()}`;
     }
-    if (!knowsNewNames(req.headers)) {
+    // The old twins in answers: the compound names for those who do not say they know them, and the bare word for
+    // those who do not say they know that (an old phone; the web of the day before, during a deploy).
+    const compound = !knowsNewNames(req.headers);
+    const bare = !knowsBareNames(req.headers);
+    if (compound || bare) {
       const json = res.json.bind(res);
-      res.json = (body: unknown) => json(withOldNamesToo(body));
+      res.json = (body: unknown) => json(bare ? withBareOldNamesToo(compound ? withOldNamesToo(body) : body) : withOldNamesToo(body));
     }
     next();
   };

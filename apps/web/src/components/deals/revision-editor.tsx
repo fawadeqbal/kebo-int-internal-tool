@@ -615,7 +615,7 @@ export function RevisionEditor({
     o.supplierQuoteId ? (offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId) ?? null) : null;
   const nameOf = (o: OptionState) => {
     const off = offerOf(o);
-    return o.supplierQuoteId ? (off ? shortName(off.factory.name) : "A removed offer") : "The customer's items";
+    return o.supplierQuoteId ? (off ? shortName(off.supplier.name) : "A removed offer") : "The customer's items";
   };
   const oursOf = (o: OptionState): OurTerms => ({
     leadDays: wholeOf(o.leadDays),
@@ -632,7 +632,7 @@ export function RevisionEditor({
     const c = totalsOf(o).costing;
     // What the supplier is paid: the option's cost without the costs to reach our basis (freight and the like).
     const supplierMinor = c.costMinor - c.extraCostMinor;
-    return { factory: shortName(off.factory.name), ...off.terms, costMinor: supplierMinor > 0 ? supplierMinor : null };
+    return { factory: shortName(off.supplier.name), ...off.terms, costMinor: supplierMinor > 0 ? supplierMinor : null };
   };
   const checksOf = (key: "payment" | "warranty") =>
     s.options.flatMap((o, i) => {
@@ -748,7 +748,7 @@ export function RevisionEditor({
                         />
                         <span className="w-4 shrink-0 font-bold">{on ? optionLetter(i) : ""}</span>
                         <span className="min-w-0 flex-1">
-                          <span className="block font-semibold">{off.factory.name}</span>
+                          <span className="block font-semibold">{off.supplier.name}</span>
                           <span className="block text-xs text-text-2">{facts.join(" · ")}</span>
                         </span>
                         <span className="shrink-0 font-semibold tabular">{t ? fmt(t.totals.total) : "—"}</span>
@@ -813,7 +813,7 @@ export function RevisionEditor({
                   <Notice key={o.supplierQuoteId ?? "items"} tone="todo">
                     Option {optionLetter(i)}
                     {o.supplierQuoteId
-                      ? ` (${offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.factory.name ?? "its offer"})`
+                      ? ` (${offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.supplier.name ?? "its offer"})`
                       : ""}{" "}
                     and the prices you set for it will be removed when you save.
                   </Notice>

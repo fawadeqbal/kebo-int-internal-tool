@@ -38,13 +38,13 @@ export async function OrderSide({ id }: { id: string }) {
   // The parts that could not be read, said once at the top (the rest works).
   const failed = failedWhat(peoplePart);
   const base = `/orders/${o.id}`;
-  const paid = (m?.factories?.rows ?? []).filter((r) => Number(r.owed) > 0 || Number(r.paid) > 0);
+  const paid = (m?.suppliers?.rows ?? []).filter((r) => Number(r.owed) > 0 || Number(r.paid) > 0);
   // Exact, as the order's own pages show them (whole units are for headline tiles only).
   const figures = [
     { label: "Order total", value: money(o.money.total, o.currency) },
     { label: "Received", value: money(o.money.received, o.currency) },
     { label: "Still due", value: money(o.money.due, o.currency) },
-    ...paid.map((r) => ({ label: paid.length > 1 ? `Paid to ${r.factory.name}` : "Paid to supplier", value: money(r.paid, r.currency) })),
+    ...paid.map((r) => ({ label: paid.length > 1 ? `Paid to ${r.supplier.name}` : "Paid to supplier", value: money(r.paid, r.currency) })),
   ];
   const dates = keyDates(o, flow, today());
   const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];

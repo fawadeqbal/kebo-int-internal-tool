@@ -352,7 +352,7 @@ async function changeOf(me: Me, p: PaymentView, expense: ExpenseView | null): Pr
   }
   if (p.kind === "supplier" && p.orderId) {
     const [m, people, settings] = await Promise.all([orderMoneyOf(p.orderId), getPeople(), getSettings()]);
-    const f = m.factories;
+    const f = m.suppliers;
     const x = f?.payments.find((y) => y.id === p.id);
     if (!f || !x || !f.canRecord) return null;
     return (

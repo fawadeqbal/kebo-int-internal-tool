@@ -297,7 +297,7 @@ async function payables(q: Q): Promise<SheetSpec> {
       text("Orders", 40),
     ],
     rows: rows.map((p): Cell[] => [
-      p.factory.name,
+      p.supplier.name,
       p.lookedAfterBy?.name ?? null,
       p.currency,
       num(p.owed),
@@ -489,7 +489,7 @@ async function expenses(q: Q): Promise<SheetSpec> {
       e.customer?.name ?? null,
       e.deal?.refNo ?? null,
       e.order?.refNo ?? null,
-      e.factory?.name ?? null,
+      e.supplier?.name ?? null,
       e.paidBy?.name ?? null,
       e.account?.name ?? null,
       e.currency,
@@ -630,7 +630,7 @@ async function quotation(q: Q): Promise<SheetSpec> {
       rows.push(
         pad([
           null,
-          `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.factory ? ` (${o.factory.name})` : ""}`,
+          `OPTION ${o.letter}${o.leadTime ? ` — delivery ${o.leadTime}` : ""}${internal && o.supplier ? ` (${o.supplier.name})` : ""}`,
         ]),
       );
     const extra = o.costing?.extraCostMinor ?? 0;

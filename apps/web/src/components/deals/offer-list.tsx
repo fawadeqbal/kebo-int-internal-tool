@@ -51,7 +51,7 @@ const Best = ({ children }: { children: ReactNode }) => (
 export function OfferCompare({ view, status, dealId, waiting }: { view: SourcingView; status: (q: SupplierQuoteView) => ReactNode; dealId: string; waiting: string[] }) {
   const offers = view.quotes.filter((q) => q.lines.length);
   if (offers.length < 2)
-    return <p className="px-5 py-8 text-center text-sm text-text-2">Compare needs two offers with their items{offers.length === 1 ? `; so far only ${offers[0]!.factory.name}'s` : ""}.</p>;
+    return <p className="px-5 py-8 text-center text-sm text-text-2">Compare needs two offers with their items{offers.length === 1 ? `; so far only ${offers[0]!.supplier.name}'s` : ""}.</p>;
   const fig = new Map(offers.map((q) => [q.id, offerFigures(q)]));
   const one = new Set(offers.map((q) => q.currency)).size === 1;
   const foreign = offers.some((q) => q.currency !== view.currency);
@@ -100,7 +100,7 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
           {offers.map((q) => (
             <div key={q.id} className={cn(cell, "bg-surface-2/40")}>
               <Link href={`/inquiries/${dealId}/offers/${q.id}`} className="block font-bold text-text hover:text-primary">
-                {q.factory.name}
+                {q.supplier.name}
               </Link>
               <span className="mt-1 block">{status(q)}</span>
             </div>

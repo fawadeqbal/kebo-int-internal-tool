@@ -20,7 +20,7 @@ describe("the web's calls to the API", () => {
     await apiFetch("/history", { headers: { "x-names": "factory" } });
     expect(fetch).toHaveBeenCalledTimes(3);
     for (const [, init] of fetch.mock.calls as unknown as [string, RequestInit][]) {
-      expect(new Headers(init.headers).get("x-names")).toBe("supplier");
+      expect(new Headers(init.headers).get("x-names")).toBe("supplier.2");
     }
   });
 });

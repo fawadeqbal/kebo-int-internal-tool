@@ -604,7 +604,7 @@ function MakeWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { typ
   const stepHref = `${orderBase}/${STEP_PATH[p.step]}`;
   const stepWord = FLOW_STEP_LABEL[p.step];
   const named = [p.label, p.number ?? p.refNo].filter(Boolean).join(" ");
-  const forWhom = p.buyer?.buyer.name ?? p.factories?.find((f) => f.id === p.ref)?.name ?? props.order.customer;
+  const forWhom = p.buyer?.buyer.name ?? p.suppliers?.find((f) => f.id === p.ref)?.name ?? props.order.customer;
 
   const send = useOrderPair(
     props,
@@ -632,9 +632,9 @@ function MakeWindow(props: OrderWindowProps & { doc: Extract<OrderDocItem, { typ
     <div className="flex flex-col gap-4">
       {error && <Notice tone="bad">{error}</Notice>}
       {notice && <Notice tone="ok">{notice}</Notice>}
-      {p.factories && p.factories.length > 1 && (
+      {p.suppliers && p.suppliers.length > 1 && (
         <nav aria-label="Supplier" className="flex flex-wrap gap-1.5">
-          {p.factories.map((f) => (
+          {p.suppliers.map((f) => (
             <Link
               key={f.id}
               href={orderWindowHref(p.orderId, p.kind, { ref: f.id, back: props.back })}

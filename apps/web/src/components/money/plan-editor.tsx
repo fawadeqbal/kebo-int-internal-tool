@@ -333,13 +333,13 @@ export function SupplierPlanWindow({
   return (
     <PlanEditWindow
       label={label}
-      title={`Supplier payment plan · ${plan.factory.name}`}
+      title={`Supplier payment plan · ${plan.supplier.name}`}
       sub={sub}
       create={plan.rows.length === 0}
       editor={{
         intro: (
           <>
-            Payable to {plan.factory.name}: <b className="font-semibold text-text tabular">{money(plan.owed, c)}</b>.
+            Payable to {plan.supplier.name}: <b className="font-semibold text-text tabular">{money(plan.owed, c)}</b>.
             {Number(plan.paid) > 0 && (
               <>
                 {" "}
@@ -382,7 +382,7 @@ export function SupplierPlanWindow({
                 : null,
         action,
         toPayload: (parts) => ({
-          supplierId: plan.factory.id,
+          supplierId: plan.supplier.id,
           items: parts.map((p) => {
             const share = num(p.share);
             return {

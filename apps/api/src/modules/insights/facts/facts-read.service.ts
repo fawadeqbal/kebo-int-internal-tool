@@ -470,11 +470,11 @@ export class FactsReadService {
              count(*) filter (where jsonb_array_length(f.open_parts) > 0)::int as "rows"
       from ${table} f where ${scope}`;
     const total = Object.keys(buckets).reduce((s, k) => s + toMinor(t![k]!), 0);
-    let rows: { orderId: string; refNo: string; customer: string; factory: string | null; amount: string }[] | null = null;
+    let rows: { orderId: string; refNo: string; customer: string; supplier: string | null; amount: string }[] | null = null;
     if (q.bucket) {
-      const list = await this.prisma.db.$queryRaw<{ orderId: string; refNo: string; customer: string; factory: string | null; amount: string }[]>`
+      const list = await this.prisma.db.$queryRaw<{ orderId: string; refNo: string; customer: string; supplier: string | null; amount: string }[]>`
         select f.order_id as "orderId", o.ref_no as "refNo", c.name as customer,
-               ${q.side === "payable" ? Prisma.sql`(select x.name from parties x where x.id = f.factory_id)` : Prisma.sql`null::text`} as factory,
+               ${q.side === "payable" ? Prisma.sql`(select x.name from parties x where x.id = f.factory_id)` : Prisma.sql`null::text`} as supplier,
                ${buckets[q.bucket]}::text as amount
         from ${table} f join orders o on o.id = f.order_id join parties c on c.id = o.customer_id
         where ${scope} and ${buckets[q.bucket]} > 0
@@ -524,14 +524,14 @@ export class FactsReadService {
             from expenses e where e.voided_at is null and e.spent_on between ${from}::date and ${to}::date`
         : Promise.resolve([]),
     ]);
-    const months = new Map<string, { in: number; factories: number; expenses: number; company: number }>();
+    const months = new Map<string, { in: number; suppliers: number; expenses: number; company: number }>();
     const month = (m: string) => {
       let x = months.get(m);
-      if (!x) months.set(m, (x = { in: 0, factories: 0, expenses: 0, company: 0 }));
+      if (!x) months.set(m, (x = { in: 0, suppliers: 0, expenses: 0, company: 0 }));
       return x;
     };
     for (const p of payments) month(p.m).in += fx.order(Math.round(Number(p.minor)), p);
-    for (const p of supplierPaid) month(p.m).factories += fx.order(convert(Math.round(Number(p.minor)), Number(p.rate)), p);
+    for (const p of supplierPaid) month(p.m).suppliers += fx.order(convert(Math.round(Number(p.minor)), Number(p.rate)), p);
     const kinds = new Map<string, { minor: number; orders: Set<string> }>();
     for (const e of expenses) {
       const v = convert(Math.round(Number(e.minor)), Number(e.rate));
@@ -554,11 +554,11 @@ export class FactsReadService {
         .map(([m, x]) => ({
           month: m,
           in: fromMinor(x.in),
-          out: seeMoney ? fromMinor(x.factories + x.expenses) : null,
-          factories: seeMoney ? fromMinor(x.factories) : null,
+          out: seeMoney ? fromMinor(x.suppliers + x.expenses) : null,
+          suppliers: seeMoney ? fromMinor(x.suppliers) : null,
           expenses: seeExpenses ? fromMinor(x.expenses) : null,
           company: seeExpenses ? fromMinor(x.company) : null,
-          net: seeMoney ? fromMinor(x.in - x.factories - x.expenses) : null,
+          net: seeMoney ? fromMinor(x.in - x.suppliers - x.expenses) : null,
         })),
       byKind: seeExpenses
         ? [...kinds.entries()].map(([category, k]) => ({ category, amount: fromMinor(k.minor), orders: k.orders.size })).sort((a, b) => toMinor(b.amount) - toMinor(a.amount))
@@ -762,9 +762,9 @@ export class FactsReadService {
   /** When the tables were last worked out, what is still queued, and how many rows they hold. */
   async status(user: SessionUser) {
     if (!can(user, "reports.view")) throw new ForbiddenError("Only managers can see insights.");
-    const [r] = await this.prisma.db.$queryRaw<{ orders: number; inquiries: number; factories: number; computedAt: Date | null; pending: number }[]>`
+    const [r] = await this.prisma.db.$queryRaw<{ orders: number; inquiries: number; suppliers: number; computedAt: Date | null; pending: number }[]>`
       select (select count(*) from order_facts)::int as orders, (select count(*) from inquiry_facts)::int as inquiries,
-             (select count(*) from factory_order_facts)::int as factories,
+             (select count(*) from factory_order_facts)::int as suppliers,
              greatest((select max(computed_at) from order_facts), (select max(computed_at) from inquiry_facts)) as "computedAt",
              (select count(*) from facts_queue)::int as pending`;
     return r!;

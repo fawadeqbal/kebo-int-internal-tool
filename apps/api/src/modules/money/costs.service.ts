@@ -348,7 +348,7 @@ export class CostsService {
         spentOn: fromDbDate(e.spentOn),
         step: (e.step as FlowStep | null) ?? null,
         borneBy: e.borneBy as ExpenseBearer,
-        factory: e.supplier,
+        supplier: e.supplier,
         paidBy: e.paidBy,
         account: e.account,
         ownMoney: e.ownMoney,
@@ -371,7 +371,7 @@ export class CostsService {
               /** The part of the sale whose lines have a cost (profit is worked out on it), and the rest. */
               sale: fromMinor(costing.costedRevenueMinor),
               uncosted: fromMinor(costing.uncostedRevenueMinor),
-              factory: fromMinor(costing.goodsCostMinor),
+              supplier: fromMinor(costing.goodsCostMinor),
               supplierOwed: [...supplierOwed].map(([currency, f]) => ({ currency, amount: fromMinor(f.owed), toPay: fromMinor(f.toPay) })),
               planned: fromMinor(plan.plannedMinor),
               notPlanned: fromMinor(plan.notPlannedMinor),

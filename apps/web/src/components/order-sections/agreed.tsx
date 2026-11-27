@@ -118,7 +118,7 @@ export function sideBySide(o: OrderView, m: OrderMoney | null): SideTable[] {
   const ourBasis = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
   const ourWarranty = a.warrantyMonths !== null ? `${plural(a.warrantyMonths, "month")} from ${WARRANTY_FROM_LABEL[isWarrantyFrom(a.warrantyFrom) ? a.warrantyFrom : "shipment"]}` : a.warranty;
   return o.supplierTerms.map((f) => {
-    const name = shortName(f.factory.name);
+    const name = shortName(f.supplier.name);
     const t = f.terms;
     const theirs: TheirTerms = {
       factory: name,

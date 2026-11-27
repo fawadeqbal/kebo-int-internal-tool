@@ -60,7 +60,7 @@ export class CancelOrderService {
           where: { purchaseOrderId: id, ...livePurchase },
           include: { movement: { include: { party: { select: { id: true, name: true } } } } },
         })
-      ).map((a) => ({ supplierId: a.movement.partyId!, factory: a.movement.party!, currency: a.movement.currency, amount: a.share }));
+      ).map((a) => ({ supplierId: a.movement.partyId!, supplier: a.movement.party!, currency: a.movement.currency, amount: a.share }));
       const customerMoney = inMinor > 0 ? (money.customerMoney ?? "credit") : null;
       const supplierMoney = supplierPaid.length ? (money.supplierMoney ?? "refund_due") : null;
       const posted: LedgerRef[] = [{ type: "order_all", id }];
@@ -92,10 +92,10 @@ export class CancelOrderService {
       }
       if (supplierMoney === "loss") {
         // One expense per supplier and currency, borne by us (no account: the money already left with the supplier payment).
-        const byKey = new Map<string, { factory: { id: string; name: string }; currency: string; minor: number }>();
+        const byKey = new Map<string, { supplier: { id: string; name: string }; currency: string; minor: number }>();
         for (const p of supplierPaid) {
           const k = `${p.supplierId}:${p.currency}`;
-          const cur = byKey.get(k) ?? { factory: p.factory, currency: p.currency, minor: 0 };
+          const cur = byKey.get(k) ?? { supplier: p.supplier, currency: p.currency, minor: 0 };
           cur.minor += decimalToMinor(p.amount);
           byKey.set(k, cur);
         }
@@ -108,11 +108,11 @@ export class CancelOrderService {
               orderId: id,
               customerId: o.customerId,
               inquiryId: o.inquiryId,
-              supplierId: x.factory.id,
+              supplierId: x.supplier.id,
               category: "other",
               step: "factory",
               borneBy: "us",
-              description: `Paid to ${x.factory.name}, lost when ${o.refNo} was cancelled`.slice(0, 200),
+              description: `Paid to ${x.supplier.name}, lost when ${o.refNo} was cancelled`.slice(0, 200),
               amount: fromMinor(x.minor),
               currency: x.currency,
               rate,

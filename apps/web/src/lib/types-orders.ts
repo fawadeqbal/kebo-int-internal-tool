@@ -160,10 +160,10 @@ export interface OrderView {
   /** The proforma's number once issued (KEB260916TN07); null while it is a draft. */
   proforma: { number: string; issuedOn: string | null } | null;
   /** The chosen supplier's own quotation, catalogue and screenshots (people who see supplier prices). */
-  supplierFiles: (OfferFile & { factory: string })[];
+  supplierFiles: (OfferFile & { supplier: string })[];
   /** What each supplier gives, beside what was agreed with the customer (people who see supplier prices). */
   supplierTerms?: {
-    factory: { id: string; name: string };
+    supplier: { id: string; name: string };
     offer: { id: string; reference: string | null; receivedOn: string };
     basis: Incoterm | null;
     basisPlace: string | null;
@@ -236,7 +236,7 @@ export interface OrderLineView {
   unitPrice: string;
   lineTotal: string;
   /** The supplier it was quoted from, when known. */
-  factory: { id: string; name: string } | null;
+  supplier: { id: string; name: string } | null;
   /** The papers' customs side: the customer's and China's HS codes (China's empty: the same), the item in Chinese and who wrote it. */
   customs: { hsCode: string | null; hsCodeCn: string | null; descriptionZh: string | null; zhBy: "machine" | "staff" | null };
   receivedQty: string;
@@ -512,7 +512,7 @@ export interface RevisionDoc {
     id: string;
     letter: string;
     status: "open" | "accepted" | "not_chosen";
-    factory: { id: string; name: string } | null;
+    supplier: { id: string; name: string } | null;
     leadTime: string | null;
     subtotal: string;
     discount: string;
