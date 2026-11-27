@@ -49,6 +49,9 @@ describe("the Money pages that became “To receive and to pay”", () => {
     expect(companyCostsTarget()).toBe("/money/company-costs");
     expect(companyCostsTarget({ p: "2026-10", category: "rent" })).toBe("/money/company-costs?p=2026-10&kind=rent");
     expect(companyCostsTarget({ p: "2026", customer: "c1", kind: "general" })).toBe("/money/company-costs");
+    // A month that does not exist is not kept: the page opens on this month.
+    expect(companyCostsTarget({ p: "2025-13" })).toBe("/money/company-costs");
+    expect(companyCostsTarget({ month: "2025-11" })).toBe("/money/company-costs?p=2025-11");
   });
 
   it("a payment request and an order's invoice open the order's Payment tab", () => {
