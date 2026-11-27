@@ -87,7 +87,7 @@ const INQUIRY: TableSpec = {
   daily: [],
 };
 
-const FACTORY: TableSpec = {
+const SUPPLIER: TableSpec = {
   table: "factory_order_facts",
   key: ["order_id", "factory_id"],
   columns: {
@@ -127,7 +127,7 @@ export interface FactDifference {
 export interface RebuildReport {
   orders: number;
   inquiries: number;
-  factoryRows: number;
+  supplierRows: number;
   differences: FactDifference[];
 }
 
@@ -254,7 +254,7 @@ export class FactsService implements OnModuleDestroy {
     return { done, left: await this.pending() };
   }
 
-  /** Work these orders out again now (and their order × factory rows). */
+  /** Work these orders out again now (and their order × supplier rows). */
   async refreshOrders(ids: string[]) {
     await this.locked(async (tx) => this.refreshIn(tx, await this.ctx(tx), ids, []));
   }
@@ -274,7 +274,7 @@ export class FactsService implements OnModuleDestroy {
       const ids = orders.slice(i, i + BATCH);
       const rows = await orderFactsOf(tx, ids, ctx);
       await this.sync(tx, ORDER, rows.orders, Prisma.sql`order_id = any(${ids}::uuid[])`);
-      await this.sync(tx, FACTORY, rows.factories, Prisma.sql`order_id = any(${ids}::uuid[])`);
+      await this.sync(tx, SUPPLIER, rows.factories, Prisma.sql`order_id = any(${ids}::uuid[])`);
     }
     const inquiries = [...new Set(inquiryIds)];
     for (let i = 0; i < inquiries.length; i += BATCH) {
@@ -294,14 +294,14 @@ export class FactsService implements OnModuleDestroy {
     const orderIds = (await db.order.findMany({ select: { id: true }, orderBy: [{ orderedOn: "asc" }, { id: "asc" }] })).map((o) => o.id);
     const inquiryIds = (await db.inquiry.findMany({ where: { deletedAt: null }, select: { id: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })).map((i) => i.id);
     const differences: FactDifference[] = [];
-    let factoryRows = 0;
+    let supplierRows = 0;
     for (let i = 0; i < orderIds.length; i += BATCH) {
       const ids = orderIds.slice(i, i + BATCH);
       await this.locked(async (tx) => {
         const rows = await orderFactsOf(tx, ids, await this.ctx(tx));
-        factoryRows += rows.factories.length;
+        supplierRows += rows.factories.length;
         differences.push(...(await this.sync(tx, ORDER, rows.orders, Prisma.sql`order_id = any(${ids}::uuid[])`)));
-        differences.push(...(await this.sync(tx, FACTORY, rows.factories, Prisma.sql`order_id = any(${ids}::uuid[])`)));
+        differences.push(...(await this.sync(tx, SUPPLIER, rows.factories, Prisma.sql`order_id = any(${ids}::uuid[])`)));
       });
     }
     for (let i = 0; i < inquiryIds.length; i += BATCH) {
@@ -321,11 +321,11 @@ export class FactsService implements OnModuleDestroy {
       if (orphans.length) {
         const rows = await orderFactsOf(tx, orphans, await this.ctx(tx));
         differences.push(...(await this.sync(tx, ORDER, rows.orders, Prisma.sql`order_id = any(${orphans}::uuid[])`)));
-        differences.push(...(await this.sync(tx, FACTORY, rows.factories, Prisma.sql`order_id = any(${orphans}::uuid[])`)));
+        differences.push(...(await this.sync(tx, SUPPLIER, rows.factories, Prisma.sql`order_id = any(${orphans}::uuid[])`)));
       }
       if (started !== null) await tx.$executeRaw`delete from facts_queue where seq <= ${started}`;
     });
-    const report = { orders: orderIds.length, inquiries: inquiryIds.length, factoryRows, differences };
+    const report = { orders: orderIds.length, inquiries: inquiryIds.length, supplierRows, differences };
     if (log && differences.length) {
       const company = CompanyContext.require();
       const shown = differences.slice(0, 20).map((d) =>

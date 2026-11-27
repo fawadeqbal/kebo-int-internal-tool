@@ -6,13 +6,13 @@ import { Clock } from "../src/common/time/clock.service";
 
 /**
  * Single source of truth, PR 4: plans follow the dates.
- *  - one ready date per factory (owner, 3 Nov 2026): each factory's PO, its plan's "on the ready date" part and
+ *  - one ready date per supplier (owner, 3 Nov 2026): each supplier's PO, its plan's "on the ready date" part and
  *    its production item read its own date; the order's ready date is the latest of them;
  *  - the customer's plan has due rules worked out live (on_ready, on_ship_plus_days, after_papers, fixed);
  *    a date typed by hand is fixed and stays;
  *  - rebuilding the plan from a new route keeps the instalments changed by hand; names come from amounts;
  *  - the order starts on the route the quotation's terms imply ("from the quotation");
- *  - a factory's offer says its advance %: it seeds the factory's plan and is printed on the PO;
+ *  - a supplier's offer says its advance %: it seeds the supplier's plan and is printed on the PO;
  *  - a payment's kind is what it pays (deposit while open, else balance); only "other" is kept as sent.
  */
 describe("plans follow the dates", () => {
@@ -27,9 +27,9 @@ describe("plans follow the dates", () => {
   const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
   const day = (n: number) => addDays(today, n);
 
-  /** A new deal from one factory's offer, quoted on these terms and accepted: its order (dated back, out of this month's reports). */
+  /** A new deal from one supplier's offer, quoted on these terms and accepted: its order (dated back, out of this month's reports). */
   const newOrder = async (o: { balanceTerms?: string; advancePercent?: number | null } = {}) => {
-    const factoryId = (await api(app, sana).post("/factories", { name: `Plan Works ${Math.random().toString(36).slice(2, 7)} ${tag}`, address: "Wenzhou" }).expect(201)).body
+    const supplierId = (await api(app, sana).post("/factories", { name: `Plan Works ${Math.random().toString(36).slice(2, 7)} ${tag}`, address: "Wenzhou" }).expect(201)).body
       .id as string;
     const inquiry = (
       await api(app, sana)
@@ -39,7 +39,7 @@ describe("plans follow the dates", () => {
     const items = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items as { id: string }[];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-80),
         currency: "CNY",
         taxRate: 0,
@@ -70,14 +70,14 @@ describe("plans follow the dates", () => {
     const order = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0];
     await prisma.platform.$executeRaw`update orders set ordered_on = ordered_on - 75 where id = ${order.id}::uuid`;
     await prisma.platform.$executeRaw`update inquiries set closed_at = closed_at - interval '75 days' where id = ${inquiry.id}::uuid`;
-    return { id: order.id as string, refNo: order.refNo as string, factoryId };
+    return { id: order.id as string, refNo: order.refNo as string, supplierId };
   };
-  /** The order's second line moved to another factory (as an order bought from two factories). */
-  const secondFactory = async (orderId: string) => {
+  /** The order's second line moved to another supplier (as an order bought from two suppliers). */
+  const secondSupplier = async (orderId: string) => {
     const id = (await api(app, sana).post("/factories", { name: `Second Works ${tag} ${Math.random().toString(36).slice(2, 6)}`, address: "Ningbo" }).expect(201)).body
       .id as string;
     const lines = await prisma.platform.orderLine.findMany({ where: { orderId }, orderBy: { sortOrder: "asc" } });
-    await prisma.platform.orderLine.update({ where: { id: lines[1]!.id }, data: { factoryId: id } });
+    await prisma.platform.orderLine.update({ where: { id: lines[1]!.id }, data: { supplierId: id } });
     return id;
   };
   const order = async (id: string) => (await api(app, sana).get(`/orders/${id}`).expect(200)).body;
@@ -109,40 +109,40 @@ describe("plans follow the dates", () => {
 
   it("keeps one ready date per factory: each factory's plan, PO and production item use its own; the order's is the latest", async () => {
     const o = await newOrder();
-    const b = await secondFactory(o.id);
-    await api(app, sana).patch(`/orders/${o.id}/factory-order`, { factoryOrderedOn: day(-10) }).expect(200);
-    // Only the first factory has said: the order's ready date is not known yet.
-    await details(o.id, { readyBy: [{ factoryId: o.factoryId, readyOn: day(20) }] });
+    const b = await secondSupplier(o.id);
+    await api(app, sana).patch(`/orders/${o.id}/factory-order`, { supplierOrderedOn: day(-10) }).expect(200);
+    // Only the first supplier has said: the order's ready date is not known yet.
+    await details(o.id, { readyBy: [{ supplierId: o.supplierId, readyOn: day(20) }] });
     let ord = await order(o.id);
     expect(ord.readyOn).toBeNull();
     expect(ord.readyBy).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ factoryId: o.factoryId, readyOn: day(20) }),
-        expect.objectContaining({ factoryId: b, readyOn: null }),
+        expect.objectContaining({ supplierId: o.supplierId, readyOn: day(20) }),
+        expect.objectContaining({ supplierId: b, readyOn: null }),
       ]),
     );
-    // One factory has not said yet: the order has no ready date.
+    // One supplier has not said yet: the order has no ready date.
     expect((await production(o.id)).word).toBe("Not started");
-    // The second factory says later: the order's ready date is the latest.
-    await details(o.id, { readyBy: [{ factoryId: b, readyOn: day(40) }] });
+    // The second supplier says later: the order's ready date is the latest.
+    await details(o.id, { readyBy: [{ supplierId: b, readyOn: day(40) }] });
     ord = await order(o.id);
     expect(ord.readyOn).toBe(day(40));
     expect((await production(o.id)).word).toMatch(/^Ready /);
     expect((await flow(o.id)).factory.readyBy).toHaveLength(2);
 
-    // Each factory's plan: its balance is due on its own ready date.
+    // Each supplier's plan: its balance is due on its own ready date.
     const m = await money(o.id);
     const planOf = (id: string) => m.factories.plans.find((p: { factory: { id: string } }) => p.factory.id === id);
-    expect(planOf(o.factoryId)).toMatchObject({ readyOn: day(20) });
-    expect(planOf(o.factoryId).rows.find((r: { dueRule: string }) => r.dueRule === "on_ready").due).toBe(day(20));
+    expect(planOf(o.supplierId)).toMatchObject({ readyOn: day(20) });
+    expect(planOf(o.supplierId).rows.find((r: { dueRule: string }) => r.dueRule === "on_ready").due).toBe(day(20));
     expect(planOf(b).rows.find((r: { dueRule: string }) => r.dueRule === "on_ready").due).toBe(day(40));
-    // Each factory's PO prints its own ready date.
-    expect(JSON.stringify((await poDoc(o.id, o.factoryId)).meta)).toContain(day(20));
+    // Each supplier's PO prints its own ready date.
+    expect(JSON.stringify((await poDoc(o.id, o.supplierId)).meta)).toContain(day(20));
     expect(JSON.stringify((await poDoc(o.id, b)).meta)).toContain(day(40));
     // The customer's balance before shipment follows the order's (the latest).
     expect((await plan(o.id))[1]).toMatchObject({ dueRule: "on_ready", dueOn: day(40) });
 
-    // One date for all (the phone app, the stage move): every factory gets it.
+    // One date for all (the phone app, the stage move): every supplier gets it.
     await details(o.id, { readyOn: day(30) });
     ord = await order(o.id);
     expect(ord.readyBy.map((r: { readyOn: string }) => r.readyOn)).toEqual([day(30), day(30)]);
@@ -245,11 +245,11 @@ describe("plans follow the dates", () => {
       ["Deposit 50%", "6000.00"],
       ["Balance 50%", "6000.00"],
     ]);
-    await api(app, sana).patch(`/orders/${o.id}/factory-order`, { factoryOrderedOn: day(-3) }).expect(200);
+    await api(app, sana).patch(`/orders/${o.id}/factory-order`, { supplierOrderedOn: day(-3) }).expect(200);
     m = await money(o.id);
     expect(m.factories.plans[0]).toMatchObject({ saved: true });
     expect(m.factories.plans[0].rows[0]).toMatchObject({ label: "Deposit 50%", amount: "6000.00", dueRule: "on_order" });
-    expect(JSON.stringify((await poDoc(o.id, o.factoryId)).bullets)).toMatch(/Payment: Deposit 50%, CNY 6,000\.00, when we order/);
+    expect(JSON.stringify((await poDoc(o.id, o.supplierId)).bullets)).toMatch(/Payment: Deposit 50%, CNY 6,000\.00, when we order/);
     // An offer that says nothing takes the company's default (30%), stored on the offer.
     const d = await newOrder();
     m = await money(d.id);

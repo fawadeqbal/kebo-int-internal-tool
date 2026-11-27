@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { asSupplierPayment, createSupplierPayment, fromDbDate, isSupplier, liveFile, purchasePart, supplierPayment, toDbDate } from "@kebo/database";
 import { formatMinor, fxRate, toMinor } from "@kebo/money";
-import { can, type FactoryPaymentInput } from "@kebo/shared";
+import { can, type SupplierPaymentInput } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import type { Prisma } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
@@ -57,62 +57,62 @@ export class SupplierPaymentsService {
 
 
   /**
-   * The currencies we owe a factory in on this order (its offers' currencies).
+   * The currencies we owe a supplier in on this order (its offers' currencies).
    * A payment only counts against what we owe in the same currency, so a
    * payment in another one would leave the debt standing: refused.
    */
-  private async checkFactoryCurrency(orderId: string, factory: { id: string; name: string }, currency: string, keep?: string) {
+  private async checkSupplierCurrency(orderId: string, supplier: { id: string; name: string }, currency: string, keep?: string) {
     if (keep && keep === currency) return;
-    const lines = await this.prisma.db.orderLine.findMany({ where: { orderId, factoryId: factory.id }, select: { factoryCurrency: true } });
-    const owedIn = [...new Set(lines.map((l) => l.factoryCurrency).filter((c): c is string => !!c))];
+    const lines = await this.prisma.db.orderLine.findMany({ where: { orderId, supplierId: supplier.id }, select: { supplierCurrency: true } });
+    const owedIn = [...new Set(lines.map((l) => l.supplierCurrency).filter((c): c is string => !!c))];
     if (owedIn.length && !owedIn.includes(currency)) {
       throw new DomainError(
-        `We owe ${factory.name} in ${owedIn.join(" and ")}. Record the payment in ${owedIn[0]}: a payment in ${currency} would not count against what we owe. If you sent ${currency}, enter the ${owedIn[0]} amount the supplier received.`,
+        `We owe ${supplier.name} in ${owedIn.join(" and ")}. Record the payment in ${owedIn[0]}: a payment in ${currency} would not count against what we owe. If you sent ${currency}, enter the ${owedIn[0]} amount the supplier received.`,
       );
     }
   }
 
-  private async factoryPaymentData(
+  private async supplierPaymentData(
     o: { id: string; currency: string },
-    input: FactoryPaymentInput,
+    input: SupplierPaymentInput,
     keepCurrency?: string,
     keepAccount?: string | null,
   ) {
     if (input.paidOn > this.clock.today()) throw new DomainError("The payment date cannot be in the future.");
-    const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null } });
+    const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.supplierId, deletedAt: null } });
     if (!f) throw new DomainError("That supplier was removed. Choose another one.");
-    await this.checkFactoryCurrency(o.id, f, input.currency, keepCurrency);
+    await this.checkSupplierCurrency(o.id, f, input.currency, keepCurrency);
     return {
-      factoryId: f.id,
+      supplierId: f.id,
       kind: input.kind,
       amount: input.amount,
       currency: input.currency,
       rate: await this.rateFor(input.currency, o.currency, input.rate),
       paidOn: toDbDate(input.paidOn),
       method: input.method,
-      // The person who looks after the factory pays it, unless someone else is named.
+      // The person who looks after the supplier pays it, unless someone else is named.
       paidById: (await this.activePerson(input.paidById)) ?? f.ownerId,
       reference: input.reference,
       note: input.note,
       accountId: await checkAccount(this.prisma.db, input.accountId, input.currency, keepAccount, await this.limits.allows("cash_book")),
-      factoryName: f.name,
+      supplierName: f.name,
     };
   }
 
-  async recordFactoryPayment(user: SessionUser, orderId: string, input: FactoryPaymentInput) {
+  async recordSupplierPayment(user: SessionUser, orderId: string, input: SupplierPaymentInput) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can record payments.");
     const o = await this.orders.load(user, orderId);
     if (o.status === "cancelled") throw new DomainError("This order is cancelled.");
-    const { factoryName, ...data } = await this.factoryPaymentData(o, input);
+    const { supplierName, ...data } = await this.supplierPaymentData(o, input);
     const createdId = await this.prisma.tx(async (tx) => {
-      const { factoryId, paidOn, ...rest } = data;
-      const created = await createSupplierPayment(tx, { ...rest, orderId, orderCurrency: o.currency, supplierId: factoryId, paidOn, recordedById: user.id });
+      const { supplierId, paidOn, ...rest } = data;
+      const created = await createSupplierPayment(tx, { ...rest, orderId, orderCurrency: o.currency, supplierId: supplierId, paidOn, recordedById: user.id });
       await this.audit.record(tx, {
         userId: user.id,
         action: "payment_out",
         entityType: "order",
         entityId: orderId,
-        summary: `${o.refNo}: paid ${factoryName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
+        summary: `${o.refNo}: paid ${supplierName} ${input.currency} ${data.amount}${input.reference ? ` (${input.reference})` : ""}`,
       });
       await this.ledger.post(tx, [{ type: "movement", id: created.movementId }, { type: "order", id: orderId }], { userId: user.id });
       // Our bank's charge for sending it: the order's own cost, paid from the same account on the same day.
@@ -127,7 +127,7 @@ export class SupplierPaymentsService {
             customerId: o.customerId,
             inquiryId: o.inquiryId,
             category: "bank_charges",
-            description: `Bank charges on paying ${factoryName}`,
+            description: `Bank charges on paying ${supplierName}`,
             amount: charges.toFixed(2),
             currency: input.currency,
             rate,
@@ -147,7 +147,7 @@ export class SupplierPaymentsService {
     return { orderId, createdId };
   }
 
-  private async findFactoryPayment(user: SessionUser, id: string) {
+  private async findSupplierPayment(user: SessionUser, id: string) {
     if (!can(user, "payments.record")) throw new ForbiddenError("Only accounts (managers) can change payments.");
     // The payment on the order (its part), or its entry.
     const part = await this.prisma.db.allocation.findFirst({
@@ -161,23 +161,23 @@ export class SupplierPaymentsService {
     return { p, o };
   }
 
-  /** Changing a recorded factory payment always says why. */
-  async editFactoryPayment(user: SessionUser, id: string, input: FactoryPaymentInput) {
-    const { p, o } = await this.findFactoryPayment(user, id);
+  /** Changing a recorded supplier payment always says why. */
+  async editSupplierPayment(user: SessionUser, id: string, input: SupplierPaymentInput) {
+    const { p, o } = await this.findSupplierPayment(user, id);
     const reason = requireReason(input.reason, "payment", "a recorded payment changes");
     // A payment already recorded in another currency (before this rule) may keep it.
-    const { factoryName, ...data } = await this.factoryPaymentData(
+    const { supplierName, ...data } = await this.supplierPaymentData(
       o,
       { ...input, rate: this.keptRate(input, p) },
-      p.factoryId === input.factoryId ? p.currency : undefined,
+      p.supplierId === input.supplierId ? p.currency : undefined,
       p.accountId,
     );
     await this.prisma.tx(async (tx) => {
-      const counts = supplierPayment({ ...data, supplierId: data.factoryId, orderId: o.id, orderCurrency: o.currency, recordedById: user.id });
+      const counts = supplierPayment({ ...data, supplierId: data.supplierId, orderId: o.id, orderCurrency: o.currency, recordedById: user.id });
       await tx.moneyMovement.update({
         where: { id: p.movementId },
         data: {
-          partyId: data.factoryId,
+          partyId: data.supplierId,
           amount: data.amount,
           currency: data.currency,
           rate: data.rate,
@@ -196,7 +196,7 @@ export class SupplierPaymentsService {
         action: "payment_out_edit",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: changed the payment to ${factoryName}`,
+        summary: `${o.refNo}: changed the payment to ${supplierName}`,
         oldValues: {
           factory: p.factory.name,
           amount: `${formatMinor(toMinor(p.amount), p.currency)}`,
@@ -207,7 +207,7 @@ export class SupplierPaymentsService {
         newValues: {
           // Its page reads its own changes by this (the order's history keeps them too).
           paymentId: p.id,
-          factory: factoryName,
+          factory: supplierName,
           amount: `${formatMinor(toMinor(data.amount), data.currency)}`,
           paidOn: input.paidOn,
           rate: data.rate,
@@ -221,8 +221,8 @@ export class SupplierPaymentsService {
   }
 
   /** A payment recorded by mistake: it stays listed, crossed out. */
-  async voidFactoryPayment(user: SessionUser, id: string, reason: string) {
-    const { p, o } = await this.findFactoryPayment(user, id);
+  async voidSupplierPayment(user: SessionUser, id: string, reason: string) {
+    const { p, o } = await this.findSupplierPayment(user, id);
     await this.prisma.tx(async (tx) => {
       const now = new Date();
       await tx.moneyMovement.update({ where: { id: p.movementId }, data: { voidedAt: now, voidReason: reason } });

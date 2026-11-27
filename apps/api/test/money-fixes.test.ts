@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import bcrypt from "bcryptjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FIRST_COMPANY_ID, seedCompanyBase } from "@kebo/database";
-import { factoryUnitCostMinor, multiplyMinor, toMinor, withTaxMinor } from "@kebo/money";
+import { supplierUnitCostMinor, multiplyMinor, toMinor, withTaxMinor } from "@kebo/money";
 import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
 import { owedLineSql } from "../src/modules/billing/api";
@@ -11,7 +11,7 @@ import { api, signIn, startApp } from "./app";
 
 /**
  * The money audit: an order carries the costs to reach the basis it was sold
- * on, its factory prices and its rate, all frozen when it is made; profit is
+ * on, its supplier prices and its rate, all frozen when it is made; profit is
  * only ever counted on revenue with a cost, the same on every screen; rates,
  * decimals and days are exact.
  */
@@ -30,7 +30,7 @@ describe("money fixes", () => {
   const db = () => prisma.company(FIRST_COMPANY_ID);
 
   type OfferLine = { description: string; quantity: number; unit?: string; unitPrice: number; taxRate: number };
-  /** A deal with a customer of its own, the customer's items, and factory offers. */
+  /** A deal with a customer of its own, the customer's items, and supplier offers. */
   async function deal(
     name: string,
     opts: {
@@ -63,7 +63,7 @@ describe("money fixes", () => {
       const q = (
         await api(app, sana)
           .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-            newFactoryName: `${o.name} ${tag}`,
+            newSupplierName: `${o.name} ${tag}`,
             receivedOn: today,
             currency: o.currency,
             basis: o.basis ?? null,
@@ -87,7 +87,7 @@ describe("money fixes", () => {
         .get(`/inquiries/${inquiryId}/quotation/offers?currency=${revision.currency ?? "USD"}`)
         .expect(200)
     ).body;
-    const lines = (q: string) => offers.offers.find((o: { factoryQuoteId: string }) => o.factoryQuoteId === q).lines;
+    const lines = (q: string) => offers.offers.find((o: { supplierQuoteId: string }) => o.supplierQuoteId === q).lines;
     const r = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, ...revision, options: [option(draft.options[0], lines)] })
@@ -144,7 +144,7 @@ describe("money fixes", () => {
         d.inquiryId,
         (o, lines) => ({
           ...o,
-          factoryQuoteId: d.offers[0],
+          supplierQuoteId: d.offers[0],
           prices: [{ lineId: lines(d.offers[0]!)[0]!.id, unitPrice: 14000 }],
           // A courier charge with no cost: revenue that is never counted as profit.
           charges: [{ type: "charge", description: "Courier of documents", quantity: 1, unit: "lot", unitPrice: 500, unitCost: null }],
@@ -268,7 +268,7 @@ describe("money fixes", () => {
       });
       ({ orderId } = await order(d.inquiryId, (o, lines) => ({
         ...o,
-        factoryQuoteId: d.offers[0],
+        supplierQuoteId: d.offers[0],
         prices: lines(d.offers[0]!).map((l) => ({ lineId: l.id, unitPrice: 50 })),
         charges: [],
         costs: [],
@@ -299,7 +299,7 @@ describe("money fixes", () => {
     it("is settled by paying exactly that, in the database too", async () => {
       const f = (await orderMoney(orderId)).factories.rows[0].factory.id;
       await api(app, manager)
-        .post(`/orders/${orderId}/factory-payments`, { factoryId: f, kind: "balance", amount: 194.96, currency: "CNY", paidOn: today, bankCharges: 15 })
+        .post(`/orders/${orderId}/factory-payments`, { supplierId: f, kind: "balance", amount: 194.96, currency: "CNY", paidOn: today, bankCharges: 15 })
         .expect(201);
       // Our bank's charge for sending it is the order's cost, not part of what the supplier got (review 24 Nov, M-38).
       const costs = (await orderMoney(orderId)).expenses as { category: string; amount: string; currency: string }[];
@@ -311,11 +311,11 @@ describe("money fixes", () => {
 
     it("never takes a rate for the order's own currency, and keeps or looks up the rate on a change", async () => {
       const other = (await api(app, sana).get(`/factory-quotes/${d.offers[1]}`).expect(200)).body.factory.id;
-      // A factory owed nothing on this order may be paid in any currency; in USD (the order's), the rate is 1.
+      // A supplier owed nothing on this order may be paid in any currency; in USD (the order's), the rate is 1.
       const made = (
         await api(app, manager)
           .post(`/orders/${orderId}/factory-payments`, {
-            factoryId: other,
+            supplierId: other,
             kind: "other",
             amount: 10,
             currency: "USD",
@@ -330,7 +330,7 @@ describe("money fixes", () => {
       const edited = (
         await api(app, manager)
           .patch(`/factory-payments/${made.createdId}`, {
-            factoryId: other,
+            supplierId: other,
             kind: "other",
             amount: 71,
             currency: "CNY",
@@ -347,7 +347,7 @@ describe("money fixes", () => {
       // Same currency, no rate: the rate used before stays.
       await api(app, manager)
         .patch(`/factory-payments/${made.createdId}`, {
-          factoryId: other,
+          supplierId: other,
           kind: "other",
           amount: 71,
           currency: "CNY",
@@ -359,7 +359,7 @@ describe("money fixes", () => {
       const kept = (
         await api(app, manager)
           .patch(`/factory-payments/${made.createdId}`, {
-            factoryId: other,
+            supplierId: other,
             kind: "other",
             amount: 70,
             currency: "CNY",
@@ -425,7 +425,7 @@ describe("money fixes", () => {
       });
       const { orderId } = await order(d.inquiryId, (o, lines) => ({
         ...o,
-        factoryQuoteId: d.offers[0],
+        supplierQuoteId: d.offers[0],
         prices: [{ lineId: lines(d.offers[0]!)[0]!.id, unitPrice: 1000 }],
         charges: [],
         costs: [],
@@ -457,7 +457,7 @@ describe("money fixes", () => {
         d.inquiryId,
         (o) => ({
           ...o,
-          factoryQuoteId: null,
+          supplierQuoteId: null,
           prices: (o.prices as { lineId: string }[]).map((p) => ({ ...p, unitPrice: 7100 })),
           charges: [],
           costs: [],
@@ -487,7 +487,7 @@ describe("money fixes", () => {
         d.inquiryId,
         (o) => ({
           ...o,
-          factoryQuoteId: null,
+          supplierQuoteId: null,
           prices: (o.prices as { lineId: string }[]).map((p) => ({ ...p, unitPrice: 2_800_000 })),
           charges: [],
           costs: [],
@@ -603,7 +603,7 @@ describe("money fixes", () => {
       from unnest(${cases.map((c) => c[0])}::numeric[], ${cases.map((c) => c[1])}::numeric[], ${cases.map((c) => c[2])}::numeric[], ${cases.map((c) => c[3])}::boolean[]) with ordinality as x(p, t, q, inc, i)`;
     const app = rows.map((r) => {
       const [price, tax, qty, included] = cases[Number(r.i) - 1]!;
-      return multiplyMinor(factoryUnitCostMinor(toMinor(price), tax, included), qty);
+      return multiplyMinor(supplierUnitCostMinor(toMinor(price), tax, included), qty);
     });
     expect(rows.map((r) => Number(r.owed))).toEqual(app);
     expect(app.slice(0, 2)).toEqual([113_57, 81_39]);

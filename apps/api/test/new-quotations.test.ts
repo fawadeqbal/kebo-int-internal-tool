@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 
 type Made = { id: string; refNo: string; letter: string; revisionId: string; number: number };
-type Rev = { id: string; number: number; status: string; currency: string; validUntil: string; total: string; options: { factoryQuoteId: string | null; total: string; lines: { unitPrice: string; unitCost?: string | null }[] }[] };
+type Rev = { id: string; number: number; status: string; currency: string; validUntil: string; total: string; options: { supplierQuoteId: string | null; total: string; lines: { unitPrice: string; unitCost?: string | null }[] }[] };
 type Page = { quotation: { refNo: string; letter: string } | null; quotations: { id: string; refNo: string; letter: string; revisions: Rev[] }[] };
 
 /**
@@ -49,7 +49,7 @@ describe("new quotations from the offers", () => {
       (
         await api(app, sana)
           .post(`/inquiries/${inquiryId}/factory-quotes`, {
-            newFactoryName: `${name} ${tag}`,
+            newSupplierName: `${name} ${tag}`,
             receivedOn: "2026-11-12",
             currency: "USD",
             leadDays: 45,
@@ -86,13 +86,13 @@ describe("new quotations from the offers", () => {
     const a = of(p, "A").revisions[0]!;
     expect(a).toMatchObject({ number: 1, status: "draft", currency: "USD", validUntil });
     expect(a.options).toHaveLength(1);
-    expect(a.options[0]).toMatchObject({ factoryQuoteId: offerX });
+    expect(a.options[0]).toMatchObject({ supplierQuoteId: offerX });
     // Priced at the margin on the price: cost ÷ (1 − 20%).
     expect(a.options[0]!.lines.map((l) => l.unitPrice)).toEqual(["10000.00", "625.00"]);
     expect(a.total).toBe("11250.00");
-    expect(of(p, "B").revisions[0]!.options[0]).toMatchObject({ factoryQuoteId: offerY, total: "10250.00" });
+    expect(of(p, "B").revisions[0]!.options[0]).toMatchObject({ supplierQuoteId: offerY, total: "10250.00" });
     // Own prices: the customer's items, to be priced by hand.
-    expect(of(p, "C").revisions[0]!.options[0]).toMatchObject({ factoryQuoteId: null, total: "0.00" });
+    expect(of(p, "C").revisions[0]!.options[0]).toMatchObject({ supplierQuoteId: null, total: "0.00" });
   });
 
   it("quotes an offer again on other terms, each offer once in one go", async () => {
@@ -100,7 +100,7 @@ describe("new quotations from the offers", () => {
     const again = (await api(app, sana).post(`/inquiries/${inquiryId}/quotations`, { offers: [offerX], currency: "USD", validUntil, margin: 25 }).expect(201)).body.quotations as Made[];
     expect(again).toMatchObject([{ letter: "D", number: 1 }]);
     const d = of(await page(), "D").revisions[0]!;
-    expect(d.options[0]).toMatchObject({ factoryQuoteId: offerX });
+    expect(d.options[0]).toMatchObject({ supplierQuoteId: offerX });
     expect(d.options[0]!.lines.map((l) => l.unitPrice)).toEqual(["10666.67", "666.67"]);
   });
 
@@ -124,7 +124,7 @@ describe("new quotations from the offers", () => {
     await api(app, sana).post(`/revisions/${b.revisions[0]!.id}/status`, { to: "sent" }).expect(200);
     const draft = (await api(app, sana).get(`/quotations/${b.id}/draft`).expect(200)).body;
     expect(draft).toMatchObject({ number: 2, currency: "USD" });
-    expect(draft.options[0]).toMatchObject({ factoryQuoteId: offerY });
+    expect(draft.options[0]).toMatchObject({ supplierQuoteId: offerY });
     // The customer has seen R1: R2 says why it changes.
     const asked = await api(app, sana).post(`/quotations/${b.id}/revisions`, draft).expect(409);
     expect(asked.body.code).toBeTruthy();

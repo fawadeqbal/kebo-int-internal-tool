@@ -46,7 +46,7 @@ describe("many quotations per inquiry", () => {
     const itemId = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0].id;
     await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Foshan Pack ${tag}`,
+        newSupplierName: `Foshan Pack ${tag}`,
         receivedOn: "2026-11-10",
         currency: "USD",
         lines: [{ requestedItemId: itemId, description: "Carton erector CE-20", quantity: 1, unitPrice: "10000.00", taxRate: 0 }],

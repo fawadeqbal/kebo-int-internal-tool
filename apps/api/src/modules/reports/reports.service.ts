@@ -11,6 +11,7 @@ import { OrdersService } from "../orders/orders.service";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { optionFigures, worthView } from "../quotations/revision-figures";
 import { FactsReadService } from "../insights/facts/facts-read.service";
+import { savedHistory } from "../../common/names/old-names";
 
 export interface Range {
   from: ISODate;
@@ -274,7 +275,7 @@ export class ReportsService {
         : {}),
     };
     const [rows, total, byType] = await Promise.all([
-      this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+      this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * q.pageSize, take: q.pageSize }).then((all) => all.map(savedHistory)),
       this.prisma.db.auditLog.count({ where }),
       // The list's chips: how many entries of each kind of record, for the same record and person.
       this.prisma.db.auditLog.groupBy({ by: ["entityType"], where: { ...where, entityType: undefined }, _count: true }),

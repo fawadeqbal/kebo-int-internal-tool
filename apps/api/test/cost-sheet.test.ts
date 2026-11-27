@@ -55,12 +55,12 @@ describe("the order's cost sheet", () => {
     sana = await signIn(app, "sana@example.com");
     manager = await signIn(app, "manager@example.com", "Manager@12345");
     sanaId = (await api(app, sana).get("/auth/me")).body.id;
-    // 10 pumps from a factory at CNY 1,000, sold CFR at USD 200 with USD 100 to the port and USD 300 freight set aside on the quotation.
+    // 10 pumps from a supplier at CNY 1,000, sold CFR at USD 200 with USD 100 to the port and USD 300 freight set aside on the quotation.
     const customer = (await api(app, sana).post("/customers", { name: `Sheet Co ${tag}`, country: "GH", contacts: [{ name: "Ama", email: `ama-${tag}@sheet.test` }] }).expect(201)).body;
     const inquiry = (await api(app, sana).post("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: sanaId, items: [{ description: "Pump", quantity: 10 }] }).expect(201)).body;
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Sheet Pumps ${tag}`, receivedOn: "2026-10-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Pump", quantity: 10, unitPrice: 1000 }] })
+      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newSupplierName: `Sheet Pumps ${tag}`, receivedOn: "2026-10-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Pump", quantity: 10, unitPrice: 1000 }] })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
     const options = [

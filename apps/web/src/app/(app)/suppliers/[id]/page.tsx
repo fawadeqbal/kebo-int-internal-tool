@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { can, ORDER_WORD_TONE } from "@kebo/shared";
 import { hasFeature, requirePermission } from "@/lib/session";
 import { api } from "@/lib/api";
-import type { FactoryOrders } from "@/lib/types-facts";
+import type { SupplierOrders } from "@/lib/types-facts";
 import { DataTable } from "@/components/common/data-table";
-import { factoryOf } from "@/lib/party-data";
+import { supplierOf } from "@/lib/party-data";
 import { ArrowRight } from "lucide-react";
 import {
   ButtonLink,
@@ -27,14 +27,14 @@ import { getPeople } from "@/lib/loaders";
 import type { Person } from "@/lib/types";
 import { DetailsCard } from "@/components/common/record";
 import { RecordLanding } from "@/components/common/record-nav";
-import { saveFactoryAction } from "../actions";
-import { FactoryPanel } from "../factory-form";
+import { saveSupplierAction } from "../actions";
+import { SupplierPanel } from "../supplier-form";
 import { supplierTitle } from "@/lib/titles";
 
 export const generateMetadata = supplierTitle();
 
-/** Where an order with the factory is: ready date passed, else the order's stage; closed or cancelled. */
-function poState(o: FactoryOrders["rows"][number], today: string): { label: string; meaning: StatusMeaning } {
+/** Where an order with the supplier is: ready date passed, else the order's stage; closed or cancelled. */
+function poState(o: SupplierOrders["rows"][number], today: string): { label: string; meaning: StatusMeaning } {
   const word = o.word ?? (o.status === "closed" ? "Done" : o.status === "cancelled" ? "Cancelled" : "Confirmed");
   if (!o.ready && o.readyOn && o.readyOn < today && (word === "Confirmed" || word === "In production"))
     return { label: "Ready date passed", meaning: "bad" };
@@ -48,7 +48,7 @@ const TAB_OF: Record<string, string> = { prices: "offers", costs: "costs", makin
  * The supplier's Overview tab: Performance (Insights) and Details with ✎ Edit (the side panel), its main
  * contact among them. What it makes, its prices, costs and notes each have their own tab.
  */
-export default async function FactoryOverview({
+export default async function SupplierOverview({
   params,
   searchParams,
 }: {
@@ -63,9 +63,9 @@ export default async function FactoryOverview({
   const editing = sp.panel === "edit-factory";
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
   const [f, people, pos] = await Promise.all([
-    factoryOf(id),
+    supplierOf(id),
     editing ? getPeople().catch(() => [] as Person[]) : ([] as Person[]),
-    money ? api.get<FactoryOrders>("/insights/facts/factory-orders", { factoryId: id }).catch(() => null) : null,
+    money ? api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id }).catch(() => null) : null,
   ]);
   const r = f.record;
   const today = companyToday();
@@ -94,7 +94,7 @@ export default async function FactoryOverview({
           { label: "Notes", value: f.notes && <span className="whitespace-pre-line">{f.notes}</span>, wide: true },
         ]}
       />
-      {/* Purchase orders (board): what each order with this factory costs us, what we paid, ready, where it is. */}
+      {/* Purchase orders (board): what each order with this supplier costs us, what we paid, ready, where it is. */}
       <Card className="overflow-hidden">
         <CardHeader
           title="Purchase orders"
@@ -198,7 +198,7 @@ export default async function FactoryOverview({
         )}
       </Card>
       {editing && (
-        <FactoryPanel action={saveFactoryAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />
+        <SupplierPanel action={saveSupplierAction.bind(null, f.id, f.updatedAt)} factory={f} people={people} meId={me.id} onRecord />
       )}
     </div>
   );

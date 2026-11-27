@@ -71,6 +71,8 @@ async function client(): Promise<Record<string, string>> {
 export async function apiFetch(path: string, init: RequestInit & { query?: Query; auth?: boolean; platform?: boolean } = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   for (const [k, v] of Object.entries(await client())) if (!headers.has(k) && !(init.platform && k === "x-company")) headers.set(k, v);
+  // This web reads the API's new field names ("factory" became "supplier"): it needs no old name beside them.
+  headers.set("x-names", "supplier");
   const t = init.auth === false ? undefined : await token(init.platform);
   if (t) headers.set("authorization", `Bearer ${t}`);
   if (init.body && typeof init.body === "string") headers.set("content-type", "application/json");

@@ -23,7 +23,7 @@ describe("order documents", () => {
   let manager: string;
   let me: string;
   let customerId: string;
-  let factoryId: string;
+  let supplierId: string;
   let orderId: string;
   let refNo: string;
   const tag = Date.now().toString(36);
@@ -84,7 +84,7 @@ describe("order documents", () => {
         })
         .expect(201)
     ).body.id;
-    factoryId = (
+    supplierId = (
       await api(app, sana)
         .post("/factories", { name: `Documents Works ${tag}`, address: "Ningbo" })
         .expect(201)
@@ -102,7 +102,7 @@ describe("order documents", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "DPP-260", quantity: 1, unitPrice: 300000 }],
@@ -293,9 +293,9 @@ describe("order documents", () => {
     expect(taxBullets(po)).toEqual([]);
     expect(po.doc.sums).toEqual([]);
     const freeze = (rate: number, included: boolean) =>
-      prisma.company(FIRST_COMPANY_ID).orderLine.updateMany({ where: { orderId, factoryId }, data: { factoryTaxRate: rate, factoryTaxIncluded: included } });
+      prisma.company(FIRST_COMPANY_ID).orderLine.updateMany({ where: { orderId, supplierId }, data: { supplierTaxRate: rate, supplierTaxIncluded: included } });
     try {
-      // Without tax at 13%: the tax is added on top, and the total is what we owe the factory.
+      // Without tax at 13%: the tax is added on top, and the total is what we owe the supplier.
       await freeze(13, false);
       const added = await doc("purchase-order");
       expect(taxBullets(added)).toEqual(["Prices are without tax; 13% tax is added on top."]);

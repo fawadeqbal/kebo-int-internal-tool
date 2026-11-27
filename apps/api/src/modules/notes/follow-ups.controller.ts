@@ -24,14 +24,14 @@ import { FollowUpsService } from "./follow-ups.service";
 export class FollowUpsController {
   constructor(private readonly followUps: FollowUpsService) {}
 
-  /** ?mine=true&on=&from=&to=&open=true|false&inquiryId|orderId|customerId|factoryId&page&pageSize → { rows, total, page, pageSize, counts: { open, done, late }, canViewAll } */
+  /** ?mine=true&on=&from=&to=&open=true|false&inquiryId|orderId|customerId|supplierId&page&pageSize → { rows, total, page, pageSize, counts: { open, done, late }, canViewAll } */
   @SignedIn("anyone signed in to the company")
   @Get("follow-ups")
   list(@CurrentUser() user: SessionUser, @Query(Validate(followUpListQuery)) q: FollowUpListQuery) {
     return this.followUps.list(user, q);
   }
 
-  /** { title, kind?, dueOn, dueAt?, place?, note?, inquiryId | orderId | customerId | factoryId (at most one), assigneeId? (default me) } */
+  /** { title, kind?, dueOn, dueAt?, place?, note?, inquiryId | orderId | customerId | supplierId (at most one), assigneeId? (default me) } */
   @SignedIn("anyone signed in to the company")
   @Post("follow-ups")
   create(@CurrentUser() user: SessionUser, @Body(Validate(followUpInput)) body: FollowUpInput) {

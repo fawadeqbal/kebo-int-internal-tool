@@ -57,7 +57,7 @@ const CONTRACT: string[] = [...BANK_CONTRACT_FIELDS];
 const DELIVERY = ["deliveredOn", "deliveryNote", "deliveryReceivedBy", "satEngineerId", "satPlannedOn", "satDoneOn", "satSignedBy", "installedOn", "warrantyMonths"];
 const DETAILS = ["shipBy", "readyOn", "shippedOn", "blNo", "portOfDischarge", "containerNo", "shippingMarks", "documentTitle", "customerRef", "customerPoOn", "consignee", "notifyParty", "deliveryAddress"];
 
-/** A factory's own ready date field on the Factory card: "readyOn__<factory id>". */
+/** A supplier's own ready date field on the Supplier card: "readyOn__<supplier id>". */
 const READY_OF = "readyOn__";
 
 /** What a form says about the order's checks: it can ask (`ask`), or the person went ahead (`confirm`, with why). */
@@ -101,7 +101,7 @@ async function saveShipment(orderId: string, shipmentId: string | null, v: Recor
 
 /**
  * One value ("+ Add") or a whole card (Edit) of a step's view. `target`:
- * shipment:<id> | shipment:new | contract | factory | order | delivery.
+ * shipment:<id> | shipment:new | contract | supplier | order | delivery.
  */
 export async function fieldsAction(orderId: string, target: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
@@ -121,11 +121,11 @@ export async function fieldsAction(orderId: string, target: string, _prev: Actio
           return api.put(`/orders/${orderId}/bank-contract`, body);
         }
         case "factory": {
-          const fo = pick(v, ["factoryOrderedOn", "factoryOrderNo"]);
+          const fo = pick(v, ["supplierOrderedOn", "supplierOrderNo"]);
           const details: Record<string, unknown> = pick(v, ["readyOn", "shipBy"]);
-          // One ready date per factory: "readyOn__<factory id>" fields are each factory's own.
+          // One ready date per supplier: "readyOn__<supplier id>" fields are each supplier's own.
           const each = Object.keys(v).filter((k) => k.startsWith(READY_OF));
-          if (each.length) details.readyBy = each.map((k) => ({ factoryId: k.slice(READY_OF.length), readyOn: v[k] || null }));
+          if (each.length) details.readyBy = each.map((k) => ({ supplierId: k.slice(READY_OF.length), readyOn: v[k] || null }));
           if (Object.keys(fo).length) await api.patch(`/orders/${orderId}/factory-order`, fo);
           if (Object.keys(details).length) await api.patch(`/orders/${orderId}/details`, { ...details, reason: reasonOf(form) });
           return null;

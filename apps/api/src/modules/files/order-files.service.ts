@@ -102,7 +102,7 @@ const MAX_ZIP = 300 * 1024 * 1024;
 /**
  * Documents v3: every file of an order in one list, wherever it is kept, with
  * the same tools everywhere. Reading follows the order (and each source's own
- * rule: factory offers' and factory payments' files for people who see factory
+ * rule: supplier offers' and supplier payments' files for people who see supplier
  * prices, expense receipts for managers); changing a file needs the permission
  * of what it is attached to — documents.manage for a paper's file,
  * orders.update for a section's or a step's file, payments.record for a
@@ -137,17 +137,17 @@ export class OrderFilesService {
     const open = o.status !== "cancelled";
     const seeCosts = can(user, "sourcing.manage");
     const seeExpenses = can(user, "expenses.manage") && (await this.limits.allows("expenses"));
-    const [inquiry, papers, features, attachments, offers, payments, factoryPaid, expenses, docs] = await Promise.all([
+    const [inquiry, papers, features, attachments, offers, payments, supplierPaid, expenses, docs] = await Promise.all([
       db.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId }, select: { id: true, refNo: true, assigneeId: true, createdById: true } }),
       this.papers.list(user, orderId),
       this.limits.features(),
       db.attachment.findMany({
-        where: { inquiryId: o.inquiryId, deletedAt: null, factoryQuoteId: null, OR: [{ orderId: null }, { orderId }] },
+        where: { inquiryId: o.inquiryId, deletedAt: null, supplierQuoteId: null, OR: [{ orderId: null }, { orderId }] },
         include: { uploadedBy: { select: { id: true, name: true } } },
         orderBy: { createdAt: "asc" },
       }),
       seeCosts
-        ? db.factoryQuote.findMany({
+        ? db.supplierQuote.findMany({
             where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId } } } } } } },
             select: { id: true, factory: { select: { name: true } } },
           })
@@ -190,7 +190,7 @@ export class OrderFilesService {
     ]);
     const offerFiles = offers.length
       ? await db.attachment.findMany({
-          where: { factoryQuoteId: { in: offers.map((q) => q.id) }, deletedAt: null, replacedById: null },
+          where: { supplierQuoteId: { in: offers.map((q) => q.id) }, deletedAt: null, replacedById: null },
           include: { uploadedBy: { select: { id: true, name: true } } },
           orderBy: { createdAt: "asc" },
         })
@@ -293,7 +293,7 @@ export class OrderFilesService {
         note: a.note,
         attachedTo: {
           link: "offer",
-          label: `Supplier offer · ${offers.find((q) => q.id === a.factoryQuoteId)?.factory.name ?? "factory"}`,
+          label: `Supplier offer · ${offers.find((q) => q.id === a.supplierQuoteId)?.factory.name ?? "factory"}`,
           href: `/inquiries/${inquiry.id}/sourcing`,
         },
         step: null,
@@ -307,7 +307,7 @@ export class OrderFilesService {
         viewHref: VIEWABLE_FILE.test(a.mimeType) ? `/files/${a.id}?view=1` : null,
         version: a.version,
         versions: [],
-        // Kept with the factory's offer: changed there.
+        // Kept with the supplier's offer: changed there.
         can: { rename: false, describe: false, attach: false, replace: false, remove: false },
       });
 
@@ -343,7 +343,7 @@ export class OrderFilesService {
         can: { rename: payEdit, describe: false, attach: false, replace: payEdit, remove: payEdit },
       });
     }
-    for (const p of factoryPaid) {
+    for (const p of supplierPaid) {
       const type = p.fileType ?? "application/octet-stream";
       files.push({
         id: `factory_payment:${p.id}`,

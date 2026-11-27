@@ -35,7 +35,7 @@ interface Entry {
 /**
  * The cash book (managers): where our money is kept (cash, banks, wallets),
  * money moved between those accounts, and one dated list of every amount in
- * (from customers) and out (to factories, expenses) with running balances.
+ * (from customers) and out (to suppliers, expenses) with running balances.
  */
 @Injectable()
 export class CashService {
@@ -244,7 +244,7 @@ export class CashService {
   }
 
   /**
-   * Every amount in and out between two dates: from customers, to factories,
+   * Every amount in and out between two dates: from customers, to suppliers,
    * expenses, and moves between our accounts. ?account= one account (with its
    * balance before, after each line, and at the end), or "none" for what was
    * not put on any account yet. ?currency= one currency.
@@ -487,7 +487,7 @@ export class CashService {
     };
   }
 
-  /** Put an amount on an account afterwards (a payment, a factory payment or an expense recorded without one). */
+  /** Put an amount on an account afterwards (a payment, a supplier payment or an expense recorded without one). */
   async setAccount(user: SessionUser, kind: "in" | "factory" | "expense", id: string, accountId: string | null) {
     this.assertManager(user);
     if (kind === "expense") await this.limits.require("expenses");

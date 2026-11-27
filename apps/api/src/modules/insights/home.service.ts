@@ -97,8 +97,8 @@ export class HomeService {
         join parties p on p.id = x.customer_id
         where x.overdue > 0 group by x.customer_id, p.name order by max(x.days) desc, p.name`,
       // Each supplier's last three ready dates that are due: how many were missed, and what is late right now.
-      db.$queryRaw<{ factoryId: string; name: string; judged: number; late: number; lateNow: string | null; daysNow: number | null }[]>`
-        select r.factory_id as "factoryId", p.name, count(*)::int as judged, count(*) filter (where r.late)::int as late,
+      db.$queryRaw<{ supplierId: string; name: string; judged: number; late: number; lateNow: string | null; daysNow: number | null }[]>`
+        select r.factory_id as "supplierId", p.name, count(*)::int as judged, count(*) filter (where r.late)::int as late,
                (array_agg(r.ref_no order by r.days_now desc nulls last) filter (where r.days_now is not null))[1] as "lateNow",
                max(r.days_now)::int as "daysNow"
         from (select f.factory_id, o.ref_no,

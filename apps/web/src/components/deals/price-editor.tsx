@@ -87,7 +87,7 @@ export function PriceSheet({
     lines.map((l) => ({ unitCostMinor: l.unitCost === null ? null : toMinor(l.unitCost), quantity: numberText(l.quantity) || 0 })),
     extra.minor,
   );
-  const offer = opt.factoryQuoteId ? offers.offers.find((o) => o.factoryQuoteId === opt.factoryQuoteId) : null;
+  const offer = opt.supplierQuoteId ? offers.offers.find((o) => o.supplierQuoteId === opt.supplierQuoteId) : null;
   const itemName = (no: string) => offers.items.find((i) => i.no === no)?.description.split("\n")[0] ?? "";
   const topItems = offers.items.filter((i) => !i.parentId).length;
   const fx: Fx = { main: offers.mainCurrency, rates: offers.rates };
@@ -95,7 +95,7 @@ export function PriceSheet({
 
   const priceAll = () => marginOk && setS((st) => ({ ...st, options: pricedAll(st, offers, marginNumber) }));
 
-  const nameOf = (o: OptionState) => (o.factoryQuoteId ? (offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "a removed offer") : "the customer's items");
+  const nameOf = (o: OptionState) => (o.supplierQuoteId ? (offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.factory.name ?? "a removed offer") : "the customer's items");
 
   /* ---------- the lines */
   const priceKeys = (i: number, attr: string) => (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -121,7 +121,7 @@ export function PriceSheet({
   };
   const lineView = lines.map((l, i) => {
     const price = opt.prices[l.id] ?? "";
-    // On the landed cost: the factory's cost plus this line's share of the costs to reach our basis.
+    // On the landed cost: the supplier's cost plus this line's share of the costs to reach our basis.
     const cost = landed[i] ?? null;
     const m = showCosts && cost !== null && valid(price) && Number(numberText(price)) > 0 ? marginPercent(toMinor(numberText(price)), cost) : null;
     const part = l.no.includes(".");
@@ -164,7 +164,7 @@ export function PriceSheet({
       .filter((c) => c.description);
 
   /* ---------- the costs to reach our basis */
-  const gap = opt.factoryQuoteId ? gapOf(opt, offers, s.incoterm) : null;
+  const gap = opt.supplierQuoteId ? gapOf(opt, offers, s.incoterm) : null;
   const costLine = (gap?.needed ?? []).map((step) => {
     const c = opt.costs[step];
     const filled = c && valid(c.amount) && Number(numberText(c.amount)) > 0;
@@ -187,7 +187,7 @@ export function PriceSheet({
 
   const optionCard = (o: OptionState, i: number) => {
     const t = totalsOf(o);
-    const off = o.factoryQuoteId ? offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+    const off = o.supplierQuoteId ? offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId) : null;
     const on = i === at;
     return (
       <button
@@ -203,7 +203,7 @@ export function PriceSheet({
       >
         <span className="flex items-baseline justify-between gap-3">
           <span className="min-w-0 truncate text-sm font-semibold" title={nameOf(o)}>
-            {optionLetter(i)} · {off ? shortName(off.factory.name) : o.factoryQuoteId ? "removed offer" : "by hand"}
+            {optionLetter(i)} · {off ? shortName(off.factory.name) : o.supplierQuoteId ? "removed offer" : "by hand"}
           </span>
           <span className="shrink-0 text-sm font-semibold tabular">{fmt(t.totals.total)}</span>
         </span>
@@ -242,7 +242,7 @@ export function PriceSheet({
           <Card aria-label={`Option ${letter} items`}>
             <div className="border-b border-line px-4 py-3">
               <h3 className={cn(subTitleClass, "max-sm:hidden")}>
-                Option {letter} · {opt.factoryQuoteId ? (offer ? `items from ${offer.factory.name}'s offer` : "an offer that was removed") : "the customer's items"}
+                Option {letter} · {opt.supplierQuoteId ? (offer ? `items from ${offer.factory.name}'s offer` : "an offer that was removed") : "the customer's items"}
               </h3>
               <h3 className={cn(subTitleClass, "sm:hidden")}>Items</h3>
               <p className="mt-0.5 text-xs text-muted max-sm:hidden">
@@ -256,7 +256,7 @@ export function PriceSheet({
                 {offer ? ` · Incoterm ${offer.basis ? basisText(offer.basis, offer.basisPlace) : "not said"} → ${ours}` : ""}
               </p>
             </div>
-            {lines.length === 0 && opt.factoryQuoteId && !offer && (
+            {lines.length === 0 && opt.supplierQuoteId && !offer && (
               <p className="m-4 rounded-md bg-warn-soft px-3 py-2 text-sm">This supplier offer was removed from the inquiry. Remove this option or add another offer.</p>
             )}
             {/* Wide: every column in view. */}
@@ -356,8 +356,8 @@ export function PriceSheet({
             </ul>
           </Card>
 
-          {/* The costs between the factory's basis and ours: internal, one line. */}
-          {showCosts && opt.factoryQuoteId && offer && (
+          {/* The costs between the supplier's basis and ours: internal, one line. */}
+          {showCosts && opt.supplierQuoteId && offer && (
             <Card aria-label={`Getting it to ${ours}`}>
               <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
                 <div className="min-w-0">
@@ -391,8 +391,8 @@ export function PriceSheet({
                   <BasisCosts
                     bare
                     letter={letter}
-                    factoryBasis={offer.basis}
-                    factoryPlace={offer.basisPlace}
+                    supplierBasis={offer.basis}
+                    supplierPlace={offer.basisPlace}
                     selling={s.incoterm}
                     sellingPlace={s.incotermPlace}
                     currency={currency}

@@ -62,7 +62,7 @@ export default async function QuotationPage({
   const offersForNew = manage ? await loadOffers(q.newDefaults.currency) : null;
   // Which quotations each offer is in (an offer can be quoted again on other terms).
   const usedIn: Record<string, string[]> = {};
-  for (const x of quotations) for (const o of currentOf(x).options) if (o.factoryQuoteId) (usedIn[o.factoryQuoteId] ??= []).push(x.letter);
+  for (const x of quotations) for (const o of currentOf(x).options) if (o.supplierQuoteId) (usedIn[o.supplierQuoteId] ??= []).push(x.letter);
   const letters = quotations.map((x) => x.letter);
   const newButton = (variant: "primary" | "secondary" = "secondary") =>
     manage ? (
@@ -140,7 +140,7 @@ export default async function QuotationPage({
               const facts = termsFacts(c);
               const checks = showCosts ? checksOf(c, o) : [];
               const problem = checks.find((k) => !k.ok);
-              const from = o?.factory ? shortName(o.factory.name) : o && !o.factoryQuoteId ? "Own prices" : null;
+              const from = o?.factory ? shortName(o.factory.name) : o && !o.supplierQuoteId ? "Own prices" : null;
               return (
                 <li key={x.id} className="border-b border-line last:border-b-0">
                   <Link

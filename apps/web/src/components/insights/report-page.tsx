@@ -10,12 +10,12 @@ import { SECTION_PATH, viewPath } from "@/lib/old-addresses";
 import { PlanOff } from "@/components/common/plan-off";
 import { FileActions } from "@/components/common/file-actions";
 import { PERIOD_KINDS, PERIOD_LABEL, periodOf, type Period, type Section } from "@/lib/insights-period";
-import { CUSTOMER_CHIPS, loadCash, loadCustomers, loadFactories, loadFunnel, loadOverview, loadPeople, loadProfit, loadSpending, PROFIT_SORTS, spendingOf, type CustomerChip, type ProfitSort } from "@/lib/insights-data";
+import { CUSTOMER_CHIPS, loadCash, loadCustomers, loadSuppliers, loadFunnel, loadOverview, loadPeople, loadProfit, loadSpending, PROFIT_SORTS, spendingOf, type CustomerChip, type ProfitSort } from "@/lib/insights-data";
 import { SpendingSection } from "./spending-section";
 import { Overview } from "./overview";
 import { ProfitSection } from "./profit-section";
 import { CashSection } from "./cash-section";
-import { CustomersSection, FactoriesSection, FunnelSection, PeopleSection } from "./parties-sections";
+import { CustomersSection, SuppliersSection, FunnelSection, PeopleSection } from "./parties-sections";
 import { TargetsView } from "./targets-view";
 import { companyToday } from "@/lib/format";
 
@@ -231,7 +231,7 @@ async function Body({
       return <CustomersSection d={d} p={p} href={href} chip={chip} page={page} base={path} params={{ ...keep, chip: chip === "all" ? undefined : chip }} spent={spent} />;
     }
     case "factories":
-      return <FactoriesSection d={await loadFactories(p)} p={p} page={page} base={path} params={keep} />;
+      return <SuppliersSection d={await loadSuppliers(p)} p={p} page={page} base={path} params={keep} />;
     case "people": {
       const [d, s] = await Promise.all([loadPeople(p, today), seeMoney ? spendingOf(p) : null]);
       const spend = s ? new Map(s.people.map((x) => [x.person.id, { spent: Number(x.spent), owed: Number(x.owed) }])) : null;

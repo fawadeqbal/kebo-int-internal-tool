@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expenseIn, factoryPosition, orderMoney, orderPosition, orderProfit, settle } from "../src";
+import { expenseIn, supplierPosition, orderMoney, orderPosition, orderProfit, settle } from "../src";
 
 const pay = (amountMinor: number, bankChargesMinor = 0) => ({ amountMinor, bankChargesMinor });
 
@@ -53,10 +53,10 @@ describe("orderPosition: one money truth for the customer", () => {
   });
 });
 
-describe("factoryPosition: one truth for what we owe a factory", () => {
+describe("supplierPosition: one truth for what we owe a factory", () => {
   const fx = { main: "USD", rates: { CNY: 7.1 } };
-  const line = (factoryId: string, unitPriceMinor: number, quantity: number, taxRate = 0, taxIncluded = false, currency = "CNY") => ({
-    factoryId,
+  const line = (supplierId: string, unitPriceMinor: number, quantity: number, taxRate = 0, taxIncluded = false, currency = "CNY") => ({
+    supplierId,
     currency,
     unitPriceMinor,
     taxRate,
@@ -65,31 +65,31 @@ describe("factoryPosition: one truth for what we owe a factory", () => {
   });
 
   it("owes the price with tax, less what we paid and what the factory bears", () => {
-    // CNY 100 + 13% × 10 = 1,130; paid 500; a CNY 130 inspection the factory bears.
-    const [f] = factoryPosition(
+    // CNY 100 + 13% × 10 = 1,130; paid 500; a CNY 130 inspection the supplier bears.
+    const [f] = supplierPosition(
       [line("a", 100_00, 10, 13)],
-      [{ factoryId: "a", currency: "CNY", amountMinor: 500_00 }],
-      [{ factoryId: "a", currency: "CNY", amountMinor: 130_00, rate: 7.1 }],
+      [{ supplierId: "a", currency: "CNY", amountMinor: 500_00 }],
+      [{ supplierId: "a", currency: "CNY", amountMinor: 130_00, rate: 7.1 }],
       fx,
     );
     expect(f).toMatchObject({ owedMinor: 1_130_00, paidMinor: 500_00, takenOffMinor: 130_00, settledMinor: 630_00, toPayMinor: 500_00, overpaidMinor: 0 });
     // Tax included: the price as it is.
-    expect(factoryPosition([line("a", 113_00, 10, 13, true)], [], [], fx)[0]!.owedMinor).toBe(1_130_00);
+    expect(supplierPosition([line("a", 113_00, 10, 13, true)], [], [], fx)[0]!.owedMinor).toBe(1_130_00);
   });
 
   it("turns a factory's expense in another currency at its rate and the Settings rate", () => {
-    // USD 100 charged to a CNY factory: USD 100 → CNY 710.
-    const [f] = factoryPosition([line("a", 1_000_00, 1)], [], [{ factoryId: "a", currency: "USD", amountMinor: 100_00, rate: 1 }], fx);
+    // USD 100 charged to a CNY supplier: USD 100 → CNY 710.
+    const [f] = supplierPosition([line("a", 1_000_00, 1)], [], [{ supplierId: "a", currency: "USD", amountMinor: 100_00, rate: 1 }], fx);
     expect(f!.takenOffMinor).toBe(710_00);
-    // No rate for the factory's currency: left out (never counted at 1:1).
-    const [g] = factoryPosition([line("a", 1_000_00, 1, 0, false, "EUR")], [], [{ factoryId: "a", currency: "USD", amountMinor: 100_00, rate: 1 }], fx);
+    // No rate for the supplier's currency: left out (never counted at 1:1).
+    const [g] = supplierPosition([line("a", 1_000_00, 1, 0, false, "EUR")], [], [{ supplierId: "a", currency: "USD", amountMinor: 100_00, rate: 1 }], fx);
     expect(g!.takenOffMinor).toBe(0);
-    // A factory with no lines on the order: its expense has nowhere to go.
-    expect(factoryPosition([], [], [{ factoryId: "b", currency: "CNY", amountMinor: 1_00, rate: 7.1 }], fx)).toEqual([]);
+    // A supplier with no lines on the order: its expense has nowhere to go.
+    expect(supplierPosition([], [], [{ supplierId: "b", currency: "CNY", amountMinor: 1_00, rate: 7.1 }], fx)).toEqual([]);
   });
 
   it("lists factories only paid (owed 0) after those with lines", () => {
-    const rows = factoryPosition([line("a", 1_00, 1)], [{ factoryId: "b", currency: "CNY", amountMinor: 5_00 }], [], fx);
+    const rows = supplierPosition([line("a", 1_00, 1)], [{ supplierId: "b", currency: "CNY", amountMinor: 5_00 }], [], fx);
     expect(rows.map((r) => [r.key, r.owedMinor, r.paidMinor, r.toPayMinor, r.overpaidMinor])).toEqual([
       ["a:CNY", 1_00, 0, 1_00, 0],
       ["b:CNY", 0, 5_00, 0, 0],
@@ -104,7 +104,7 @@ describe("orderMoney: named profit figures", () => {
     goodsCostMinor: 6_000_00,
     basisCostMinor: 1_000_00,
     receivedMinor: 5_000_00,
-    factoryPaidMinor: 3_000_00,
+    supplierPaidMinor: 3_000_00,
     expensesMinor: 1_500_00,
     basisPaidMinor: 1_200_00,
     bankChargesMinor: 50_00,

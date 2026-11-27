@@ -2,7 +2,7 @@ import { orderAccess } from "../../common/auth/order-access";
 import { customerOnly } from "./fields";
 import { Injectable } from "@nestjs/common";
 import { fromDbDateOrNull, type Prisma, isSupplier, newSupplier } from "@kebo/database";
-import { can, type FactoryImport, type FactoryInput, type ImportResult, type ListQuery } from "@kebo/shared";
+import { can, type SupplierImport, type SupplierInput, type ImportResult, type ListQuery } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -40,15 +40,15 @@ export function cityOf(address: string | null | undefined): string | null {
   return parts.length ? parts[parts.length - 1]!.slice(0, 60) : null;
 }
 
-type ContactFields = Pick<FactoryInput, "contactPerson" | "phone" | "wechat" | "email">;
+type ContactFields = Pick<SupplierInput, "contactPerson" | "phone" | "wechat" | "email">;
 
 /**
- * Factories are shared by the whole team (staff source from them); only
+ * Suppliers are shared by the whole team (staff source from them); only
  * managers remove one. Each may have one person who looks after it ("My
  * factories"), who is also the default for paying it.
  */
 @Injectable()
-export class FactoriesService {
+export class SuppliersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -94,7 +94,7 @@ export class FactoriesService {
       // The cities to choose from: the last part of every supplier's address.
       this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null, address: { not: null } }, select: { address: true } }),
       // Asked for a price and not answered yet (the "Offers waiting" figure).
-      this.prisma.db.factoryRequest.count({ where: { status: "sent", factory: { deletedAt: null } } }),
+      this.prisma.db.supplierRequest.count({ where: { status: "sent", factory: { deletedAt: null } } }),
       this.prisma.db.party.count({ where: whereFor({}) }),
       this.prisma.db.party.count({ where: whereFor({ status: "offers" }) }),
       this.prisma.db.party.count({ where: whereFor({ status: "none" }) }),
@@ -151,25 +151,25 @@ export class FactoriesService {
   }
 
   /**
-   * How the factory works with us: how often it answers when asked for a price
+   * How the supplier works with us: how often it answers when asked for a price
    * (and how fast), and the orders it is making now, with how many are late (ready date passed, goods not all in).
    */
   private async record(id: string, user?: SessionUser) {
     const db = this.prisma.db;
     const [requests, quotes, orders, late, every] = await Promise.all([
-      db.factoryRequest.findMany({ where: { factoryId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
-      db.factoryQuote.findMany({ where: { factoryId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
-      db.order.findMany({ where: { status: "open", lines: { some: { factoryId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" } }),
+      db.supplierRequest.findMany({ where: { supplierId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
+      db.supplierQuote.findMany({ where: { supplierId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
+      db.order.findMany({ where: { status: "open", lines: { some: { supplierId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" } }),
       // Late: the ready date it gave has passed and not every line of its goods has come in.
-      db.orderFactory.findMany({
-        where: { factoryId: id, readyOn: { lt: new Date() }, order: { status: "open" } },
-        select: { order: { select: { lines: { where: { factoryId: id, type: "goods" }, select: { quantity: true, receivedQty: true } } } } },
+      db.orderSupplier.findMany({
+        where: { supplierId: id, readyOn: { lt: new Date() }, order: { status: "open" } },
+        select: { order: { select: { lines: { where: { supplierId: id, type: "goods" }, select: { quantity: true, receivedQty: true } } } } },
       }),
       // Every order it made for us, not only the ones it is making (review 24 Nov, O-38: the Orders tab showed those only).
       user
         ? db.order.findMany({
-            where: { status: { not: "cancelled" }, lines: { some: { factoryId: id } }, ...orderAccess(user) },
-            select: { id: true, refNo: true, status: true, stage: true, factories: { where: { factoryId: id }, select: { readyOn: true } }, customer: { select: { name: true } } },
+            where: { status: { not: "cancelled" }, lines: { some: { supplierId: id } }, ...orderAccess(user) },
+            select: { id: true, refNo: true, status: true, stage: true, factories: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } },
             orderBy: { orderedOn: "desc" },
           })
         : Promise.resolve([]),
@@ -188,7 +188,7 @@ export class FactoriesService {
       declined: requests.filter((r) => r.status === "declined").length,
       noReply: requests.filter((r) => r.status === "no_reply").length,
       avgDaysToAnswer: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
-      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })), // this factory's own ready date
+      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })), // this supplier's own ready date
       orders: every.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, status: o.status, stage: o.stage, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })),
       lateSteps,
     };
@@ -206,7 +206,7 @@ export class FactoriesService {
     if (!u) throw new DomainError("Choose an active person to look after this supplier.");
   }
 
-  private fields(input: FactoryInput) {
+  private fields(input: SupplierInput) {
     const { reason: _reason, contactPerson: _person, phone: _phone, wechat: _wechat, email: _email, ...fields } = input;
     return { ...fields, ownerId: input.ownerId ?? null };
   }
@@ -223,7 +223,7 @@ export class FactoriesService {
       await tx.contact.create({ data: { ...data, partyId, name: c.contactPerson || partyName, isPrimary: true } });
   }
 
-  async create(user: SessionUser, input: FactoryInput) {
+  async create(user: SessionUser, input: SupplierInput) {
     await this.assertUniqueName(input.name);
     await this.assertOwner(input.ownerId);
     return this.prisma.tx(async (tx) => {
@@ -234,13 +234,13 @@ export class FactoriesService {
     });
   }
 
-  /** Factories from an uploaded file: a name already known is left out; the rest are added together, or none are. */
-  async importMany(user: SessionUser, input: FactoryImport): Promise<ImportResult> {
+  /** Suppliers from an uploaded file: a name already known is left out; the rest are added together, or none are. */
+  async importMany(user: SessionUser, input: SupplierImport): Promise<ImportResult> {
     const known = new Set(
       (await this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { name: true } })).map((f) => f.name.trim().toLowerCase()),
     );
     const skipped: ImportResult["skipped"] = [];
-    const fresh: FactoryInput[] = [];
+    const fresh: SupplierInput[] = [];
     for (const f of input.factories) {
       const key = f.name.trim().toLowerCase();
       if (known.has(key)) {
@@ -261,15 +261,15 @@ export class FactoriesService {
     return { added: fresh.length, skipped };
   }
 
-  async update(user: SessionUser, id: string, input: FactoryInput) {
+  async update(user: SessionUser, id: string, input: SupplierInput) {
     const before = await this.get(id);
     await this.assertUniqueName(input.name, id);
     await this.assertOwner(input.ownerId);
     const ownerId = input.ownerId ?? null;
-    // Renaming, or handing the factory from one person to another, says why.
+    // Renaming, or handing the supplier from one person to another, says why.
     const renamed = before.name !== input.name;
     const handedOver = before.ownerId !== null && before.ownerId !== ownerId;
-    const reason = renamed || handedOver ? requireReason(input.reason, "factoryDetails", renamed ? "the supplier's name changes" : "another person looks after this supplier") : input.reason;
+    const reason = renamed || handedOver ? requireReason(input.reason, "supplierDetails", renamed ? "the supplier's name changes" : "another person looks after this supplier") : input.reason;
     return this.prisma.tx(async (tx) => {
       const saved = await tx.party.update({ where: { ...isSupplier, id }, data: this.fields(input), omit: customerOnly, include: { owner: ownerSelect } });
       await this.setMainContact(tx, id, saved.name, input);

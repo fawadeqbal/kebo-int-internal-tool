@@ -9,7 +9,7 @@ import type { ActionState } from "@/lib/actions";
 
 /**
  * Shown inside a form when the API answers code "reason_needed": the change
- * reaches someone else (the customer, a factory, money), so it asks why. A
+ * reaches someone else (the customer, a supplier, money), so it asks why. A
  * quick choice or the person's own words goes back with the same form as
  * `reason`, and is kept in the record's history.
  */

@@ -13,7 +13,7 @@ const fresh = (more: Partial<SectionFacts> = {}): SectionFacts => ({
   deposit: "55260.00",
   due: "184200.00",
   paidInFullOn: null,
-  factoryOrderedOn: null,
+  supplierOrderedOn: null,
   factories: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "0.00", toPay: "950000.00" }],
   readyOn: null,
   goods: { lines: 4, received: 0 },
@@ -90,7 +90,7 @@ describe("where each stage stands", () => {
         depositIn: true,
         depositOn: "2026-11-16",
         due: "128940.00",
-        factoryOrderedOn: "2026-11-16",
+        supplierOrderedOn: "2026-11-16",
         factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
         readyOn: "2026-12-05",
         shipments: [ship({ status: "booked", forwarder: "Sino-Africa Logistics", bookingNo: "SAL-88213" })],
@@ -126,7 +126,7 @@ describe("where each stage stands", () => {
         depositIn: true,
         due: "0.00",
         paidInFullOn: "2026-12-10",
-        factoryOrderedOn: "2026-11-16",
+        supplierOrderedOn: "2026-11-16",
         factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
         deliveredOn: "2027-01-26",
       }),
@@ -139,7 +139,7 @@ describe("where each stage stands", () => {
   });
 
   it("a person who may not see supplier money still reads PO sent", () => {
-    expect(stageWords(fresh({ factoryOrderedOn: "2026-11-16", factories: null }), TODAY).factory.word).toBe("PO sent");
+    expect(stageWords(fresh({ supplierOrderedOn: "2026-11-16", factories: null }), TODAY).factory.word).toBe("PO sent");
   });
 
   it("by LC: the open LC is the word until the money is in; the documents are seven", () => {
@@ -185,8 +185,8 @@ describe("the Overview's lines", () => {
       depositIn: true,
       depositOn: "2026-11-16",
       due: "128940.00",
-      factoryOrderedOn: "2026-11-16",
-      factoryOrderNo: "JF-26-1107",
+      supplierOrderedOn: "2026-11-16",
+      supplierOrderNo: "JF-26-1107",
       factories: [{ name: "Jiangsu Filling Machinery", currency: "CNY", owed: "950000.00", paid: "380000.00", toPay: "570000.00" }],
       readyOn: "2026-12-05",
       fat: [{ factory: null, plannedOn: "2026-12-03", doneOn: null, result: null }],
@@ -206,7 +206,7 @@ describe("the Overview's lines", () => {
       depositOn: "2026-11-16",
       due: "0.00",
       paidInFullOn: "2026-12-10",
-      factoryOrderedOn: "2026-11-16",
+      supplierOrderedOn: "2026-11-16",
       factories: [{ name: "Jiangsu", currency: "CNY", owed: "950000.00", paid: "950000.00", toPay: "0.00" }],
       readyOn: "2026-12-05",
       goods: { lines: 4, received: 4 },

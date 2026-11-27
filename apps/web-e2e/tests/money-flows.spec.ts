@@ -25,7 +25,7 @@ test("Purchase order: what was agreed with the supplier, the plan with Pay on th
   // A part paid (its Receipt) and one still to pay (its Pay).
   await orderWith(page, "factory", (p) => p.getByRole("region", { name: /^Payment plan/ }).filter({ has: p.getByRole("link", { name: /^Receipt/ }) }).getByRole("button", { name: "Pay", exact: true }));
 
-  // Its payment is in what was agreed with the factory (the "How we pay them" card went there: design "terms that travel").
+  // Its payment is in what was agreed with the supplier (the "How we pay them" card went there: design "terms that travel").
   const how = page.getByRole("region", { name: /^Agreed with the supplier/ }).first();
   await expect(how).toContainText(/\d+ installments?/);
   await expect(how).toContainText("Their invoices");

@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { factoryReadyActual, readyDelay, shippedOnTime } from "../src";
+import { supplierReadyActual, readyDelay, shippedOnTime } from "../src";
 
 /** Insights data (PR B): the few rules the calculated tables add, each in one place. */
 describe("a factory's goods actually ready", () => {
   const line = (quantity: number, receivedQty: number, receivedOn: string | null) => ({ quantity, receivedQty, receivedOn });
 
   it("is the day its last line came in full", () => {
-    expect(factoryReadyActual([line(2, 2, "2026-10-03"), line(1, 1, "2026-10-05")], null)).toBe("2026-10-05");
+    expect(supplierReadyActual([line(2, 2, "2026-10-03"), line(1, 1, "2026-10-05")], null)).toBe("2026-10-05");
   });
 
   it("is not known while a line is short", () => {
-    expect(factoryReadyActual([line(2, 1, "2026-10-03"), line(1, 1, "2026-10-05")], null)).toBeNull();
-    expect(factoryReadyActual([], null)).toBeNull();
+    expect(supplierReadyActual([line(2, 1, "2026-10-03"), line(1, 1, "2026-10-05")], null)).toBeNull();
+    expect(supplierReadyActual([], null)).toBeNull();
   });
 
   it("is at the latest the day the order shipped (the goods had left)", () => {
-    expect(factoryReadyActual([line(2, 0, null)], "2026-10-09")).toBe("2026-10-09");
-    expect(factoryReadyActual([line(2, 2, "2026-10-12")], "2026-10-09")).toBe("2026-10-09");
-    expect(factoryReadyActual([line(2, 2, "2026-10-02")], "2026-10-09")).toBe("2026-10-02");
+    expect(supplierReadyActual([line(2, 0, null)], "2026-10-09")).toBe("2026-10-09");
+    expect(supplierReadyActual([line(2, 2, "2026-10-12")], "2026-10-09")).toBe("2026-10-09");
+    expect(supplierReadyActual([line(2, 2, "2026-10-02")], "2026-10-09")).toBe("2026-10-02");
   });
 });
 

@@ -151,8 +151,8 @@ function Warnings({ text }: { text: string }) {
 /**
  * Cancel an order (MoneyV2Cancel). Money is never left hanging: with money
  * received it asks what happens to it (keep as credit, refund now or later,
- * keep as a fee); with money paid to the factory, a refund expected from the
- * factory or a loss on this order.
+ * keep as a fee); with money paid to the supplier, a refund expected from the
+ * supplier or a loss on this order.
  */
 export function CancelOrderForm({
   action,
@@ -160,7 +160,7 @@ export function CancelOrderForm({
   customer,
   received,
   currency,
-  factoryPaid = [],
+  supplierPaid = [],
   today,
   total,
   voids,
@@ -171,8 +171,8 @@ export function CancelOrderForm({
   /** Money received on the order (its currency). */
   received?: string;
   currency?: string;
-  /** Money paid to the factories ("CNY 30,000.00 to Wenzhou Works"). */
-  factoryPaid?: string[];
+  /** Money paid to the suppliers ("CNY 30,000.00 to Wenzhou Works"). */
+  supplierPaid?: string[];
   today?: string;
   /** The order total, for the dialog's title line. */
   total?: string;
@@ -183,7 +183,7 @@ export function CancelOrderForm({
   const { open, close } = useSidePanel("cancel-order");
   const [customerMoney, setCustomerMoney] = useState<"credit" | "refund" | "fee">("credit");
   const [refundNow, setRefundNow] = useState(true);
-  const [factoryMoney, setFactoryMoney] = useState<"refund_due" | "loss">("refund_due");
+  const [supplierMoney, setSupplierMoney] = useState<"refund_due" | "loss">("refund_due");
   const moneyIn = Number(received ?? 0) > 0 && currency;
   const choice = (value: string, chosen: string, title: string, pick: () => void) => (
     <button
@@ -247,17 +247,17 @@ export function CancelOrderForm({
                   )}
                 </div>
               )}
-              {factoryPaid.length > 0 && (
+              {supplierPaid.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  <input type="hidden" name="factoryMoney" value={factoryMoney} />
-                  <p className="text-sm font-semibold">Supplier deposit {factoryPaid.join(", ")}</p>
+                  <input type="hidden" name="supplierMoney" value={supplierMoney} />
+                  <p className="text-sm font-semibold">Supplier deposit {supplierPaid.join(", ")}</p>
                   <div role="radiogroup" aria-label="Money paid to the supplier" className="grid gap-2 sm:grid-cols-2">
-                    {choice("refund_due", factoryMoney, "Refund expected from the supplier", () => setFactoryMoney("refund_due"))}
-                    {choice("loss", factoryMoney, "A loss on this order", () => setFactoryMoney("loss"))}
+                    {choice("refund_due", supplierMoney, "Refund expected from the supplier", () => setSupplierMoney("refund_due"))}
+                    {choice("loss", supplierMoney, "A loss on this order", () => setSupplierMoney("loss"))}
                   </div>
                 </div>
               )}
-              {!moneyIn && !factoryPaid.length && <p className="text-xs text-muted">No money was received or paid on this order.</p>}
+              {!moneyIn && !supplierPaid.length && <p className="text-xs text-muted">No money was received or paid on this order.</p>}
               <div className="-mx-5 -mb-4 mt-1 flex flex-wrap justify-end gap-2 border-t border-line bg-surface-2/60 px-5 py-3.5 sm:-mx-6 sm:px-6">
                 <Button type="button" variant="secondary" onClick={() => close()}>
                   Keep the order

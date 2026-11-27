@@ -12,11 +12,11 @@ import { OrderPage } from "@/components/order-sections/order-side";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import {
-  ChangeFactoryPaymentWindow,
-  FactoryAgreedWindow,
-  FactoryOrderWindow,
-  PayFactoryWindow,
-} from "@/components/order-sections/factory-windows";
+  ChangeSupplierPaymentWindow,
+  SupplierAgreedWindow,
+  SupplierOrderWindow,
+  PaySupplierWindow,
+} from "@/components/order-sections/supplier-windows";
 import { BoxFacts } from "@/components/common/record-box";
 import { SendForm, type PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLinesView } from "@/components/orders/order-lines";
@@ -25,9 +25,9 @@ import { SupplierPlanWindow } from "@/components/money/plan-editor";
 import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords, theirInvoices } from "@/components/order-sections/supplier-plan";
 import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
-import { factoryPaymentAction, factoryPlanAction, removePaymentFileAction, voidFactoryPaymentAction } from "../../../money/actions";
+import { supplierPaymentAction, supplierPlanAction, removePaymentFileAction, voidSupplierPaymentAction } from "../../../money/actions";
 import { sendPurchaseOrderAction } from "../../flow-actions";
-import { factoryTermsAction } from "../../actions";
+import { supplierTermsAction } from "../../actions";
 import { fieldsAction } from "../../light-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
@@ -37,11 +37,11 @@ export const generateMetadata = orderTitle("Purchase order");
 
 
 /**
- * Factory order (design "the order, final"): the purchase order to each factory, the lines we ordered at
- * the factory's prices, the plan for paying it and the payments made. Money to a factory is recorded
- * here and nowhere else on the order. Factory prices show only to people who may see them.
+ * Supplier order (design "the order, final"): the purchase order to each supplier, the lines we ordered at
+ * the supplier's prices, the plan for paying it and the payments made. Money to a supplier is recorded
+ * here and nowhere else on the order. Supplier prices show only to people who may see them.
  */
-export default async function OrderFactory({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderSupplier({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const d = await stageData(id, "factory");
   const { me, o, flow, now, defaults } = d;
@@ -64,7 +64,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
     ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}`
     : null;
   const goodsLines = o.lines.filter((l) => l.type === "goods");
-  const priced = goodsLines.some((l) => l.factoryPrice) ? goodsLines : [];
+  const priced = goodsLines.some((l) => l.supplierPrice) ? goodsLines : [];
   const payments = m.factories?.payments ?? [];
   const live = payments.filter((x) => !x.voided);
   const plans = m.factories?.plans ?? [];
@@ -73,10 +73,10 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const paidFor = new Map<string, string[]>();
   for (const plan of plans)
     for (const r of plan.rows) for (const x of r.payments) paidFor.set(x.id, [...(paidFor.get(x.id) ?? []), r.label]);
-  const manyFactories = new Set(payments.map((x) => x.factory.id)).size > 1 || plans.length > 1;
+  const manySuppliers = new Set(payments.map((x) => x.factory.id)).size > 1 || plans.length > 1;
   const madeFor = (x: (typeof payments)[number]) => {
     const parts = paidFor.get(x.id)?.join(", ") ?? null;
-    if (!manyFactories) return parts;
+    if (!manySuppliers) return parts;
     return (
       <>
         {parts ?? <Dash />}
@@ -94,16 +94,16 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
   const pay = (
     label: string,
     main: boolean,
-    prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null },
+    prefill?: { supplierId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null },
     name?: string,
   ) =>
     canPay ? (
-      <PayFactoryWindow
+      <PaySupplierWindow
         name={name}
         label={label}
         main={main}
         sub={sub}
-        action={factoryPaymentAction.bind(null, o.id, null, null)}
+        action={supplierPaymentAction.bind(null, o.id, null, null)}
         factories={owing}
         people={people ?? []}
         orderCurrency={o.currency}
@@ -113,7 +113,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       />
     ) : null;
   // Pay is on each plan's next part, as Record payment is on the customer's; Payments made offers "Pay the
-  // factory" only for a factory owed money with no part left to pay it on (prices changed since the plan).
+  // factory" only for a supplier owed money with no part left to pay it on (prices changed since the plan).
   const onAPart = (f: { factory: { id: string }; currency: string }) =>
     plans.some(
       (p) => p.factory.id === f.factory.id && p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0),
@@ -125,7 +125,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       <SupplierPlanWindow
         label={label}
         sub={`${o.refNo} · ${plan.factory.name} · ${money(plan.owed, plan.currency)}`}
-        action={factoryPlanAction.bind(null, o.id)}
+        action={supplierPlanAction.bind(null, o.id)}
         plan={plan}
         orderedOn={orderedOn}
       />
@@ -142,7 +142,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
       currency={o.currency}
     />
   );
-  // Agreed with the factory (design "terms that travel", step 3b): the purchase order's own copy once sent, else
+  // Agreed with the supplier (design "terms that travel", step 3b): the purchase order's own copy once sent, else
   // its offer's, in the four groups; the payment is its plan's.
   const agreedOf = (po: PurchaseOrderView, many: boolean) => {
     const a = po.agreed;
@@ -178,10 +178,10 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
               </Link>
             )}
             {canEdit && (
-              <FactoryAgreedWindow
+              <SupplierAgreedWindow
                 title={`What we agreed with ${po.supplier.name}`}
                 sub={`${po.number}${from ? ` · from their offer ${from}` : ""}`}
-                action={factoryTermsAction.bind(null, o.id, po.id)}
+                action={supplierTermsAction.bind(null, o.id, po.id)}
                 sent={!!po.sentOn}
                 values={{
                   basis: a.basis,
@@ -349,7 +349,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                   <Printer aria-hidden /> View / print
                 </ButtonLink>
                 {canEdit && n === 0 && (
-                  <FactoryOrderWindow
+                  <SupplierOrderWindow
                     orderId={o.id}
                     sub={`${po.number} · ${po.supplier.name}`}
                     action={fieldsAction.bind(null, o.id, "factory")}
@@ -435,7 +435,7 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                 payments={byId}
                 pay={(r) =>
                   pay("Pay", true, {
-                    factoryId: plan.factory.id,
+                    supplierId: plan.factory.id,
                     amount: r.open,
                     kind: r.dueRule === "on_order" ? "deposit" : "balance",
                     reference: r.supplierRef,
@@ -483,11 +483,11 @@ export default async function OrderFactory({ params }: { params: Promise<{ id: s
                       Receipt
                     </Link>
                     {m.factories!.canRecord && o.status !== "cancelled" && (
-                      <ChangeFactoryPaymentWindow
+                      <ChangeSupplierPaymentWindow
                         sub={`${o.refNo} · ${x.factory.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
                         payment={x}
-                        save={factoryPaymentAction.bind(null, o.id, x.id, x.updatedAt)}
-                        remove={voidFactoryPaymentAction.bind(null, o.id, x.id)}
+                        save={supplierPaymentAction.bind(null, o.id, x.id, x.updatedAt)}
+                        remove={voidSupplierPaymentAction.bind(null, o.id, x.id)}
                         removeFile={removePaymentFileAction.bind(null, "out", x.id, o.id)}
                         factories={m.factories!.rows}
                         people={people ?? []}

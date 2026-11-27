@@ -57,8 +57,8 @@ export const orderDocInclude = {
         select: {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
-          factoryQuoteLineId: true,
-          factoryQuoteLine: { select: { parentId: true } },
+          supplierQuoteLineId: true,
+          supplierQuoteLine: { select: { parentId: true } },
         },
       },
       // The packing list prints each case (case number, package, size, weights).
@@ -85,7 +85,7 @@ export interface DocCtx {
   settings: Settings;
   fx: MoneyCtx;
   today: ISODate;
-  /** The internal copy's unit costs (people who see factory prices). */
+  /** The internal copy's unit costs (people who see supplier prices). */
   seeCosts: boolean;
   buyer: BuyerSnapshot;
 }
@@ -218,7 +218,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
       unit: l.unit,
       unitPrice: goodsOnly ? null : l.unitPrice.toFixed(2),
       lineTotal: goodsOnly ? null : l.lineTotal.toFixed(2),
-      /** The internal copy only, for people who may see factory costs (sales currency, per unit). */
+      /** The internal copy only, for people who may see supplier costs (sales currency, per unit). */
       unitCost: goodsOnly || !c.seeCosts ? null : (l.unitCost?.toFixed(2) ?? null),
       // Packing list only: what the packing list form recorded (null until filled in).
       packing: goodsOnly

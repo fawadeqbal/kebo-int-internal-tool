@@ -36,9 +36,9 @@ describe("the order's one status word", () => {
 
   it("follows the facts, not a stage moved by hand: back when the purchase order is undone, forward only when it is placed", async () => {
     const db = prisma.company(FIRST_COMPANY_ID);
-    // An open order not ordered from the factory yet and with nothing shipped: Confirmed.
+    // An open order not ordered from the supplier yet and with nothing shipped: Confirmed.
     const o = await db.order.findFirst({
-      where: { status: "open", stage: "confirmed", factoryOrderedOn: null, shipments: { none: {} }, delivery: null },
+      where: { status: "open", stage: "confirmed", supplierOrderedOn: null, shipments: { none: {} }, delivery: null },
       select: { id: true, refNo: true },
     });
     if (!o) return; // the seed has none (nothing to check)
@@ -56,14 +56,14 @@ describe("the order's one status word", () => {
         ).body as Row[]
       ).find((r) => r.id === o.id);
       expect(inList?.word).toBe("Confirmed");
-      // The factory order is placed: now it is in production; taken back: Confirmed again.
-      await db.order.update({ where: { id: o.id }, data: { factoryOrderedOn: new Date(`${today}T00:00:00Z`) } });
+      // The supplier order is placed: now it is in production; taken back: Confirmed again.
+      await db.order.update({ where: { id: o.id }, data: { supplierOrderedOn: new Date(`${today}T00:00:00Z`) } });
       expect((await word()).word).toBe("In production");
-      await db.order.update({ where: { id: o.id }, data: { factoryOrderedOn: null } });
+      await db.order.update({ where: { id: o.id }, data: { supplierOrderedOn: null } });
       expect((await word()).word).toBe("Confirmed");
     } finally {
       // Put the stage back as it was.
-      await db.order.update({ where: { id: o.id }, data: { factoryOrderedOn: null } });
+      await db.order.update({ where: { id: o.id }, data: { supplierOrderedOn: null } });
       await api(app, manager).post(`/orders/${o.id}/stage`, { to: "confirmed", reason: "Moved by mistake in a test" }).expect(200);
     }
   });

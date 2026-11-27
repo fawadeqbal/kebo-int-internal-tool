@@ -25,7 +25,7 @@ export interface DealRow {
   customer: { id: string; name: string; country: string };
   assignee: Person | null;
   items: number;
-  /** Factories asked for prices, and the offers in. */
+  /** Suppliers asked for prices, and the offers in. */
   asked?: number;
   offers?: number;
   /** The quotation that speaks for the deal (accepted, else the lowest still waiting…; while all are drafts, A). */
@@ -53,7 +53,7 @@ export interface DealItem {
   quantity: string;
   unit: string;
   targetPrice: string | null;
-  /** A factory has priced it: changing or removing it asks why. */
+  /** A supplier has priced it: changing or removing it asks why. */
   priced: boolean;
 }
 

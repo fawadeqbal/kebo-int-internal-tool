@@ -14,8 +14,8 @@ import type {
   WarrantyFrom,
 } from "@kebo/shared";
 
-/** A factory's terms as facts, to check a promise against (an older offer's words read where they say them). */
-export interface FactoryTerms {
+/** A supplier's terms as facts, to check a promise against (an older offer's words read where they say them). */
+export interface SupplierTerms {
   leadDays: number | null;
   leadFrom: LeadFrom | null;
   parts: TermPart[];
@@ -23,7 +23,7 @@ export interface FactoryTerms {
   warrantyFrom: WarrantyFrom | null;
 }
 
-/** Response shapes for the deal-work screens: inquiry form, factory prices, quotation, reports. */
+/** Response shapes for the deal-work screens: inquiry form, supplier prices, quotation, reports. */
 
 /* ---------------------------------------------------------------- pickers */
 
@@ -44,7 +44,7 @@ export interface ContactOption {
   isPrimary: boolean;
 }
 
-export interface FactoryOption {
+export interface SupplierOption {
   id: string;
   name: string;
   contactPerson: string | null;
@@ -72,9 +72,9 @@ export interface DealFormValues {
 
 /* ---------------------------------------------------------------- sourcing */
 
-export interface FactoryQuoteLineView {
+export interface SupplierQuoteLineView {
   id: string;
-  /** "1", "2", "2.1" within the offer (the factory's own breakdown). */
+  /** "1", "2", "2.1" within the offer (the supplier's own breakdown). */
   no: string;
   /** A part of this line of the same offer. */
   parentId: string | null;
@@ -89,11 +89,11 @@ export interface FactoryQuoteLineView {
   unitPrice: string;
   /** This line's tax % (the offer's unless changed): added on top of the price, or included in it. */
   taxRate: number;
-  /** e.g. "CNY 100.00 + 13% tax = CNY 113.00", "CNY 113.00, tax 13% included (CNY 13.00)" (factory currency). */
+  /** e.g. "CNY 100.00 + 13% tax = CNY 113.00", "CNY 113.00, tax 13% included (CNY 13.00)" (supplier currency). */
   costNote: string;
   /** One unit's landed cost in the selling currency; null when the exchange rate is missing. */
   unitCost: string | null;
-  /** The same product in other factories' offers (copied lines share it). */
+  /** The same product in other suppliers' offers (copied lines share it). */
   productKey: string;
   /** A quotation is priced from it: changing its price, quantity or place asks why. */
   used: boolean;
@@ -102,7 +102,7 @@ export interface FactoryQuoteLineView {
   alternativeOfNo?: string | null;
 }
 
-/** A file kept with a factory offer: its quotation, catalogue, screenshots (internal). */
+/** A file kept with a supplier offer: its quotation, catalogue, screenshots (internal). */
 export interface OfferFile {
   id: string;
   fileName: string;
@@ -113,18 +113,18 @@ export interface OfferFile {
   uploadedOn: string;
 }
 
-export interface FactoryQuoteView {
+export interface SupplierQuoteView {
   id: string;
   factory: { id: string; name: string };
   reference: string | null;
   receivedOn: string;
   validUntil: string | null;
   currency: string;
-  /** The factory's prices have the tax in them (shown, never added again), or the tax is added on top. */
+  /** The supplier's prices have the tax in them (shown, never added again), or the tax is added on top. */
   taxIncluded: boolean;
   /** The offer's tax % (its lines take it unless they have their own). */
   taxRate: number;
-  /** What the factory's prices already pay for (EXW, FOB…), and where. */
+  /** What the supplier's prices already pay for (EXW, FOB…), and where. */
   basis: Incoterm | null;
   basisPlace: string | null;
   /** The lead time's words ("30 days after the advance"). */
@@ -138,15 +138,15 @@ export interface FactoryQuoteView {
   warranty: string | null;
   warrantyMonths: number | null;
   warrantyFrom: WarrantyFrom | null;
-  /** The advance the factory asks when we order, in % (null: the company's default). */
+  /** The advance the supplier asks when we order, in % (null: the company's default). */
   advancePercent: number | null;
-  /** What the factory asks, as parts (an older offer's advance and the rest when ready). */
+  /** What the supplier asks, as parts (an older offer's advance and the rest when ready). */
   paymentParts: TermPart[];
   notes: string | null;
   fxRate: number | null;
-  lines: FactoryQuoteLineView[];
-  /** The lines at the factory's prices, in its currency. */
-  factoryTotal: string;
+  lines: SupplierQuoteLineView[];
+  /** The lines at the supplier's prices, in its currency. */
+  supplierTotal: string;
   /** The tax in that: on top (without tax) or inside (tax included), in its currency. */
   taxTotal: string;
   /** What the whole offer costs us in the selling currency (null when a rate is missing). */
@@ -158,7 +158,7 @@ export interface FactoryQuoteView {
   files: OfferFile[];
 }
 
-export interface SourcingOption extends FactoryQuoteLineView {
+export interface SourcingOption extends SupplierQuoteLineView {
   factory: { id: string; name: string };
   quoteId: string;
   currency: string;
@@ -167,7 +167,7 @@ export interface SourcingOption extends FactoryQuoteLineView {
 export interface SourcingView {
   currency: string;
   missingRates: string[];
-  quotes: FactoryQuoteView[];
+  quotes: SupplierQuoteView[];
   items: {
     id: string;
     /** "2", "2.1" (a part of item 2). */
@@ -209,7 +209,7 @@ export interface QuoteLineView {
   lineTotal: string;
   /** Only for people who may see costs. */
   unitCost?: string | null;
-  factoryQuoteLineId?: string | null;
+  supplierQuoteLineId?: string | null;
   fxRate?: string | null;
 }
 
@@ -227,7 +227,7 @@ export interface Costing {
   extraCost: string;
 }
 
-/** A cost between the factory's basis and ours, as saved on an option. */
+/** A cost between the supplier's basis and ours, as saved on an option. */
 export interface BasisCost {
   step: BasisStep;
   amount: string;
@@ -245,14 +245,14 @@ export interface Coverage {
   missing: string[];
 }
 
-/** One option of a revision: one factory's offer (or the customer's items priced by hand). */
+/** One option of a revision: one supplier's offer (or the customer's items priced by hand). */
 export interface OptionView {
   id: string;
   letter: string;
   status: OptionStatus;
   /** Internal: whose offer it is (people who see costs). */
   factory: { id: string; name: string } | null;
-  factoryQuoteId: string | null;
+  supplierQuoteId: string | null;
   leadTime: string | null;
   /** The lead time we promise as days from a moment (null: only its words). */
   leadDays: number | null;
@@ -263,14 +263,14 @@ export interface OptionView {
   coverage: Coverage;
   lines: QuoteLineView[];
   costing: Costing | null;
-  /** People who see costs: the factory's basis when priced, what it takes to reach ours, and those costs. */
-  factoryBasis?: Incoterm | null;
-  factoryBasisPlace?: string | null;
-  /** People who see costs: what the option's factory gives now, to check the promise against. */
-  factoryTerms?: FactoryTerms | null;
+  /** People who see costs: the supplier's basis when priced, what it takes to reach ours, and those costs. */
+  supplierBasis?: Incoterm | null;
+  supplierBasisPlace?: string | null;
+  /** People who see costs: what the option's supplier gives now, to check the promise against. */
+  supplierTerms?: SupplierTerms | null;
   /** People who see costs: the day the supplier's prices end, and the offer's currency. */
-  factoryValidUntil?: string | null;
-  factoryCurrency?: string | null;
+  supplierValidUntil?: string | null;
+  supplierCurrency?: string | null;
   /** People who see costs: supplier prices changed after this was quoted (now null: gone from the offer). */
   offerChanged?: { no: string; description: string; was: string; now: string | null }[];
   gap?: { needed: BasisStep[]; extra: BasisStep[] } | null;
@@ -348,9 +348,9 @@ export interface QuotationOfDeal {
   whyNotStart: string | null;
 }
 
-/** One option as the editor sends it: our price per line (factory line, or customer item without factory prices), charges, discount, lead time. */
+/** One option as the editor sends it: our price per line (supplier line, or customer item without supplier prices), charges, discount, lead time. */
 export interface OptionValues {
-  factoryQuoteId: string | null;
+  supplierQuoteId: string | null;
   leadTime: string | null;
   leadDays?: number | null;
   leadFrom?: LeadFrom | null;
@@ -398,7 +398,7 @@ export interface RevisionDraft {
   };
 }
 
-/** A line of a factory offer as the quotation editor shows it (locked; costs in the quotation currency). */
+/** A line of a supplier offer as the quotation editor shows it (locked; costs in the quotation currency). */
 export interface OfferLine {
   id: string;
   no: string;
@@ -420,7 +420,7 @@ export interface QuoteOffers {
   mainCurrency: string;
   rates: Record<string, number>;
   offers: {
-    factoryQuoteId: string;
+    supplierQuoteId: string;
     factory: { id: string; name: string };
     currency: string;
     basis: Incoterm | null;
@@ -431,8 +431,8 @@ export interface QuoteOffers {
     /** Its lead time as typed (null: only its words). */
     leadDays?: number | null;
     leadFrom?: LeadFrom | null;
-    /** What the factory gives, to check each option's promise against. */
-    terms?: FactoryTerms;
+    /** What the supplier gives, to check each option's promise against. */
+    terms?: SupplierTerms;
     coverage: Coverage;
     missingRate: boolean;
     /** Items still without a supplier price. */

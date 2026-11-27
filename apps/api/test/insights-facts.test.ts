@@ -10,7 +10,7 @@ import { toInfo } from "../src/common/company/companies.service";
 import type { SessionUser } from "../src/common/auth/session-user";
 import { FactsService } from "../src/modules/insights/facts/facts.service";
 import { FactsReadService } from "../src/modules/insights/facts/facts-read.service";
-import { factoryPositionsSql } from "../src/modules/billing/api";
+import { supplierPositionsSql } from "../src/modules/billing/api";
 import { fxOf } from "../src/modules/billing/api";
 import { MainMoney } from "../src/modules/money/order-money";
 import { readyOnOf } from "@kebo/database";
@@ -18,7 +18,7 @@ import { api, signIn, startApp } from "./app";
 
 /**
  * Insights data (PR B): three calculated tables written only by the shared rules. They agree with the
- * screens for every demo order, inquiry and order × factory; they follow every change (through the
+ * screens for every demo order, inquiry and order × supplier; they follow every change (through the
  * queue the database triggers fill); the nightly check finds, logs and fixes a planted difference; an
  * empty company is fine; companies stay apart; money is only for people who may see it.
  */
@@ -48,14 +48,14 @@ describe("Insights data: order, inquiry and supplier facts", () => {
   const row = async (orderId: string) =>
     ((await api(app, manager).get(`/insights/facts/orders?limit=1000`).expect(200)).body.rows as Record<string, unknown>[]).find((r) => r.orderId === orderId)!;
   const stored = (orderId: string) => db().orderFact.findUniqueOrThrow({ where: { orderId } });
-  const factoryRow = async (orderId: string) => {
+  const supplierRow = async (orderId: string) => {
     await api(app, manager).get("/insights/facts/status").expect(200);
     await inKebo(() => facts.drain());
-    return db().factoryOrderFact.findFirstOrThrow({ where: { orderId } });
+    return db().supplierOrderFact.findFirstOrThrow({ where: { orderId } });
   };
 
   let n = 0;
-  /** An order of 10 pumps at USD 1,000 (USD 10,000, 30% deposit) bought at CNY 1,000 from a factory of its own. */
+  /** An order of 10 pumps at USD 1,000 (USD 10,000, 30% deposit) bought at CNY 1,000 from a supplier of its own. */
   async function makeOrder() {
     n += 1;
     const customer = (
@@ -63,7 +63,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
         .post("/customers", { name: `Facts ${n} ${tag}`, country: "KE", contacts: [{ name: "Ada", email: `ada-${n}-${tag}@facts.test` }] })
         .expect(201)
     ).body;
-    const factoryId = (await api(app, sana).post("/factories", { name: `Facts Works ${n} ${tag}`, address: "Taizhou" }).expect(201)).body.id as string;
+    const supplierId = (await api(app, sana).post("/factories", { name: `Facts Works ${n} ${tag}`, address: "Taizhou" }).expect(201)).body.id as string;
     const inquiry = (
       await api(app, sana)
         .post("/inquiries", { customerId: customer.id, category: "Machinery", channel: "whatsapp", assigneeId: me, items: [{ description: "Pump", quantity: 10 }] })
@@ -72,7 +72,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-10),
         currency: "CNY",
         taxRate: 0,
@@ -85,7 +85,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r.id}/status`, { to: "accepted" }).expect(200);
     const o = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0];
-    return { orderId: o.id as string, inquiryId: inquiry.id as string, customerId: customer.id as string, factoryId };
+    return { orderId: o.id as string, inquiryId: inquiry.id as string, customerId: customer.id as string, supplierId };
   }
 
   beforeAll(async () => {
@@ -115,7 +115,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
     it("each order's money is its money page and Costs page, at the order's rate", async () => {
       const fx = await main();
       const orders = await db().order.findMany({
-        select: { id: true, status: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true, factories: true, lines: { select: { factoryId: true } }, shipments: { select: { departedOn: true } } },
+        select: { id: true, status: true, currency: true, mainCurrency: true, mainRate: true, orderedOn: true, factories: true, lines: { select: { supplierId: true } }, shipments: { select: { departedOn: true } } },
       });
       for (const o of orders) {
         const f = await stored(o.id);
@@ -157,33 +157,33 @@ describe("Insights data: order, inquiry and supplier facts", () => {
       expect(groups.rows[0]?.orders ?? 0).toBe(report.profit.total.orders);
     });
 
-    it("what we owe each supplier is factoryPosition's (the SQL twin)", async () => {
+    it("what we owe each supplier is supplierPosition's (the SQL twin)", async () => {
       const s = await settings();
-      const sql = await factoryPositionsSql(db(), fxOf(s, true));
-      const rows = await db().factoryOrderFact.findMany({ where: { status: { not: "cancelled" } } });
+      const sql = await supplierPositionsSql(db(), fxOf(s, true));
+      const rows = await db().supplierOrderFact.findMany({ where: { status: { not: "cancelled" } } });
       expect(rows.length).toBeGreaterThan(0);
       for (const r of rows) {
-        const mine = sql.filter((x) => x.orderId === r.orderId && x.factoryId === r.factoryId);
+        const mine = sql.filter((x) => x.orderId === r.orderId && x.supplierId === r.supplierId);
         expect(mine.length).toBeGreaterThan(0);
         if (mine.length === 1) {
           expect([r.orderId, r.currency, Number(r.owed), Number(r.toPay)]).toEqual([r.orderId, mine[0]!.currency, mine[0]!.owedMinor / 100, mine[0]!.toPayMinor / 100]);
           expect(Number(r.paid)).toBe((mine[0]!.paidMinor + mine[0]!.takenOffMinor) / 100);
         }
       }
-      // One row per factory the lines are bought from.
-      const pairs = await db().orderLine.findMany({ where: { factoryId: { not: null } }, select: { orderId: true, factoryId: true }, distinct: ["orderId", "factoryId"] });
-      expect(await db().factoryOrderFact.count()).toBe(pairs.length);
+      // One row per supplier the lines are bought from.
+      const pairs = await db().orderLine.findMany({ where: { supplierId: { not: null } }, select: { orderId: true, supplierId: true }, distinct: ["orderId", "supplierId"] });
+      expect(await db().supplierOrderFact.count()).toBe(pairs.length);
     });
 
     it("each inquiry's dates, prices and outcome are its own", async () => {
       const inquiries = await db().inquiry.findMany({
         where: { deletedAt: null },
-        select: { id: true, stage: true, createdAt: true, closedAt: true, lostReason: true, _count: { select: { factoryQuotes: { where: { deletedAt: null } } } } },
+        select: { id: true, stage: true, createdAt: true, closedAt: true, lostReason: true, _count: { select: { supplierQuotes: { where: { deletedAt: null } } } } },
       });
       for (const i of inquiries) {
         const f = await db().inquiryFact.findUniqueOrThrow({ where: { inquiryId: i.id } });
         const outcome = i.stage === "won" || i.stage === "lost" ? i.stage : "open";
-        expect([i.id, f.outcome, fromDbDate(f.receivedOn), f.gotPrices]).toEqual([i.id, outcome, dateIn(i.createdAt, tz), i._count.factoryQuotes > 0]);
+        expect([i.id, f.outcome, fromDbDate(f.receivedOn), f.gotPrices]).toEqual([i.id, outcome, dateIn(i.createdAt, tz), i._count.supplierQuotes > 0]);
         if (outcome !== "open" && i.closedAt) expect(fromDbDateOrNull(f.closedOn)).toBe(dateIn(i.closedAt, tz));
         if (outcome === "lost") expect(f.lostReason).toBe(i.lostReason);
       }
@@ -203,8 +203,8 @@ describe("Insights data: order, inquiry and supplier facts", () => {
 
     it("a new order has its row, its supplier's row, and its inquiry is won", async () => {
       expect(await row(o.orderId)).toMatchObject({ sales: "10000.00", received: "0.00", due: "10000.00", channel: "whatsapp", country: "KE", status: "open" });
-      expect(await factoryRow(o.orderId)).toMatchObject({ factoryId: o.factoryId, currency: "CNY", offersSent: 1, offerWon: true, claims: 0 });
-      expect(Number((await factoryRow(o.orderId)).owed)).toBe(10000);
+      expect(await supplierRow(o.orderId)).toMatchObject({ supplierId: o.supplierId, currency: "CNY", offersSent: 1, offerWon: true, claims: 0 });
+      expect(Number((await supplierRow(o.orderId)).owed)).toBe(10000);
       expect((await db().inquiryFact.findUniqueOrThrow({ where: { inquiryId: o.inquiryId } })).outcome).toBe("won");
     });
 
@@ -246,22 +246,22 @@ describe("Insights data: order, inquiry and supplier facts", () => {
     });
 
     it("a supplier payment", async () => {
-      await api(app, manager).post(`/orders/${o.orderId}/factory-payments`, { factoryId: o.factoryId, kind: "deposit", amount: 3000, currency: "CNY", paidOn: today }).expect(201);
-      const f = await factoryRow(o.orderId);
+      await api(app, manager).post(`/orders/${o.orderId}/factory-payments`, { supplierId: o.supplierId, kind: "deposit", amount: 3000, currency: "CNY", paidOn: today }).expect(201);
+      const f = await supplierRow(o.orderId);
       expect([Number(f.owed), Number(f.paid), Number(f.toPay)]).toEqual([10000, 3000, 7000]);
-      // The supplier's "Purchase orders": the same figures, in the factory's currency, with the order's number.
-      const pos = (await api(app, manager).get(`/insights/facts/factory-orders?factoryId=${o.factoryId}`).expect(200)).body;
+      // The supplier's "Purchase orders": the same figures, in the supplier's currency, with the order's number.
+      const pos = (await api(app, manager).get(`/insights/facts/factory-orders?supplierId=${o.supplierId}`).expect(200)).body;
       expect(pos.rows).toContainEqual(expect.objectContaining({ orderId: o.orderId, currency: "CNY", owed: "10000.00", paid: "3000.00", toPay: "7000.00", status: "open" }));
-      await api(app, sana).get(`/insights/facts/factory-orders?factoryId=${o.factoryId}`).expect(403);
-      // The factory's ledger: the payment row names the account it went out of.
-      const led = (await api(app, manager).get(`/ledger/parties/factory/${o.factoryId}?from=2000-01-01`).expect(200)).body;
+      await api(app, sana).get(`/insights/facts/factory-orders?supplierId=${o.supplierId}`).expect(403);
+      // The supplier's ledger: the payment row names the account it went out of.
+      const led = (await api(app, manager).get(`/ledger/parties/factory/${o.supplierId}?from=2000-01-01`).expect(200)).body;
       expect(led.rows.some((r: { debit: string; counter: { label: string } | null }) => Number(r.debit) > 0 && r.counter?.label)).toBe(true);
     });
 
     it("the ready date, a shipment that left, and the delivery", async () => {
-      await db().orderFactory.upsert({
-        where: { orderId_factoryId: { orderId: o.orderId, factoryId: o.factoryId } },
-        create: { orderId: o.orderId, factoryId: o.factoryId, readyOn: new Date(`${day(-6)}T00:00:00Z`) },
+      await db().orderSupplier.upsert({
+        where: { orderId_supplierId: { orderId: o.orderId, supplierId: o.supplierId } },
+        create: { orderId: o.orderId, supplierId: o.supplierId, readyOn: new Date(`${day(-6)}T00:00:00Z`) },
         update: { readyOn: new Date(`${day(-6)}T00:00:00Z`) },
       });
       await prisma.platform.$executeRaw`update orders set ship_by = ${day(-5)}::date where id = ${o.orderId}::uuid`;
@@ -269,9 +269,9 @@ describe("Insights data: order, inquiry and supplier facts", () => {
       const r = await row(o.orderId);
       expect(r).toMatchObject({ shippedOn: day(-2), onTime: false });
       expect(r.daysToShip).toBe((Date.parse(day(-2)) - Date.parse(String(r.orderedOn))) / 86_400_000);
-      // Ready when the goods left (nothing marked received): 4 days after the factory's date.
-      expect(await factoryRow(o.orderId)).toMatchObject({ daysLate: 4, onTime: false });
-      expect(fromDbDateOrNull((await factoryRow(o.orderId)).readyActual)).toBe(day(-2));
+      // Ready when the goods left (nothing marked received): 4 days after the supplier's date.
+      expect(await supplierRow(o.orderId)).toMatchObject({ daysLate: 4, onTime: false });
+      expect(fromDbDateOrNull((await supplierRow(o.orderId)).readyActual)).toBe(day(-2));
       await api(app, sana).patch(`/orders/${o.orderId}/delivery`, { deliveredOn: day(-1) }).expect(200);
       expect((await row(o.orderId)).deliveredOn).toBe(day(-1));
     });
@@ -358,10 +358,10 @@ describe("Insights data: order, inquiry and supplier facts", () => {
 
     it("an empty company: nothing to fill, nothing to fix, every read is empty", async () => {
       expect(await inOther(() => facts.fillIfEmpty())).toBe(false);
-      expect(await inOther(() => facts.rebuild(true))).toEqual({ orders: 0, inquiries: 0, factoryRows: 0, differences: [] });
+      expect(await inOther(() => facts.rebuild(true))).toEqual({ orders: 0, inquiries: 0, supplierRows: 0, differences: [] });
       const boss = person(["reports.view", "expenses.manage"]);
       expect((await inOther(() => read.orderGroups(boss, { period: "month", by: "customer" }))).rows).toEqual([]);
-      expect((await inOther(() => read.factoryGroups(boss, { period: "all", by: "factory" }))).rows).toEqual([]);
+      expect((await inOther(() => read.supplierGroups(boss, { period: "all", by: "factory" }))).rows).toEqual([]);
       expect(await inOther(() => read.funnel(boss, {}))).toMatchObject({ inquiries: 0, won: 0, lost: 0, lostReasons: [] });
       expect(await inOther(() => read.aging(boss, { side: "receivable" }))).toMatchObject({ total: "0.00", notDue: "0.00", over60: "0.00" });
       expect(await inOther(() => read.aging(boss, { side: "payable" }))).toMatchObject({ total: "0.00" });
@@ -374,7 +374,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
       const theirs = prisma.company(other.id);
       expect(await theirs.orderFact.count()).toBe(0);
       expect(await theirs.inquiryFact.count()).toBe(0);
-      expect(await theirs.factoryOrderFact.count()).toBe(0);
+      expect(await theirs.supplierOrderFact.count()).toBe(0);
       expect(await theirs.factsQueue.count()).toBe(0);
       const a = await db().orderFact.findFirstOrThrow();
       expect(await theirs.$executeRaw`update order_facts set total_main = 0 where order_id = ${a.orderId}::uuid`).toBe(0);
@@ -411,7 +411,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
       expect(g.sales).not.toBeNull();
       expect(g.profitQuote).not.toBeNull();
       expect([g.cost, g.profitExpected, g.margin, g.expenses, g.costsOverPlan]).toEqual([null, null, null, null, null]);
-      const f = (await inKebo(() => read.factoryGroups(reader, { period: "all", by: "factory" }))).rows;
+      const f = (await inKebo(() => read.supplierGroups(reader, { period: "all", by: "factory" }))).rows;
       expect(f.length).toBeGreaterThan(0);
       expect(f.every((r) => r.spend === null && r.toPay === null && r.own === null)).toBe(true);
       await expect(inKebo(() => read.aging(reader, { side: "payable" }))).rejects.toThrow("Only people who may see money");
@@ -427,7 +427,7 @@ describe("Insights data: order, inquiry and supplier facts", () => {
       const boss = person(["reports.view", "expenses.manage"]);
       const b = (await inKebo(() => read.orderGroups(boss, { period: "all", by: "company" }))).rows[0]!;
       expect([b.cost, b.profitExpected, b.expenses]).not.toContain(null);
-      expect((await inKebo(() => read.factoryGroups(boss, { period: "all", by: "factory" }))).rows.some((r) => r.spend !== null)).toBe(true);
+      expect((await inKebo(() => read.supplierGroups(boss, { period: "all", by: "factory" }))).rows.some((r) => r.spend !== null)).toBe(true);
     });
 
     it("nobody without Reports reads them", async () => {
@@ -468,12 +468,12 @@ describe("Insights data: order, inquiry and supplier facts", () => {
       expect(now.overdue.list.length).toBe(Math.min(5, now.overdue.customers));
       // Open quotations: the open inquiries with a quotation sent.
       expect(now.openQuotes.count).toBe(await db().inquiryFact.count({ where: { outcome: "open", firstQuoteOn: { not: null } } }));
-      // What we owe factories in their own currencies matches the factory facts.
-      const own = await db().factoryOrderFact.groupBy({ by: ["currency"], where: { status: { not: "cancelled" }, currency: { not: null } }, _sum: { toPay: true } });
+      // What we owe suppliers in their own currencies matches the supplier facts.
+      const own = await db().supplierOrderFact.groupBy({ by: ["currency"], where: { status: { not: "cancelled" }, currency: { not: null } }, _sum: { toPay: true } });
       for (const o of own.filter((x) => Number(x._sum.toPay) !== 0))
         expect(now.byCurrency.find((x: { currency: string }) => x.currency === o.currency)?.toPay).toBe(Number(o._sum.toPay).toFixed(2));
-      // A late factory is one whose goods are past the promised ready date and not ready.
-      for (const f of now.lateFactories) expect(f.days).toBeGreaterThan(0);
+      // A late supplier is one whose goods are past the promised ready date and not ready.
+      for (const f of now.lateSuppliers) expect(f.days).toBeGreaterThan(0);
       await api(app, sana).get("/insights/facts/now").expect(403);
     });
   });

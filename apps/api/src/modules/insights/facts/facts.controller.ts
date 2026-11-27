@@ -5,7 +5,7 @@ import { isISODate } from "@kebo/utils";
 import { Validate } from "../../../common/http/zod.pipe";
 import { CurrentUser, RequireFeature, SignedIn } from "../../../common/auth/decorators";
 import type { SessionUser } from "../../../common/auth/session-user";
-import { FACTORY_GROUPS, FactsReadService, ORDER_GROUPS, PERIODS } from "./facts-read.service";
+import { SUPPLIER_GROUPS, FactsReadService, ORDER_GROUPS, PERIODS } from "./facts-read.service";
 
 const date = z.string().refine(isISODate, "Use a valid date (YYYY-MM-DD)").optional();
 const id = z.string().uuid().optional();
@@ -16,17 +16,17 @@ const filters = {
   channel: z.string().max(20).optional(),
   country: z.string().length(2).optional(),
   category: z.string().max(120).optional(),
-  factoryId: id,
+  supplierId: id,
 };
 const period = z.enum(PERIODS).default("month");
 const orderQuery = z.object({ ...span, ...filters, period, by: z.enum(ORDER_GROUPS).default("company") });
 const inquiryQuery = orderQuery.extend({ on: z.enum(["received", "closed"]).default("received") });
-const factoryQuery = z.object({ ...span, factoryId: id, period, by: z.enum(FACTORY_GROUPS).default("factory") });
+const supplierQuery = z.object({ ...span, supplierId: id, period, by: z.enum(SUPPLIER_GROUPS).default("factory") });
 const agingQuery = z.object({
   side: z.enum(["receivable", "payable"]).default("receivable"),
   bucket: z.enum(["notDue", "d30", "d60", "d90", "older"]).optional(),
   customerId: id,
-  factoryId: id,
+  supplierId: id,
 });
 const owedQuery = z.object({ side: z.enum(["receivable", "payable"]).default("receivable") });
 const rowsQuery = z.object({ ...span, ...filters, limit: z.coerce.number().int().min(1).max(1000).optional() });
@@ -64,15 +64,15 @@ export class FactsController {
     return this.read.funnel(user, q);
   }
 
-  /** Factories per period × group (by=factory|company): spend, to pay, ready on time, offers won of sent, claims. */
+  /** Suppliers per period × group (by=factory|company): spend, to pay, ready on time, offers won of sent, claims. */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("factories/groups")
-  factoryGroups(@CurrentUser() user: SessionUser, @Query(Validate(factoryQuery)) q: z.infer<typeof factoryQuery>) {
-    return this.read.factoryGroups(user, q);
+  supplierGroups(@CurrentUser() user: SessionUser, @Query(Validate(supplierQuery)) q: z.infer<typeof supplierQuery>) {
+    return this.read.supplierGroups(user, q);
   }
 
-  /** Owed to us (side=receivable) or to factories (side=payable) by age today; bucket= lists its orders. */
+  /** Owed to us (side=receivable) or to suppliers (side=payable) by age today; bucket= lists its orders. */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("aging")
@@ -80,7 +80,7 @@ export class FactsController {
     return this.read.aging(user, q);
   }
 
-  /** What each customer owes us (side=receivable) or we owe each factory (side=payable) today: total and overdue. */
+  /** What each customer owes us (side=receivable) or we owe each supplier (side=payable) today: total and overdue. */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("owed")
@@ -88,15 +88,15 @@ export class FactsController {
     return this.read.owed(user, q);
   }
 
-  /** ?factoryId → that factory's orders: owed, paid, to pay, ready date, stage (Suppliers › Overview). */
+  /** ?supplierId → that supplier's orders: owed, paid, to pay, ready date, stage (Suppliers › Overview). */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("factory-orders")
-  factoryOrders(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ factoryId: z.string().uuid() }))) q: { factoryId: string }) {
-    return this.read.factoryOrders(user, q);
+  supplierOrders(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ supplierId: z.string().uuid() }))) q: { supplierId: string }) {
+    return this.read.supplierOrders(user, q);
   }
 
-  /** Cash in and out by month, straight from payments, factory payments and expenses; expenses by kind. */
+  /** Cash in and out by month, straight from payments, supplier payments and expenses; expenses by kind. */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("cash")
@@ -104,7 +104,7 @@ export class FactsController {
     return this.read.cash(user, q);
   }
 
-  /** What stands today and needs attention: open quotations, expiring ones, overdue customers, late factories, low margins. */
+  /** What stands today and needs attention: open quotations, expiring ones, overdue customers, late suppliers, low margins. */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
   @Get("now")

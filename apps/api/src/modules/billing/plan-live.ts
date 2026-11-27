@@ -10,7 +10,7 @@ type Db = PrismaService["db"] | Tx;
 
 /**
  * Single source of truth, PR 4: the customer's plan follows the dates. Each instalment's date is worked out
- * from its rule and the order's dates as they are now (the ready date: the latest factory's; shipped on: the
+ * from its rule and the order's dates as they are now (the ready date: the latest supplier's; shipped on: the
  * earliest departure; the day the papers reached the customer's bank), and each part is named from its
  * amount. Every screen, paper and reminder reads the plan through here; nothing re-dates stored rows.
  */
@@ -24,8 +24,8 @@ export const planDatesSelect = {
 } satisfies Prisma.OrderSelect;
 
 type DatesOrder = {
-  factories: { factoryId: string | null; readyOn: Date | null }[];
-  lines: { factoryId: string | null }[];
+  factories: { supplierId: string | null; readyOn: Date | null }[];
+  lines: { supplierId: string | null }[];
   shipments: { departedOn: Date | null }[];
   bankSteps: { doneOn: Date }[];
   delivery?: { satDoneOn: Date | null } | null;
@@ -46,7 +46,7 @@ const liveSelect = {
   total: true,
   ...termsSelect,
   receivables: { orderBy: { sortOrder: "asc" } },
-  lines: { select: { factoryId: true } },
+  lines: { select: { supplierId: true } },
   ...planDatesSelect,
 } satisfies Prisma.OrderSelect;
 

@@ -6,7 +6,7 @@ import type {
   BankStepKind,
   ClaimStatus,
   DeliveryCondition,
-  FactoryRequestStatus,
+  SupplierRequestStatus,
   FlowState,
   FlowStep,
   OrderDocumentKind,
@@ -43,10 +43,10 @@ export interface OrderFlow {
   factory: {
     orderedOn: string | null;
     orderNo?: string | null;
-    /** The order's ready date: the latest of its factories' (known once each has given one). */
+    /** The order's ready date: the latest of its suppliers' (known once each has given one). */
     readyOn: string | null;
-    /** Each factory's own ready date (factoryId null: the goods of an order whose lines name no factory). */
-    readyBy?: { factoryId: string | null; name: string | null; readyOn: string | null }[];
+    /** Each supplier's own ready date (supplierId null: the goods of an order whose lines name no supplier). */
+    readyBy?: { supplierId: string | null; name: string | null; readyOn: string | null }[];
     factories: { id: string; name: string }[];
   };
   shipping: { shipments: ShipmentView[] } | null;
@@ -160,7 +160,7 @@ export interface ClaimView {
   openedOn: string;
   resolvedOn: string | null;
   resolution: string | null;
-  /** What it is worth, and who bears it: factory | us | customer. */
+  /** What it is worth, and who bears it: supplier | us | customer. */
   amount?: string | null;
   currency?: string | null;
   bearer?: string | null;
@@ -185,18 +185,18 @@ export interface DeliveryView {
 }
 
 /** GET /inquiries/:id/factory-requests */
-export interface FactoryRequests {
+export interface SupplierRequests {
   items: {
     id: string;
     factory: { id: string; name: string };
-    status: FactoryRequestStatus;
+    status: SupplierRequestStatus;
     statusLabel: string;
     sentOn: string;
     replyBy: string | null;
     late: boolean;
     channel: RequestChannel | null;
     waitingDays: number | null;
-    factoryQuoteId: string | null;
+    supplierQuoteId: string | null;
     note: string | null;
     by: { id: string; name: string };
   }[];

@@ -129,7 +129,7 @@ export async function createPaymentIn(
 export const purchasePart = { target: "purchase" } as const satisfies Prisma.AllocationWhereInput;
 export const livePurchase = { target: "purchase", voidedAt: null } as const satisfies Prisma.AllocationWhereInput;
 
-/** A supplier payment as the factory's money reads it: who, in what currency, how much, at what rate. */
+/** A supplier payment as the supplier's money reads it: who, in what currency, how much, at what rate. */
 export const purchasesWithEntry = {
   where: livePurchase,
   orderBy: [{ on: "asc" }, { createdAt: "asc" }],
@@ -143,7 +143,7 @@ export const asSupplierPayment = (a: PurchaseWithEntry) => ({
   id: a.id,
   movementId: a.movementId,
   orderId: a.purchaseOrderId!,
-  factoryId: a.movement.partyId!,
+  supplierId: a.movement.partyId!,
   kind: a.kind,
   /** What was paid, in the supplier's currency. */
   amount: a.share,

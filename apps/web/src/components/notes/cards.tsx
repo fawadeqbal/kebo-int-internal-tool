@@ -17,7 +17,7 @@ import { dueText, KindIcon, todayHere, whenText } from "./kinds";
 import { FollowUpForm, FollowUpToggle, NoteAddForm, FollowUpDoneNext } from "./note-forms";
 
 /**
- * A record's notes and call logs (orders, customers, factories): the add form on top for those who may
+ * A record's notes and call logs (orders, customers, suppliers): the add form on top for those who may
  * add, then the latest first, each with its kind's icon, what happened, who it was with, and "by Sana ·
  * 9:02" (when it happened).
  */
@@ -149,7 +149,7 @@ export function FollowUpRow({
 }
 
 /**
- * A record's follow-ups (inquiries, orders, customers, factories): the open ones by when they are due, the
+ * A record's follow-ups (inquiries, orders, customers, suppliers): the open ones by when they are due, the
  * late ones in the bad tone with the word; the last few done under them; "+ Follow-up" opens the side
  * panel, on this record.
  */

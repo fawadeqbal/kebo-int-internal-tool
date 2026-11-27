@@ -6,7 +6,7 @@ import type { LineColumn, LineRow, LineValues } from "@/components/lines/line-ta
 /** The units offered in the file's Unit dropdown (others can still be typed). */
 const SHEET_UNITS = ["pcs", "sets", "units", "kg", "tons", "m", "m²", "m³", "rolls", "cartons", "boxes", "bags", "pairs", "litres", "drums", "lot"];
 
-/** Other headings a customer's or factory's own sheet may use for a column. */
+/** Other headings a customer's or supplier's own sheet may use for a column. */
 const ALIASES: Record<string, string[]> = {
   no: ["no", "#", "sn", "sno", "srno", "serial", "line", "lineno", "itemno", "pos", "position"],
   description: ["description", "item", "items", "product", "productname", "name", "goods", "itemdescription", "descriptionofgoods", "commodity"],
@@ -45,7 +45,7 @@ const valueText = (c: LineColumn, v: string) => {
   return choices ? (choices.find((o) => o.value === v)?.text ?? v) : v;
 };
 
-/** A template: No. and the columns that are typed, with any rows to start from (the customer's items for a factory). */
+/** A template: No. and the columns that are typed, with any rows to start from (the customer's items for a supplier). */
 export function lineTemplate(opts: { name: string; columns: LineColumn[]; noun: string; flat?: boolean; rows?: { no: string; values: LineValues }[] }): SheetSpec {
   const cols = opts.columns.filter((c) => c.input);
   return {

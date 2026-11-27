@@ -75,13 +75,13 @@ for (const viewport of [
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 
   const customer = await firstId(page, "customers");
-  const factory = await firstId(page, "factories");
+  const supplier = await firstId(page, "factories");
   const user = await firstId(page, "users");
 
   // Record pages: the frame, and axe.
   for (const [name, path, h1] of [
     ["customer", `/customers/${customer}`, "Details"],
-    ["factory", `/factories/${factory}`, "Details"],
+    ["factory", `/factories/${supplier}`, "Details"],
     ["user", `/users/${user}`, "Details"],
   ]) {
     await go(page, path);
@@ -97,7 +97,7 @@ for (const viewport of [
     ["/customers/:id/edit", `/customers/${customer}/edit`, /\/customers\/[^/?]+\?panel=edit-customer/, /^Edit customer · /],
     ["/customers/new", "/customers/new", /\/customers\?panel=new-customer/, /^New customer$/],
     ["/factories/new", "/factories/new", /\/factories\?panel=new-factory/, /^New factory$/],
-    ["/factories/:id/edit", `/factories/${factory}/edit`, /\/factories\/[^/?]+\?panel=edit-factory/, /^Edit factory · /],
+    ["/factories/:id/edit", `/factories/${supplier}/edit`, /\/factories\/[^/?]+\?panel=edit-factory/, /^Edit factory · /],
     ["/users/new", "/users/new", /\/users\?panel=new-user/, /^Add a person$/],
     ["?tab=history", `/customers/${customer}?tab=history`, /panel=history/, /^History · /],
     ["user ?panel=edit-user", `/users/${user}?panel=edit-user&id=${user}`, /panel=edit-user/, /^Edit person · /],
@@ -118,7 +118,7 @@ for (const viewport of [
   ok(await page.locator("#orders").isVisible(), "?tab=orders shows the Orders section");
 
   // Edit in the panel from Details ✎ Edit: Esc with changes asks first; saving updates the card in place.
-  await go(page, `/factories/${factory}`);
+  await go(page, `/factories/${supplier}`);
   await page.getByRole("link", { name: /^Edit / }).first().click();
   await dialogTitle(page);
   const contact = `Mr Wang ${stamp}${w}`;
@@ -132,7 +132,7 @@ for (const viewport of [
   ok(await page.getByText(contact).locator("visible=true").first().isVisible(), "factory saved from the panel: Details shows the new contact");
   ok(!page.url().includes("panel="), "panel closed after saving");
 
-  // New factory from the list's primary.
+  // New supplier from the list's primary.
   await go(page, "/factories");
   await page.getByRole("link", { name: "New factory" }).click();
   await dialogTitle(page);

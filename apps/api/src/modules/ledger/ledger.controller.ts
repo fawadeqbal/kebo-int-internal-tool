@@ -19,7 +19,7 @@ const entriesQuery = z.object({
   type: z.enum(LEDGER_ENTRY_TYPES).optional(),
   account: z.string().trim().max(80).optional(),
   customerId: z.uuid().optional(),
-  factoryId: z.uuid().optional(),
+  supplierId: z.uuid().optional(),
   userId: z.uuid().optional(),
   orderId: z.uuid().optional(),
   currency: z.enum(CURRENCIES).optional(),
@@ -50,7 +50,7 @@ export class LedgerController {
   constructor(private readonly ledger: LedgerService) {}
 
   /**
-   * ?from&to&type&account&customerId&factoryId&userId&orderId&currency&removed&lead&page&pageSize →
+   * ?from&to&type&account&customerId&supplierId&userId&orderId&currency&removed&lead&page&pageSize →
    * { mainCurrency, rows: [{ id, entryNo, groupId, date, type, typeLabel, source, ref, account, accountLabel, side, counter,
    *   debit, credit, currency, rate, debitBase, creditBase, with, order, memo, reason, removed, correction }], total, page,
    *   pageSize, totals: { debit, credit, balanced, entries }, byCurrency }
@@ -66,7 +66,7 @@ export class LedgerController {
     return this.ledger.entry(id);
   }
 
-  /** A customer's, factory's or person's ledger: opening, rows with the running balance, closing, ageing. */
+  /** A customer's, supplier's or person's ledger: opening, rows with the running balance, closing, ageing. */
   @Get("parties/:kind/:id")
   party(
     @Param("kind", new ParseEnumPipe(LEDGER_PARTY_KINDS)) kind: LedgerPartyKind,
@@ -111,7 +111,7 @@ export class LedgerController {
     return this.ledger.balances();
   }
 
-  /** Every account's balance, grouped (Money, Customers, Factories, Staff, Sales…), and whether debits equal credits. */
+  /** Every account's balance, grouped (Money, Customers, Suppliers, Staff, Sales…), and whether debits equal credits. */
   @Get("accounts")
   accounts(@Query(Validate(accountsQuery)) q: z.infer<typeof accountsQuery>) {
     return this.ledger.accounts(q);

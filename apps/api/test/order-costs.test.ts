@@ -8,7 +8,7 @@ import { CompaniesService } from "../src/common/company/companies.service";
 type Row = { key: string; label: string; planned: string | null; spent: string; difference: string; status: string };
 type Costs = {
   currency: string;
-  totals: { planned: string; spent: string; notPlanned: string; receiptsMissing: number; chargedToCustomer: string; takenOffFactory: string };
+  totals: { planned: string; spent: string; notPlanned: string; receiptsMissing: number; chargedToCustomer: string; takenOffSupplier: string };
   planned: Row[];
   steps: Record<string, { count: number; spent: string }>;
   expenses: { id: string; step: string | null; borneBy: string; ownMoney: boolean; repaid: { on: string } | null }[];
@@ -18,7 +18,7 @@ type Costs = {
 
 /**
  * Order flow v3, Costs: expenses on an order belong to a step and are borne by
- * us, the customer or the factory; planned costs from the quote against spent;
+ * us, the customer or the supplier; planned costs from the quote against spent;
  * the profit now expected; paying back people who used their own money.
  */
 describe("order costs", () => {
@@ -28,8 +28,8 @@ describe("order costs", () => {
   let manager: string;
   let sanaId: string;
   let orderId: string;
-  let factoryId: string;
-  let otherFactoryId: string;
+  let supplierId: string;
+  let otherSupplierId: string;
   const tag = Date.now().toString(36);
   const today = new Date().toISOString().slice(0, 10);
   // Two days on: in the future whatever the business time zone.
@@ -63,7 +63,7 @@ describe("order costs", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Costs Pumps ${tag}`,
+        newSupplierName: `Costs Pumps ${tag}`,
         receivedOn: "2026-10-01",
         currency: "CNY",
         taxRate: 13,
@@ -90,8 +90,8 @@ describe("order costs", () => {
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "accepted" }).expect(200);
     orderId = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0].id;
-    factoryId = (await api(app, sana).get(`/factories?q=Costs Pumps ${tag}`)).body.rows[0].id;
-    otherFactoryId = (await api(app, sana).post("/factories", { name: `Not on it ${tag}` }).expect(201)).body.id;
+    supplierId = (await api(app, sana).get(`/factories?q=Costs Pumps ${tag}`)).body.rows[0].id;
+    otherSupplierId = (await api(app, sana).post("/factories", { name: `Not on it ${tag}` }).expect(201)).body.id;
   });
 
   afterAll(async () => {
@@ -167,23 +167,23 @@ describe("order costs", () => {
   it("takes an expense the supplier bears off what we owe it", async () => {
     const owed = (await money()).factories.rows[0];
     expect(owed).toMatchObject({ currency: "CNY", owed: "11300.00", toPay: "11300.00" });
-    // The factory must be said, and be on the order.
+    // The supplier must be said, and be on the order.
     await add({ category: "inspection", description: "Re-inspection", amount: 710, currency: "CNY", rate: 7.1, borneBy: "factory" }).expect(400);
-    await add({ category: "inspection", description: "Re-inspection", amount: 710, currency: "CNY", rate: 7.1, borneBy: "factory", factoryId: otherFactoryId }).expect(400);
-    await add({ category: "inspection", description: `Re-inspection ${tag}`, amount: 710, currency: "CNY", rate: 7.1, borneBy: "factory", factoryId }).expect(201);
+    await add({ category: "inspection", description: "Re-inspection", amount: 710, currency: "CNY", rate: 7.1, borneBy: "factory", supplierId: otherSupplierId }).expect(400);
+    await add({ category: "inspection", description: `Re-inspection ${tag}`, amount: 710, currency: "CNY", rate: 7.1, borneBy: "factory", supplierId }).expect(201);
     // Paid in USD: turned into CNY at the Settings rate.
-    await add({ category: "courier", description: `Spare parts courier ${tag}`, amount: 10, borneBy: "factory", factoryId }).expect(201);
+    await add({ category: "courier", description: `Spare parts courier ${tag}`, amount: 10, borneBy: "factory", supplierId }).expect(201);
     const row = (await money()).factories.rows[0];
     const usdInCny = Number(row.takenOff) - 710;
     expect(usdInCny).toBeGreaterThan(10);
     expect(Number(row.toPay)).toBeCloseTo(11300 - 710 - usdInCny, 2);
     const c = await costs();
-    expect(Number(c.totals.takenOffFactory)).toBeCloseTo(100 + 10, 1);
+    expect(Number(c.totals.takenOffSupplier)).toBeCloseTo(100 + 10, 1);
     // Not our cost.
     expect(c.totals.notPlanned).toBe("70.00");
-    // What we owe factories across orders agrees.
+    // What we owe suppliers across orders agrees.
     const payable = ((await api(app, manager).get("/money/payables").expect(200)).body as { factory: { id: string }; toPay: string }[]).find(
-      (p) => p.factory.id === factoryId,
+      (p) => p.factory.id === supplierId,
     );
     expect(payable?.toPay).toBe(row.toPay);
   });

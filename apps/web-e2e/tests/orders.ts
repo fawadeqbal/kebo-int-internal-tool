@@ -23,7 +23,7 @@ export async function newOrder(page: Page) {
   const inquiry = await send("post", "/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me.id, items: [{ description: "Vial capping machine RHZ-8", quantity: 1, unit: "set" }] });
   const item = (await (await page.request.get(`/api/inquiries/${inquiry.id}`)).json()).items[0].id;
   await send("post", `/inquiries/${inquiry.id}/factory-quotes`, {
-    newFactoryName: `Jining Capping ${tag}`,
+    newSupplierName: `Jining Capping ${tag}`,
     receivedOn: new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10),
     currency: "CNY",
     lines: [{ requestedItemId: item, description: "Vial capping machine RHZ-8", quantity: 1, unit: "set", unitPrice: 200000 }],

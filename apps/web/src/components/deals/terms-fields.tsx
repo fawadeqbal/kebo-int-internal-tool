@@ -26,10 +26,10 @@ import { cn, Field, Input, Select } from "@kebo/ui";
 import { PERCENT_TOTAL, PartsEditor, PartsSummary, sumOf, type EditorPart, type PartRule } from "@/components/common/parts-editor";
 
 /**
- * The terms' fields that the factory offer's form and the quotation's share (design "RFQ Desk — terms that
+ * The terms' fields that the supplier offer's form and the quotation's share (design "RFQ Desk — terms that
  * travel"): a lead time as days from a moment, the payment as parts (a usual one in one tap, each part's share
  * and when it falls due, a bar that adds them up), the warranty as months from a moment, and a check of what
- * we promise against what the factory gives.
+ * we promise against what the supplier gives.
  */
 
 const newKey = () => Math.random().toString(36).slice(2);
@@ -402,9 +402,9 @@ export function WarrantyFields({
   );
 }
 
-/* ---------------------------------------------------------------- against the factory */
+/* ---------------------------------------------------------------- against the supplier */
 
-/** A check of what we promise against what the factory gives: green when fine, amber with what to do. */
+/** A check of what we promise against what the supplier gives: green when fine, amber with what to do. */
 export function CheckNote({ ok, children, className }: { ok: boolean; children: ReactNode; className?: string }) {
   return (
     <p className={cn("flex items-start gap-1.5 rounded-md px-3 py-2 text-xs text-text", ok ? "bg-ok-soft" : "bg-warn-soft", className)}>

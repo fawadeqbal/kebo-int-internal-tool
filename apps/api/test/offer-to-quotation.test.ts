@@ -4,10 +4,10 @@ import { api, signIn, startApp } from "./app";
 
 type Line = { unitPrice: string; unitCost?: string | null };
 type Option = {
-  factoryQuoteId: string | null;
+  supplierQuoteId: string | null;
   leadDays: number | null;
-  factoryValidUntil: string | null;
-  factoryCurrency: string | null;
+  supplierValidUntil: string | null;
+  supplierCurrency: string | null;
   offerChanged: { no: string; description: string; was: string; now: string | null }[];
   lines: Line[];
 };
@@ -59,7 +59,7 @@ describe("from the supplier offer to the quotation", () => {
     offerId = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, {
-          newFactoryName: `Ruian Capsule ${tag}`,
+          newSupplierName: `Ruian Capsule ${tag}`,
           receivedOn: day(-1),
           validUntil: day(20),
           currency: "USD",
@@ -94,16 +94,16 @@ describe("from the supplier offer to the quotation", () => {
     expect(a).toMatchObject({ incoterm: "FOB", incotermPlace: "Shanghai", warrantyMonths: 18, warrantyFrom: "shipment" });
     // Never valid longer than the supplier's prices.
     expect(a.validUntil).toBe(day(20));
-    expect(a.options[0]).toMatchObject({ factoryQuoteId: offerId, leadDays: 47, factoryValidUntil: day(20), factoryCurrency: "USD", offerChanged: [] });
+    expect(a.options[0]).toMatchObject({ supplierQuoteId: offerId, leadDays: 47, supplierValidUntil: day(20), supplierCurrency: "USD", offerChanged: [] });
     // Cost with the 13% tax on top: 11,300 → at 20% on the price, 14,125.
     expect(a.options[0]!.lines.map((l) => l.unitPrice)).toEqual(["14125.00", "1412.50"]);
   });
 
   it("costs less by the export VAT refund set in Settings (never more than the tax)", async () => {
     await api(app, admin).put("/settings/sales", { ...sales, defaultIncoterm: "FOB", quotationValidityDays: 30, leadSpareDays: 7, exportVatRefundPercent: 13, reason: "Test: export refund" }).expect(200);
-    const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body.offers as { factoryQuoteId: string; lines: { unitCost: string | null }[] }[];
+    const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body.offers as { supplierQuoteId: string; lines: { unitCost: string | null }[] }[];
     // 10,000 + 13% tax − 13% refund = 10,000.
-    expect(offers.find((o) => o.factoryQuoteId === offerId)!.lines.map((l) => l.unitCost)).toEqual(["10000.00", "1000.00"]);
+    expect(offers.find((o) => o.supplierQuoteId === offerId)!.lines.map((l) => l.unitCost)).toEqual(["10000.00", "1000.00"]);
     await api(app, admin).put("/settings/sales", { ...sales, defaultIncoterm: "FOB", quotationValidityDays: 30, leadSpareDays: 7, exportVatRefundPercent: 0, reason: "Test: no refund" }).expect(200);
   });
 
@@ -112,7 +112,7 @@ describe("from the supplier offer to the quotation", () => {
     const other = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, {
-          newFactoryName: `Wenzhou Parts ${tag}`,
+          newSupplierName: `Wenzhou Parts ${tag}`,
           receivedOn: day(-1),
           currency: "USD",
           lines: [
@@ -123,8 +123,8 @@ describe("from the supplier offer to the quotation", () => {
         .expect(201)
     ).body.id as string;
     const unpriced = async () =>
-      ((await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body.offers as { factoryQuoteId: string; unpriced: number }[]).find(
-        (o) => o.factoryQuoteId === other,
+      ((await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body.offers as { supplierQuoteId: string; unpriced: number }[]).find(
+        (o) => o.supplierQuoteId === other,
       )!.unpriced;
     expect(await unpriced()).toBe(1);
     const lines = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes.find((q: { id: string }) => q.id === other).lines as { id: string; description: string }[];

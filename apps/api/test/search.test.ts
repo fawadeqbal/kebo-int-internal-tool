@@ -22,7 +22,7 @@ describe("search everything", () => {
   const phone = `+93 7${String(Date.now()).slice(-8)}`;
   let customerId: string;
   let inquiry: { id: string; refNo: string };
-  let factoryId: string;
+  let supplierId: string;
 
   const find = async (who: string, q: string, more: Record<string, string> = {}) =>
     (await api(app, who).get(`/search?${new URLSearchParams({ q, ...more })}`).expect(200)).body as Result;
@@ -33,7 +33,7 @@ describe("search everything", () => {
     sana = await signIn(app, "sana@example.com");
     manager = await signIn(app, "manager@example.com", "Manager@12345");
     const admin = await signIn(app, "admin@example.com", "Admin@12345");
-    // Someone who sees only their own deals and no factory money.
+    // Someone who sees only their own deals and no supplier money.
     const role = (await api(app, admin).post("/roles", { name: `Look ${tag}`, permissions: ["dashboard.view"] }).expect(201)).body;
     await api(app, admin).post("/users", { name: "Looker", email: `look-${tag}@example.com`, role: role.key, password: "Person@12345" }).expect(201);
     looker = await signIn(app, `look-${tag}@example.com`, "Person@12345");
@@ -47,7 +47,7 @@ describe("search everything", () => {
       .post("/inquiries", { customerId, category: "Machinery", assigneeId: me, items: [{ description: `Tablet press ${tag}`, quantity: 1, unit: "set" }] })
       .expect(201);
     inquiry = { id: made.body.id, refNo: made.body.refNo };
-    factoryId = (await api(app, manager).post("/factories", { name: `Jinan ${tag} Works` }).expect(201)).body.id;
+    supplierId = (await api(app, manager).post("/factories", { name: `Jinan ${tag} Works` }).expect(201)).body.id;
   });
 
   afterAll(async () => {
@@ -77,7 +77,7 @@ describe("search everything", () => {
     expect(group(other, "customers")).toBeUndefined();
     expect((await find(looker, inquiry.refNo)).exact).toBeNull();
     expect(group(await find(looker, `Jinan ${tag}`), "suppliers")).toBeUndefined();
-    expect(group(await find(sana, `Jinan ${tag}`), "suppliers")).toMatchObject({ total: 1, items: [{ href: `/factories/${factoryId}` }] });
+    expect(group(await find(sana, `Jinan ${tag}`), "suppliers")).toMatchObject({ total: 1, items: [{ href: `/factories/${supplierId}` }] });
     // The same as the inquiries list says for the same words.
     const listed = (await api(app, sana).get(`/inquiries?${new URLSearchParams({ q: tag })}`).expect(200)).body;
     expect(group(await find(sana, tag), "inquiries")!.total).toBe(listed.total ?? listed.items?.length ?? listed.length);

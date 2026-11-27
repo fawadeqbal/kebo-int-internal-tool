@@ -6,13 +6,13 @@ import { paperDateText, readSettings } from "@kebo/shared";
 import { todayIn } from "@kebo/utils";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
-import { factoryPositionsSql, positionsSql } from "../src/modules/billing/api";
-import { factoryBorneExpenses, factoryPositionOf, fxOf, positionOf, positionRelations, supplierPaidRelation } from "../src/modules/billing/api";
+import { supplierPositionsSql, positionsSql } from "../src/modules/billing/api";
+import { supplierBorneExpenses, supplierPositionOf, fxOf, positionOf, positionRelations, supplierPaidRelation } from "../src/modules/billing/api";
 import { api, signIn, startApp } from "./app";
 
 /**
  * One money truth (single source of truth, PR 1): what a customer still owes,
- * the deposit, what we still owe a factory and what an LC draws are worked out
+ * the deposit, what we still owe a supplier and what an LC draws are worked out
  * in one place and read the same on every screen, paper, list and report, and
  * the SQL that narrows lists agrees with it to the cent.
  */
@@ -29,15 +29,15 @@ describe("one money truth", () => {
   const fx = async () => fxOf(readSettings(Object.fromEntries((await db().setting.findMany()).map((r) => [r.key, r.value]))), true);
 
   let n = 0;
-  /** An order of 10 pumps at USD 1,000 (USD 10,000, 30% deposit) bought at CNY 1,000 + tax from a factory of its own. */
-  async function makeOrder(opts: { taxRate?: number; taxIncluded?: boolean; factoryPrice?: number } = {}) {
+  /** An order of 10 pumps at USD 1,000 (USD 10,000, 30% deposit) bought at CNY 1,000 + tax from a supplier of its own. */
+  async function makeOrder(opts: { taxRate?: number; taxIncluded?: boolean; supplierPrice?: number } = {}) {
     n += 1;
     const customer = (
       await api(app, sana)
         .post("/customers", { name: `Truth ${n} ${tag}`, country: "NG", contacts: [{ name: "Ada", email: `ada-${n}-${tag}@truth.test` }] })
         .expect(201)
     ).body;
-    const factoryId = (await api(app, sana).post("/factories", { name: `Truth Works ${n} ${tag}`, address: "Taizhou" }).expect(201)).body.id as string;
+    const supplierId = (await api(app, sana).post("/factories", { name: `Truth Works ${n} ${tag}`, address: "Taizhou" }).expect(201)).body.id as string;
     const inquiry = (
       await api(app, sana)
         .post("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me, items: [{ description: "Pump", quantity: 10 }] })
@@ -46,12 +46,12 @@ describe("one money truth", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-10),
         currency: "CNY",
         taxRate: opts.taxRate ?? 0,
         taxIncluded: opts.taxIncluded ?? false,
-        lines: [{ requestedItemId: item.id, description: "Pump", quantity: 10, unitPrice: opts.factoryPrice ?? 1000 }],
+        lines: [{ requestedItemId: item.id, description: "Pump", quantity: 10, unitPrice: opts.supplierPrice ?? 1000 }],
       })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
@@ -65,7 +65,7 @@ describe("one money truth", () => {
     // Won and ordered months ago: this month's reports elsewhere (top customers) are left as they are.
     await prisma.platform.$executeRaw`update orders set ordered_on = ordered_on - 75 where id = ${o.id}::uuid`;
     await prisma.platform.$executeRaw`update inquiries set closed_at = closed_at - interval '75 days' where id = ${inquiry.id}::uuid`;
-    return { orderId: o.id as string, refNo: o.refNo as string, customerId: customer.id as string, factoryId };
+    return { orderId: o.id as string, refNo: o.refNo as string, customerId: customer.id as string, supplierId };
   }
   const order = async (id: string) => (await api(app, manager).get(`/orders/${id}`).expect(200)).body;
   const money = async (id: string) => (await api(app, manager).get(`/orders/${id}/money`).expect(200)).body;
@@ -211,16 +211,16 @@ describe("one money truth", () => {
     let o: Awaited<ReturnType<typeof makeOrder>>;
     const owing = async () => {
       const f = await fx();
-      return (await factoryPositionsSql(db(), f, [o.orderId])).filter((r) => r.toPayMinor > 0).length > 0;
+      return (await supplierPositionsSql(db(), f, [o.orderId])).filter((r) => r.toPayMinor > 0).length > 0;
     };
 
     beforeAll(async () => {
       // CNY 1,000 + 13% × 10 = CNY 11,300: the default plan is 30% (3,390) on order and 7,910 on the ready date.
       o = await makeOrder({ taxRate: 13 });
-      await api(app, manager).patch(`/orders/${o.orderId}/factory-order`, { factoryOrderedOn: day(-20) }).expect(200);
+      await api(app, manager).patch(`/orders/${o.orderId}/factory-order`, { supplierOrderedOn: day(-20) }).expect(200);
       await api(app, manager).patch(`/orders/${o.orderId}/details`, { readyOn: day(-3) }).expect(200);
       await api(app, manager)
-        .post(`/orders/${o.orderId}/factory-payments`, { factoryId: o.factoryId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: day(-15) })
+        .post(`/orders/${o.orderId}/factory-payments`, { supplierId: o.supplierId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: day(-15) })
         .expect(201);
     });
 
@@ -242,7 +242,7 @@ describe("one money truth", () => {
           rate: 7.1,
           spentOn: today,
           borneBy: "factory",
-          factoryId: o.factoryId,
+          supplierId: o.supplierId,
         })
         .expect(201);
       const m = await money(o.orderId);
@@ -253,7 +253,7 @@ describe("one money truth", () => {
       const payables = (await api(app, manager).get("/money/payables").expect(200)).body;
       expect(JSON.stringify(payables)).not.toContain(o.refNo);
       const costs = (await api(app, manager).get(`/orders/${o.orderId}/costs`).expect(200)).body;
-      expect(costs.profit.factoryOwed).toEqual([{ currency: "CNY", amount: "11300.00", toPay: "0.00" }]);
+      expect(costs.profit.supplierOwed).toEqual([{ currency: "CNY", amount: "11300.00", toPay: "0.00" }]);
       const po = await doc(o.orderId, "purchase-order");
       expect(po.total).toMatchObject({ label: "Total with tax", amount: "11300.00", currency: "CNY" });
       expect(po.bullets).toContainEqual({ label: `Charged to you on ${paperDateText(today)}:`, value: { money: "7910.00", currency: "CNY" } });
@@ -263,7 +263,7 @@ describe("one money truth", () => {
 
   describe("the purchase order", () => {
     it("states the payment terms from the supplier's plan, not a fixed sentence", async () => {
-      const o = await makeOrder({ taxRate: 13, taxIncluded: true, factoryPrice: 1130 });
+      const o = await makeOrder({ taxRate: 13, taxIncluded: true, supplierPrice: 1130 });
       let po = await doc(o.orderId, "purchase-order");
       // Tax included: the prices are the total (10 × 1,130); the default plan, 30% on order.
       expect(po.total).toMatchObject({ label: "Total", amount: "11300.00", currency: "CNY" });
@@ -272,7 +272,7 @@ describe("one money truth", () => {
       expect(po.bullets).toContain("Payment: Deposit 30%, CNY 3,390.00, when we order; Balance 70%, CNY 7,910.00, on the ready date.");
       await api(app, manager)
         .put(`/orders/${o.orderId}/factory-plan`, {
-          factoryId: o.factoryId,
+          supplierId: o.supplierId,
           items: [
             { label: "Deposit", percent: 50, amount: 5650, dueRule: "on_order", dueOn: null },
             { label: "Balance", percent: 50, amount: 5650, dueRule: "fixed", dueOn: "2027-01-15" },
@@ -346,18 +346,18 @@ describe("one money truth", () => {
       expect(positionOf(rows.find((r) => r.id === o.orderId)!, { ...(await fx()), expensesOn: false })).toMatchObject({ chargedMinor: 0, dueMinor: 7_000_00 });
     });
 
-    it("SQL supplier positions equal factoryPositionOf on every order", async () => {
+    it("SQL supplier positions equal supplierPositionOf on every order", async () => {
       const rows = await db().order.findMany({
         where: { status: { not: "cancelled" } },
-        include: { lines: true, supplierPaid: supplierPaidRelation, expenses: factoryBorneExpenses },
+        include: { lines: true, supplierPaid: supplierPaidRelation, expenses: supplierBorneExpenses },
       });
       for (const f of [await fx(), { ...(await fx()), expensesOn: false }]) {
-        const sql = await factoryPositionsSql(db(), f);
+        const sql = await supplierPositionsSql(db(), f);
         for (const r of rows) {
-          const ts = factoryPositionOf(r, f).filter((x) => x.lines > 0);
+          const ts = supplierPositionOf(r, f).filter((x) => x.lines > 0);
           const mine = sql.filter((x) => x.orderId === r.id);
-          expect(mine.map((x) => [x.factoryId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort()).toEqual(
-            ts.map((x) => [x.factoryId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort(),
+          expect(mine.map((x) => [x.supplierId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort()).toEqual(
+            ts.map((x) => [x.supplierId, x.currency, x.owedMinor, x.paidMinor, x.takenOffMinor, x.toPayMinor]).sort(),
           );
         }
       }

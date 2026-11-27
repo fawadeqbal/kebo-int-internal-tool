@@ -21,11 +21,11 @@ import { Clock, companyDay } from "../../common/time/clock.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
 import { companySnapshot, SettingsService } from "../settings/settings.service";
-import { factoryPositionsSql, positionsSql } from "../billing/api";
+import { supplierPositionsSql, positionsSql } from "../billing/api";
 import { orderRate } from "../money/order-money";
 import { chargedExpenses, fxOf, positionOf, type MoneyCtx } from "../billing/api";
 import { livePlansOf } from "../billing/api";
-import { factoryPlansFor } from "../billing/api";
+import { supplierPlansFor } from "../billing/api";
 import { LedgerPosting } from "./posting.service";
 import { ledgerCheck, type LedgerCheck } from "./check";
 
@@ -52,7 +52,7 @@ export interface EntriesQuery {
   type?: string;
   account?: string;
   customerId?: string;
-  factoryId?: string;
+  supplierId?: string;
   userId?: string;
   orderId?: string;
   currency?: string;
@@ -68,13 +68,13 @@ const minor = (d: Prisma.Decimal | string | number | null | undefined) =>
   d === null || d === undefined ? 0 : decimalToMinor(d as Prisma.Decimal);
 const money = (m: Minor) => fromMinor(m);
 
-/** The sign of a party's balance: what a customer owes us (debit − credit); what we owe a factory or a person (credit − debit). */
+/** The sign of a party's balance: what a customer owes us (debit − credit); what we owe a supplier or a person (credit − debit). */
 const partySign = (kind: LedgerPartyKind) => (kind === "customer" ? 1 : -1);
 const partyAccount = (kind: LedgerPartyKind, id: string) => `${kind}:${id}`;
 
 /**
  * Finance › Ledger, read only: the rows as posted (with the names of what they point at), one posting with
- * what it settles and its document, a customer's, factory's or person's ledger with opening and closing balances
+ * what it settles and its document, a customer's, supplier's or person's ledger with opening and closing balances
  * and ageing, ageing across all of them, and every account's balance. The first read of a company whose ledger
  * was never posted posts it (LedgerPosting.ensureBuilt).
  */
@@ -94,8 +94,8 @@ export class LedgerService {
     return fxOf(await this.settings.get(), await this.limits.allows("expenses"));
   }
 
-  /** The names of the records the rows point at (accounts, customers, factories, people, orders). */
-  private async names(rows: Pick<Row, "account" | "customerId" | "factoryId" | "userId" | "orderId" | "moneyAccountId">[]) {
+  /** The names of the records the rows point at (accounts, customers, suppliers, people, orders). */
+  private async names(rows: Pick<Row, "account" | "customerId" | "supplierId" | "userId" | "orderId" | "moneyAccountId">[]) {
     const ids = {
       money: new Set<string>(),
       customer: new Set<string>(),
@@ -110,12 +110,12 @@ export class LedgerService {
       if (a.id && a.kind === "staff") ids.user.add(a.id);
       if (a.id && a.kind === "money") ids.money.add(a.id);
       if (r.customerId) ids.customer.add(r.customerId);
-      if (r.factoryId) ids.factory.add(r.factoryId);
+      if (r.supplierId) ids.factory.add(r.supplierId);
       if (r.userId) ids.user.add(r.userId);
       if (r.orderId) ids.order.add(r.orderId);
     }
     const db = this.prisma.db;
-    const [money, customers, factories, users, orders] = await Promise.all([
+    const [money, customers, suppliers, users, orders] = await Promise.all([
       db.moneyAccount.findMany({ where: { id: { in: [...ids.money] } }, select: { id: true, name: true } }),
       db.party.findMany({ where: { ...isCustomer, id: { in: [...ids.customer] } }, select: { id: true, name: true } }),
       db.party.findMany({ where: { ...isSupplier, id: { in: [...ids.factory] } }, select: { id: true, name: true } }),
@@ -126,20 +126,20 @@ export class LedgerService {
     return {
       money: map(money),
       customer: map(customers),
-      factory: map(factories),
+      factory: map(suppliers),
       user: map(users),
       order: new Map(orders.map((o) => [o.id, o.refNo])),
     };
   }
 
-  /** Who a row is with: the factory, else the person (own money), else the customer. */
-  private withOf(r: Pick<Row, "account" | "customerId" | "factoryId" | "userId">, n: Awaited<ReturnType<LedgerService["names"]>>) {
+  /** Who a row is with: the supplier, else the person (own money), else the customer. */
+  private withOf(r: Pick<Row, "account" | "customerId" | "supplierId" | "userId">, n: Awaited<ReturnType<LedgerService["names"]>>) {
     const a = parseLedgerAccount(r.account);
     if (a.kind === "factory" && a.id) return { kind: "factory" as const, id: a.id, name: n.factory.get(a.id) ?? "Supplier" };
     if (a.kind === "staff" && a.id) return { kind: "staff" as const, id: a.id, name: n.user.get(a.id) ?? "Staff" };
     if ((a.kind === "customer" || a.kind === "credit") && a.id)
       return { kind: "customer" as const, id: a.id, name: n.customer.get(a.id) ?? "Customer" };
-    if (r.factoryId) return { kind: "factory" as const, id: r.factoryId, name: n.factory.get(r.factoryId) ?? "Supplier" };
+    if (r.supplierId) return { kind: "factory" as const, id: r.supplierId, name: n.factory.get(r.supplierId) ?? "Supplier" };
     if (r.userId) return { kind: "staff" as const, id: r.userId, name: n.user.get(r.userId) ?? "Staff" };
     if (r.customerId) return { kind: "customer" as const, id: r.customerId, name: n.customer.get(r.customerId) ?? "Customer" };
     return null;
@@ -152,7 +152,7 @@ export class LedgerService {
     if (q.type) c.push(Prisma.sql`l.type = ${q.type}`);
     if (q.account) c.push(q.account.endsWith(":") ? Prisma.sql`l.account like ${`${q.account}%`}` : Prisma.sql`l.account = ${q.account}`);
     if (q.customerId) c.push(Prisma.sql`l.customer_id = ${q.customerId}::uuid`);
-    if (q.factoryId) c.push(Prisma.sql`l.factory_id = ${q.factoryId}::uuid`);
+    if (q.supplierId) c.push(Prisma.sql`l.factory_id = ${q.supplierId}::uuid`);
     if (q.userId) c.push(Prisma.sql`l.user_id = ${q.userId}::uuid`);
     if (q.orderId) c.push(Prisma.sql`l.order_id = ${q.orderId}::uuid`);
     if (q.currency) c.push(Prisma.sql`l.currency = ${q.currency}`);
@@ -328,7 +328,7 @@ export class LedgerService {
       id: sourceId,
       orderId: null as string | null,
       customerId: null as string | null,
-      factoryId: null as string | null,
+      supplierId: null as string | null,
       userId: null as string | null,
     };
     const out = {
@@ -380,11 +380,11 @@ export class LedgerService {
           ...out,
           orderId: p?.purchaseOrderId ?? null,
           customerId: p?.purchaseOrder?.customerId ?? null,
-          factoryId: other.partyId,
+          supplierId: other.partyId,
           label: `Payment to ${other.party?.name ?? ""} for ${p?.purchaseOrder?.refNo ?? ""}`,
           file: other.files[0] ? { id: other.files[0].id, name: other.files[0].fileName } : null,
           recordedBy: other.recordedBy.name,
-          settles: p ? await this.settlesOfFactoryPayment(p.id) : null,
+          settles: p ? await this.settlesOfSupplierPayment(p.id) : null,
           removed: other.voidedAt ? { at: other.voidedAt, reason: other.voidReason } : null,
         };
       }
@@ -463,7 +463,7 @@ export class LedgerService {
         ...out,
         orderId: e.orderId,
         customerId: e.customerId,
-        factoryId: e.factoryId,
+        supplierId: e.supplierId,
         userId: e.ownMoney ? e.paidById : null,
         label: e.description,
         file: e.files[0] ? { id: e.files[0].id, name: e.files[0].fileName } : null,
@@ -474,7 +474,7 @@ export class LedgerService {
       };
     }
     if (type === "order" || type === "fx_order" || type === "purchase_order" || type === "fx_factory") {
-      const [orderId, factoryId] = sourceId.split(":") as [string, string | undefined];
+      const [orderId, supplierId] = sourceId.split(":") as [string, string | undefined];
       const o = await db.order.findUnique({
         where: { id: orderId },
         select: { id: true, refNo: true, customerId: true, status: true, cancellation: { select: { cancelledAt: true, reason: true } } },
@@ -484,7 +484,7 @@ export class LedgerService {
         ...out,
         orderId: o.id,
         customerId: o.customerId,
-        factoryId: factoryId ?? null,
+        supplierId: supplierId ?? null,
         label:
           type === "order"
             ? `Order ${o.refNo}`
@@ -526,22 +526,22 @@ export class LedgerService {
     return touched.length ? `${touched.join(", ")} on ${order?.refNo ?? ""}` : null;
   }
 
-  /** The parts of the factory's plan a payment paid. */
-  private async settlesOfFactoryPayment(id: string) {
+  /** The parts of the supplier's plan a payment paid. */
+  private async settlesOfSupplierPayment(id: string) {
     const db = this.prisma.db;
     const part = await db.allocation.findUnique({ where: { id }, include: { movement: { select: { partyId: true, currency: true } } } });
     if (!part?.purchaseOrderId) return null;
-    const p = { orderId: part.purchaseOrderId, factoryId: part.movement.partyId!, currency: part.movement.currency };
+    const p = { orderId: part.purchaseOrderId, supplierId: part.movement.partyId!, currency: part.movement.currency };
     const [paid, plan] = await Promise.all([
       db.allocation
         .findMany({
-          where: { ...livePurchase, purchaseOrderId: p.orderId, movement: { partyId: p.factoryId, currency: p.currency } },
+          where: { ...livePurchase, purchaseOrderId: p.orderId, movement: { partyId: p.supplierId, currency: p.currency } },
           orderBy: [{ on: "asc" }, { createdAt: "asc" }],
           select: { id: true, share: true },
         })
         .then((rows) => rows.map((x) => ({ id: x.id, amount: x.share }))),
       db.invoice.findMany({
-        where: { purchaseOrderId: p.orderId, supplierId: p.factoryId, currency: p.currency },
+        where: { purchaseOrderId: p.orderId, supplierId: p.supplierId, currency: p.currency },
         orderBy: { sortOrder: "asc" },
         select: { label: true, amount: true },
       }),
@@ -563,7 +563,7 @@ export class LedgerService {
   /* ---------------------------------------------------------------- one party */
 
   /**
-   * A customer's, factory's or person's ledger between two days: the balance before, every row with the balance
+   * A customer's, supplier's or person's ledger between two days: the balance before, every row with the balance
    * after it (in the party's currency and the main one), the balance at the end, and ageing. "Only open items"
    * leaves out the orders that are settled. Rows removed and their reversals are left out unless asked for (they
    * cancel out).
@@ -653,7 +653,7 @@ export class LedgerService {
       from,
       to,
       mainCurrency: (await this.settings.get()).sales.currency,
-      /** customer: what they owe us (debit − credit); factory, staff: what we owe them (credit − debit). */
+      /** customer: what they owe us (debit − credit); supplier, staff: what we owe them (credit − debit). */
       sign: kind === "customer" ? "they owe us" : "we owe",
       currencies: currencies.map((c) => ({
         currency: c,
@@ -680,7 +680,7 @@ export class LedgerService {
   /**
    * A party's statement of account between two days, in one currency, as a paper in Kebo's one document template
    * (KeboDoc): the balance before, every row with the balance after it, the balance at the end, and what is open.
-   * Numbered per party and year (ST-C-2026-0003 for a customer, ST-F-… a factory, ST-S-… a person) when issued
+   * Numbered per party and year (ST-C-2026-0003 for a customer, ST-F-… a supplier, ST-S-… a person) when issued
    * (issueStatement); a preview without a number says so.
    */
   async statement(kind: LedgerPartyKind, id: string, q: { from?: ISODate; to?: ISODate; currency?: string; no?: number }) {
@@ -903,7 +903,7 @@ export class LedgerService {
         }
       }
     } else if (side === "payable") {
-      const owing = (await factoryPositionsSql(db, fx)).filter((r) => r.toPayMinor > 0 && (!only || r.factoryId === only));
+      const owing = (await supplierPositionsSql(db, fx)).filter((r) => r.toPayMinor > 0 && (!only || r.supplierId === only));
       const orderIds = [...new Set(owing.map((r) => r.orderId))];
       const orders = new Map(
         (await db.order.findMany({ where: { id: { in: orderIds }, status: { not: "cancelled" } }, select: { id: true, refNo: true } })).map(
@@ -911,13 +911,13 @@ export class LedgerService {
         ),
       );
       // Every order's payment plans in one read, not one read per order.
-      const allPlans = await factoryPlansFor(db, [...orders.keys()], s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
+      const allPlans = await supplierPlansFor(db, [...orders.keys()], s.sales.supplierAdvancePercent, today, s.reminders.dueSoonDays, fx);
       for (const orderId of orderIds) {
         const o = orders.get(orderId);
         if (!o) continue;
         const plans = allPlans.get(orderId) ?? [];
         for (const p of plans) {
-          if (!owing.some((r) => r.orderId === orderId && r.factoryId === p.factory.id && r.currency === p.currency)) continue;
+          if (!owing.some((r) => r.orderId === orderId && r.supplierId === p.factory.id && r.currency === p.currency)) continue;
           const rate = p.currency === fx.main ? 1 : (fx.rates[p.currency] ?? null);
           for (const r of p.rows) {
             const open = decimalToMinor(r.open as never);
@@ -987,7 +987,7 @@ export class LedgerService {
     return { total: money(items.reduce((t, i) => t + i.base, 0)), buckets: this.bucketsOf(items) };
   }
 
-  /** Ageing of everyone on one side: customers (to receive), factories (to pay) or people (to repay). */
+  /** Ageing of everyone on one side: customers (to receive), suppliers (to pay) or people (to repay). */
   async ageing(side: "receivable" | "payable" | "staff") {
     await this.posting.ensureBuilt();
     const all = await this.ageingItems(side);
@@ -1038,7 +1038,7 @@ export class LedgerService {
         from ledger_entries
        where account like 'customer:%' or account like 'factory:%' or account like 'money:%' or account like 'staff:%'
        group by 1, 2 order by 1, 2`;
-    const n = await this.names(rows.map((r) => ({ account: r.account, customerId: null, factoryId: null, userId: null, orderId: null, moneyAccountId: null })));
+    const n = await this.names(rows.map((r) => ({ account: r.account, customerId: null, supplierId: null, userId: null, orderId: null, moneyAccountId: null })));
     const KIND = { customer: "customer", factory: "supplier", money: "account", staff: "person" } as const;
     return rows.map((r) => {
       const a = parseLedgerAccount(r.account);
@@ -1071,7 +1071,7 @@ export class LedgerService {
         from ledger_entries ${q.to ? Prisma.sql`where date <= ${q.to}::date` : Prisma.empty}
        group by 1, 2 order by 1, 2`;
     const n = await this.names(
-      rows.map((r) => ({ account: r.account, customerId: null, factoryId: null, userId: null, orderId: null, moneyAccountId: null })),
+      rows.map((r) => ({ account: r.account, customerId: null, supplierId: null, userId: null, orderId: null, moneyAccountId: null })),
     );
     const byAccount = new Map<
       string,
@@ -1195,7 +1195,7 @@ export class LedgerService {
           });
         } else
           this.log.log(
-            `${c.slug}: the ledger agrees with today's figures (${result.checked.orders} orders, ${result.checked.factoryParts} supplier parts, ${result.checked.accounts} accounts)`,
+            `${c.slug}: the ledger agrees with today's figures (${result.checked.orders} orders, ${result.checked.supplierParts} supplier parts, ${result.checked.accounts} accounts)`,
           );
       }).catch((e) => this.log.error(`the nightly ledger run for ${c.slug} failed: ${(e as Error).stack ?? e}`));
   }

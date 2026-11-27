@@ -103,7 +103,7 @@ export function lcChecksOf(
     currency: string;
     total: Prisma.Decimal;
     depositPercent: Prisma.Decimal;
-    /** The order's ready date (the latest factory's). */
+    /** The order's ready date (the latest supplier's). */
     readyOn: ISODate | null;
     /** Our ship-by: checked against the LC's latest shipment date. */
     shipBy: Date | null;

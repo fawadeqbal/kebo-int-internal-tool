@@ -10,16 +10,16 @@ import {
   deliveryAllGoodInput,
   deliveryInput,
   satAllPassedInput,
-  factoryOrderInput,
-  factoryRequestsInput,
-  factoryRequestUpdateInput,
+  supplierOrderInput,
+  supplierRequestsInput,
+  supplierRequestUpdateInput,
   orderDocumentInput,
   orderDocumentUpdateInput,
   paymentRouteInput,
   satInput,
   sendPurchaseOrderInput,
-  factoryTermsInput,
-  type FactoryTermsInput,
+  supplierTermsInput,
+  type SupplierTermsInput,
   shipmentInput,
   shipmentUpdateInput,
   type BankContractInput,
@@ -30,9 +30,9 @@ import {
   type DeliveryAllGoodInput,
   type DeliveryInput,
   type SatAllPassedInput,
-  type FactoryOrderInput,
-  type FactoryRequestsInput,
-  type FactoryRequestUpdateInput,
+  type SupplierOrderInput,
+  type SupplierRequestsInput,
+  type SupplierRequestUpdateInput,
   type OrderDocumentInput,
   type OrderDocumentUpdateInput,
   type PaymentRouteInput,
@@ -45,7 +45,7 @@ import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequireFeature, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { FlowService } from "./flow.service";
-import { FactoryRequestsService } from "./factory-requests.service";
+import { SupplierRequestsService } from "./supplier-requests.service";
 
 const uuid = new ParseUUIDPipe();
 const stepParam = Validate(z.enum(BANK_STEP_KINDS));
@@ -59,7 +59,7 @@ const stepParam = Validate(z.enum(BANK_STEP_KINDS));
 export class OrderFlowController {
   constructor(private readonly flow: FlowService) {}
 
-  /** The steps (payment → factory → production → shipping → documents & bank → delivery & SAT) and each module's data. */
+  /** The steps (payment → supplier → production → shipping → documents & bank → delivery & SAT) and each module's data. */
   @SignedIn("anyone signed in to the company")
   @Get(":id/flow")
   get(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
@@ -68,7 +68,7 @@ export class OrderFlowController {
 
   /**
    * What a step's row fills in from earlier orders and the quote (nothing is saved): the forwarder of the last
-   * order on this route, the banks of this customer's last LC, the quote's lead time and the factory's price basis.
+   * order on this route, the banks of this customer's last LC, the quote's lead time and the supplier's price basis.
    */
   @SignedIn("checked inside: sourcing.manage")
   @Get(":id/defaults")
@@ -90,11 +90,11 @@ export class OrderFlowController {
     return this.flow.saveBankContract(user, id, body);
   }
 
-  /** { factoryOrderedOn } — when we ordered from the factory (empty: not yet). */
+  /** { supplierOrderedOn } — when we ordered from the supplier (empty: not yet). */
   @Patch(":id/factory-order")
   @RequirePermissions("orders.update")
-  factoryOrder(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(factoryOrderInput)) body: FactoryOrderInput) {
-    return this.flow.setFactoryOrder(user, id, body);
+  supplierOrder(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(supplierOrderInput)) body: SupplierOrderInput) {
+    return this.flow.setSupplierOrder(user, id, body);
   }
 
   /** The order's purchase orders: one per supplier on its lines, with its number and whether it was sent. */
@@ -117,16 +117,16 @@ export class OrderFlowController {
     return this.flow.sendPurchaseOrder(user, id, poId, body);
   }
 
-  /** What was agreed with the purchase order's factory (design "terms that travel"): a change from its offer asks why once sent. */
+  /** What was agreed with the purchase order's supplier (design "terms that travel"): a change from its offer asks why once sent. */
   @SignedIn("checked inside: orders.update")
   @Patch(":id/purchase-orders/:poId/terms")
-  factoryTerms(
+  supplierTerms(
     @CurrentUser() user: SessionUser,
     @Param("id", uuid) id: string,
     @Param("poId", uuid) poId: string,
-    @Body(Validate(factoryTermsInput)) body: FactoryTermsInput,
+    @Body(Validate(supplierTermsInput)) body: SupplierTermsInput,
   ) {
-    return this.flow.setFactoryTerms(user, id, poId, body);
+    return this.flow.setSupplierTerms(user, id, poId, body);
   }
 
   @Post(":id/shipments")
@@ -265,10 +265,10 @@ export class ClaimsController {
 
 @ApiTags("sourcing")
 @Controller()
-export class FactoryRequestsController {
-  constructor(private readonly requests: FactoryRequestsService) {}
+export class SupplierRequestsController {
+  constructor(private readonly requests: SupplierRequestsService) {}
 
-  /** The factories asked for a price on this inquiry, and who answered. */
+  /** The suppliers asked for a price on this inquiry, and who answered. */
   @Get("inquiries/:id/factory-requests")
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")
@@ -276,18 +276,18 @@ export class FactoryRequestsController {
     return this.requests.list(user, id);
   }
 
-  /** { factoryIds, sentOn?, replyBy?, note? } — send the spec to these factories. */
+  /** { supplierIds, sentOn?, replyBy?, note? } — send the spec to these suppliers. */
   @Post("inquiries/:id/factory-requests")
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")
-  ask(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(factoryRequestsInput)) body: FactoryRequestsInput) {
+  ask(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(supplierRequestsInput)) body: SupplierRequestsInput) {
     return this.requests.ask(user, id, body);
   }
 
   @Patch("factory-requests/:id")
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")
-  update(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(factoryRequestUpdateInput)) body: FactoryRequestUpdateInput) {
+  update(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(supplierRequestUpdateInput)) body: SupplierRequestUpdateInput) {
     return this.requests.update(user, id, body);
   }
 

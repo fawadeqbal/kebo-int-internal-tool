@@ -1,6 +1,6 @@
-/** Customers and factories to and from Excel: the templates, and the rows of a filled file checked as the forms check them. */
+/** Customers and suppliers to and from Excel: the templates, and the rows of a filled file checked as the forms check them. */
 
-import { CURRENCIES, customerInput, factoryInput, UNKNOWN_COUNTRY, type CustomerInput, type FactoryInput } from "@kebo/shared";
+import { CURRENCIES, customerInput, supplierInput, UNKNOWN_COUNTRY, type CustomerInput, type SupplierInput } from "@kebo/shared";
 import { COUNTRIES } from "@/lib/countries";
 import { headerKey, type ReadSheet, type SheetCol, type SheetSpec } from "@/lib/sheet-spec";
 
@@ -24,7 +24,7 @@ const CUSTOMER_FIELDS: Field[] = [
   { key: "contact.wechat", header: "WeChat", names: ["wechat", "wechatid", "weixin"], col: { width: 16 } },
 ];
 
-const FACTORY_FIELDS: Field[] = [
+const SUPPLIER_FIELDS: Field[] = [
   { key: "name", header: "Supplier name", names: ["factory", "factoryname", "supplier", "suppliername", "company", "companyname", "name", "vendor"], col: { width: 32, required: true } },
   { key: "contactPerson", header: "Contact person", names: ["contact", "contactperson", "contactname", "person"], col: { width: 22 } },
   { key: "phone", header: "Phone", names: ["phone", "tel", "telephone", "mobile", "cell"], col: { width: 18 } },
@@ -53,8 +53,8 @@ export const customersTemplate = () =>
     "Only new customers are added: one already here (same name, or a contact's email or phone already known) is left out.",
   ]);
 
-export const factoriesTemplate = () =>
-  template("Suppliers", FACTORY_FIELDS, [
+export const suppliersTemplate = () =>
+  template("Suppliers", SUPPLIER_FIELDS, [
     "Suppliers: one row per supplier.",
     "Upload the file with Excel › Upload a filled file. The suppliers are shown to check; nothing is saved until you add them.",
     "Only new suppliers are added: a name already here is left out.",
@@ -79,7 +79,7 @@ const countryOf = (t: string) => {
   return COUNTRY_BY_NAME.get(v.toLowerCase()) ?? v; // a 2-letter code, or left for the check to point out
 };
 
-/** One customer or factory read from a file, checked as the form checks it. */
+/** One customer or supplier read from a file, checked as the form checks it. */
 export interface PartyRow<T> {
   name: string;
   /** "Nigeria · 2 contacts" */
@@ -155,15 +155,15 @@ export function customersFromSheet(read: ReadSheet): PartyRead<CustomerInput> {
   return { items, unused, error: null };
 }
 
-export function factoriesFromSheet(read: ReadSheet): PartyRead<FactoryInput> {
-  const { at, unused } = columnsOf(read.headers, FACTORY_FIELDS);
+export function suppliersFromSheet(read: ReadSheet): PartyRead<SupplierInput> {
+  const { at, unused } = columnsOf(read.headers, SUPPLIER_FIELDS);
   if (!at.has("name")) return { items: [], unused, error: "No “Supplier name” column in the file. Download the template from Excel › Download a template, or rename the column." };
   const cell = (cells: string[], key: string) => (at.has(key) ? (cells[at.get(key)!] ?? "").trim() : "");
   const seen = new Set<string>();
-  const items: PartyRow<FactoryInput>[] = [];
+  const items: PartyRow<SupplierInput>[] = [];
   read.rows.forEach((cells, r) => {
     if (!cells.some((c) => c.trim())) return;
-    const raw = Object.fromEntries(FACTORY_FIELDS.map((f) => [f.key, cell(cells, f.key)]));
+    const raw = Object.fromEntries(SUPPLIER_FIELDS.map((f) => [f.key, cell(cells, f.key)]));
     const name = raw.name ?? "";
     const detail = [raw.contactPerson, raw.phone || raw.email || raw.wechat].filter(Boolean).join(" · ");
     if (name && seen.has(name.toLowerCase())) {
@@ -171,7 +171,7 @@ export function factoriesFromSheet(read: ReadSheet): PartyRead<FactoryInput> {
       return;
     }
     seen.add(name.toLowerCase());
-    const parsed = factoryInput.safeParse(raw);
+    const parsed = supplierInput.safeParse(raw);
     items.push(
       parsed.success
         ? { name, detail, rows: [r + 2], input: parsed.data, problem: null }

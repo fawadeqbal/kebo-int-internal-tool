@@ -10,7 +10,7 @@
   },
   "longFiles": [
     "components/deals/deal-form.tsx",
-    "components/deals/factory-quote-form.tsx",
+    "components/deals/supplier-quote-form.tsx",
     "components/deals/offer-work.tsx",
     "components/deals/revision-editor.tsx",
     "components/lines/line-table.tsx",

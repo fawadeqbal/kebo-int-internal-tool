@@ -31,7 +31,7 @@ describe("treasury: every payment in one list", () => {
     sana = await signIn(app, "sana@example.com");
     bilal = await signIn(app, "bilal@example.com");
     const sanaId = (await api(app, sana).get("/auth/me")).body.id as string;
-    // Sana's order: 10 valves at USD 300 from a factory at CNY 1,000 each.
+    // Sana's order: 10 valves at USD 300 from a supplier at CNY 1,000 each.
     customerId = (
       await api(app, sana)
         .post("/customers", { name: `Treasury Co ${tag}`, country: "KE", contacts: [{ name: "Wanjiru", email: `w-${tag}@treasury.test` }] })
@@ -45,7 +45,7 @@ describe("treasury: every payment in one list", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Treasury Valves ${tag}`,
+        newSupplierName: `Treasury Valves ${tag}`,
         receivedOn: today,
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "Valve", quantity: 10, unitPrice: 1000 }],
@@ -69,10 +69,10 @@ describe("treasury: every payment in one list", () => {
       .post(`/orders/${orderId}/payments`, { kind: "deposit", amount: 900, currency: "USD", paidOn: today, reference: `TT-${tag}` })
       .expect(201);
     const money = (await api(app, manager).get(`/orders/${orderId}/money`).expect(200)).body;
-    const factoryId = money.factories.rows[0].factory.id as string;
+    const supplierId = money.factories.rows[0].factory.id as string;
     await api(app, manager)
       .post(`/orders/${orderId}/factory-payments`, {
-        factoryId,
+        supplierId,
         kind: "deposit",
         amount: 3000,
         currency: "CNY",

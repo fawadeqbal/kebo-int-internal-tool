@@ -13,7 +13,7 @@ import { TermsFillService } from "../src/modules/flow/terms-fill.service";
  * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 4: old records filled once. An order made before it kept
  * its own copy of what was agreed takes its quotation's (exactly what it showed and printed: nothing on a screen or
  * a paper changes), its typed ship-by date stays typed; a purchase order sent before it kept what was agreed with
- * the factory takes its offer's. Run again, nothing happens.
+ * the supplier takes its offer's. Run again, nothing happens.
  */
 describe("old records take the terms they were agreed on, once", () => {
   let app: INestApplication;
@@ -46,7 +46,7 @@ describe("old records take the terms they were agreed on, once", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0].id;
     await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Jinan Fill ${tag}`,
+        newSupplierName: `Jinan Fill ${tag}`,
         reference: "JF-1",
         receivedOn: addDays(today, -3),
         currency: "CNY",
@@ -120,7 +120,7 @@ describe("old records take the terms they were agreed on, once", () => {
       const pos = (await api(app, sana).get(`/orders/${id}/purchase-orders`).expect(200)).body.items[0];
       const { copied, shipByTyped, shipByFrom, ...agreed } = o.agreed;
       const { copied: poCopied, ...poAgreed } = pos.agreed;
-      return { copied, shipByTyped, shipByFrom, poCopied, agreed, shipBy: o.shipBy, factoryTerms: o.factoryTerms, contract: contract.bullets, proforma: proforma.bullets, po: poPaper.bullets, poMeta: poPaper.meta, poAgreed };
+      return { copied, shipByTyped, shipByFrom, poCopied, agreed, shipBy: o.shipBy, supplierTerms: o.supplierTerms, contract: contract.bullets, proforma: proforma.bullets, po: poPaper.bullets, poMeta: poPaper.meta, poAgreed };
     };
     const before = await seen();
     expect(before).toMatchObject({ copied: false, poCopied: false, shipBy: typedOn });
@@ -135,7 +135,7 @@ describe("old records take the terms they were agreed on, once", () => {
     // Every screen and paper says what it said — but an order without a port of discharge of its own takes the one
     // the quotation agreed (accepted before the order kept it): the papers name it now.
     expect(after.agreed).toEqual(before.agreed);
-    expect(after.factoryTerms).toEqual(before.factoryTerms);
+    expect(after.supplierTerms).toEqual(before.supplierTerms);
     const withPort = (bullets: unknown[]) =>
       bullets.map((b) => (typeof b === "string" ? b.replace(/^Shipment: by sea( from [^,]+)?,/, (_m, from: string | undefined) => `Shipment: by sea${from ?? ""} to Karachi,`).replace(/^Shipped( from [^.]+)?\.$/, (_m, from: string | undefined) => `Shipped${from ?? ""} to Karachi.`) : b));
     expect(after.contract).toEqual(withPort(before.contract));

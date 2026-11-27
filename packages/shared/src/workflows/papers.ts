@@ -195,11 +195,11 @@ export const LIVE_PAPERS: readonly PaperKind[] = ["customer-statement"];
  */
 export const SENT_PAPERS: readonly PaperKind[] = ["payment-request", "payment-receipt"];
 
-/** Papers made one per factory (?ref=<factory id>). */
-export const PER_FACTORY_PAPERS: readonly PaperKind[] = ["purchase-order"];
+/** Papers made one per supplier (?ref=<supplier id>). */
+export const PER_SUPPLIER_PAPERS: readonly PaperKind[] = ["purchase-order"];
 
-/** Papers that show factory prices: only for people who see them (sourcing.manage). */
-export const FACTORY_PRICE_PAPERS: readonly PaperKind[] = ["purchase-order"];
+/** Papers that show supplier prices: only for people who see them (sourcing.manage). */
+export const SUPPLIER_PRICE_PAPERS: readonly PaperKind[] = ["purchase-order"];
 
 /* ---------------------------------------------------------------- papers we use */
 
@@ -510,7 +510,7 @@ export interface PaperDoc {
     taxNo?: string | null;
     stamp: string | null;
   };
-  /** "Prepared for": the customer, or the factory on a purchase order, or our bank on the cover letter. */
+  /** "Prepared for": the customer, or the supplier on a purchase order, or our bank on the cover letter. */
   party: {
     name: string;
     country?: string | null;

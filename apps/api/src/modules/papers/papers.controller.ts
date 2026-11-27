@@ -29,7 +29,7 @@ const finalInput = z.object({ options: z.object(Object.fromEntries(PAPER_OPTIONS
  * The papers the app makes from an order (see @kebo/shared workflows/papers).
  * Reading follows the order; making needs documents.manage (checked here and
  * in the service, with the bank papers' module and the purchase order's
- * factory prices).
+ * supplier prices).
  */
 @ApiTags("order papers")
 @Controller()

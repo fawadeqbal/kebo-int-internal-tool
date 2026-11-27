@@ -12,7 +12,7 @@ import { FieldsWindow } from "@/components/order-sections/fields-window";
 import { AllReceivedWindow } from "@/components/order-sections/production-windows";
 import { OrderLinesEditor, OrderLinesView } from "@/components/orders/order-lines";
 import { PanelButton } from "@/components/orders/step-view";
-import { factoryTestAction, goodsReceivedAction, readyDateAction } from "../../section-actions";
+import { supplierTestAction, goodsReceivedAction, readyDateAction } from "../../section-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
 import { api } from "@/lib/api";
@@ -23,9 +23,9 @@ export const generateMetadata = orderTitle("Production");
 const DAY = 86_400_000;
 
 /**
- * Production (design "the order, final"): when the factory says the goods will be ready, the factory
- * test, and what came in from the factory line by line. Nothing else: no timeline of steps and no
- * inspection. An order made at two factories shows the first two sections once per factory.
+ * Production (design "the order, final"): when the supplier says the goods will be ready, the supplier
+ * test, and what came in from the supplier line by line. Nothing else: no timeline of steps and no
+ * inspection. An order made at two suppliers shows the first two sections once per supplier.
  */
 export default async function OrderProduction({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -107,7 +107,7 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
               title="Factory test (FAT)"
               sub={sub}
               plain
-              action={factoryTestAction.bind(null, o.id, fid)}
+              action={supplierTestAction.bind(null, o.id, fid)}
               files={d.canFiles ? { orderId: o.id, section: "fat" } : undefined}
               fields={[
                 { name: "fatPlannedOn", label: "Planned on", type: "date", value: r.fat.plannedOn },

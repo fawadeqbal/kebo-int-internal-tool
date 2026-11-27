@@ -14,7 +14,7 @@ export const generateMetadata = inquiryTitle("Files");
 
 /**
  * Files: add the customer's URS, drawings and photos (with a note), the
- * inquiry's files, the factories' own quotations (people who see factory
+ * inquiry's files, the suppliers' own quotations (people who see supplier
  * prices only) and the papers made here (the quotation PDFs).
  */
 export default async function DealFiles({ params }: { params: Promise<{ id: string }> }) {

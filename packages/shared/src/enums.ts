@@ -144,13 +144,13 @@ export const BASIS_COST_CATEGORIES: readonly ExpenseCategory[] = ["freight", "in
 export const RUNNING_COST_CATEGORIES: readonly ExpenseCategory[] = ["rent", "salaries", "utilities", "office"];
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
-/** The costs between a factory's price and ours (see workflows/basis). */
+/** The costs between a supplier's price and ours (see workflows/basis). */
 export const BASIS_STEPS = values("to_port", "freight", "insurance", "delivery", "duties");
 export type BasisStep = (typeof BASIS_STEPS)[number];
 
 /**
  * Who bears an expense on an order: us (it cuts the order's profit), the
- * customer (added to what they owe on the order) or the factory (taken off
+ * customer (added to what they owe on the order) or the supplier (taken off
  * what we owe it).
  */
 export const EXPENSE_BEARERS = values("us", "customer", "factory");
@@ -165,8 +165,8 @@ export type PaymentRoute = (typeof PAYMENT_ROUTES)[number];
 export const BANK_CONTRACT_STATUSES = values("draft", "opened", "amended", "documents_presented", "paid", "closed");
 export type BankContractStatus = (typeof BANK_CONTRACT_STATUSES)[number];
 
-export const FACTORY_REQUEST_STATUSES = values("sent", "quoted", "declined", "no_reply");
-export type FactoryRequestStatus = (typeof FACTORY_REQUEST_STATUSES)[number];
+export const SUPPLIER_REQUEST_STATUSES = values("sent", "quoted", "declined", "no_reply");
+export type SupplierRequestStatus = (typeof SUPPLIER_REQUEST_STATUSES)[number];
 
 export const SHIP_MODES = values("sea", "air", "road", "rail");
 export type ShipMode = (typeof SHIP_MODES)[number];
@@ -228,7 +228,7 @@ export const ENUMS = {
   PaymentMethod: PAYMENT_METHODS,
   PaymentRoute: PAYMENT_ROUTES,
   BankContractStatus: BANK_CONTRACT_STATUSES,
-  FactoryRequestStatus: FACTORY_REQUEST_STATUSES,
+  SupplierRequestStatus: SUPPLIER_REQUEST_STATUSES,
   ShipMode: SHIP_MODES,
   ShipmentStatus: SHIPMENT_STATUSES,
   OrderDocumentKind: ORDER_DOCUMENT_KINDS,

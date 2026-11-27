@@ -7,7 +7,7 @@ import { CancelOrderForm } from "./forms";
 
 /**
  * "Cancel the order…" in the order's ⋯ menu (managers): its window, with what the money received and
- * the money paid to the factory become, and what else ends with the order. It opens on any tab.
+ * the money paid to the supplier become, and what else ends with the order. It opens on any tab.
  */
 export async function CancelOrder({ id }: { id: string }) {
   const o = await orderOf(id);
@@ -19,7 +19,7 @@ export async function CancelOrder({ id }: { id: string }) {
     o.quotation ? `The quotation R${o.quotation.number} becomes \u201cvoid\u201d` : null,
     pos?.items.length ? `${pos.items.map((x) => x.number).join(", ")} ${pos.items.length === 1 ? "is" : "are"} cancelled` : null,
   ].filter(Boolean);
-  const factoryPaid = (m?.factories?.rows ?? [])
+  const supplierPaid = (m?.factories?.rows ?? [])
     .filter((r) => Number(r.paid) > 0)
     .map((r) => `${r.currency} ${Number(r.paid).toLocaleString("en-US", { minimumFractionDigits: 2 })} to ${r.factory.name}`);
   return (
@@ -29,7 +29,7 @@ export async function CancelOrder({ id }: { id: string }) {
       customer={o.customer.name}
       received={o.money.received}
       currency={o.currency}
-      factoryPaid={factoryPaid}
+      supplierPaid={supplierPaid}
       today={today()}
       total={o.money.total}
       voids={ended.length ? `${ended.join(" and ")}.` : undefined}

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { Request, Response } from "express";
 import { from, lastValueFrom, type Observable } from "rxjs";
 import { PrismaService } from "../../database/prisma.service";
+import { withNewNames } from "@kebo/shared";
 
 /**
  * One-time keys for money saves. A client sends `Idempotency-Key: <key>` with a save (the web's forms one per
@@ -46,8 +47,11 @@ export class OnceInterceptor implements NestInterceptor {
     if (!ONCE_KEY.test(key)) throw new HttpException({ message: "This save's one-time key is not valid. Reload and try again." }, HttpStatus.BAD_REQUEST);
     const db = this.prisma.db;
     const action = `${req.method} ${(req.originalUrl ?? req.url).split("?")[0]}`.slice(0, 200);
+    // The body as it arrived: old names are read as new ones on the way in, and a save that is repeated
+    // must look the same as the first time it was sent.
+    const sent = (req as Request & { bodyAsSent?: unknown }).bodyAsSent ?? req.body;
     const fingerprint = createHash("sha256")
-      .update(JSON.stringify(req.body ?? null))
+      .update(JSON.stringify(sent ?? null))
       .digest("hex");
     const until = Date.now() + WAIT_MS;
     for (;;) {
@@ -68,7 +72,8 @@ export class OnceInterceptor implements NestInterceptor {
       }
       if (row.answered_at) {
         res.setHeader("Idempotent-Replayed", "true");
-        return row.answer ?? undefined;
+        // An answer remembered before "factory" became "supplier" is given with today's names.
+        return withNewNames(row.answer) ?? undefined;
       }
       if (Date.now() - row.created_at.getTime() > LOST_MS) {
         throw new HttpException({ message: "We could not confirm that this went through. Check the list before saving it again." }, HttpStatus.CONFLICT);

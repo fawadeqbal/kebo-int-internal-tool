@@ -76,7 +76,7 @@ export default async function QuotationPrint({
   const options = r.options.some((o) => o.status === "accepted") ? r.options.filter((o) => o.status === "accepted") : r.options;
   const single = options.length === 1;
   const costs = internal && options.some((o) => o.lines.some((l) => l.unitCost != null));
-  // On the internal copy, each line's cost is its landed cost: the factory's plus its share of the costs to reach our basis.
+  // On the internal copy, each line's cost is its landed cost: the supplier's plus its share of the costs to reach our basis.
   const landed = internal && options.some((o) => (o.costing?.extraCostMinor ?? 0) > 0);
   const rowsOf = (o: (typeof options)[number]) => {
     const extra = o.costing?.extraCostMinor ?? 0;
@@ -181,7 +181,7 @@ export default async function QuotationPrint({
               head={single ? undefined : ["", ...options.map((o) => `Option ${o.letter}`)]}
               rows={[
                 ["Supplier", ...options.map((o) => o.factory?.name ?? "—")],
-                ["Supplier's Incoterm", ...options.map((o) => basisText(o.factoryBasis ?? null, o.factoryBasisPlace ?? null) ?? "—")],
+                ["Supplier's Incoterm", ...options.map((o) => basisText(o.supplierBasis ?? null, o.supplierBasisPlace ?? null) ?? "—")],
                 ["Sales (after discount)", ...options.map((o) => (o.costing ? docMoney(o.costing.sales, c) : "—"))],
                 ...(options.some((o) => o.costing && o.costing.extraCostMinor > 0)
                   ? [

@@ -1,4 +1,4 @@
-import { divideMinor, expenseIn, factoryPosition, type Minor, type Rates } from "@kebo/money";
+import { divideMinor, expenseIn, supplierPosition, type Minor, type Rates } from "@kebo/money";
 import {
   EXPENSE_CATEGORY_LABEL,
   ledgerAccount as acc,
@@ -24,7 +24,7 @@ export type Side = "debit" | "credit";
 export interface Dims {
   orderId: string | null;
   customerId: string | null;
-  factoryId: string | null;
+  supplierId: string | null;
   /** The person whose own money it was (staff, to repay). */
   userId: string | null;
 }
@@ -60,7 +60,7 @@ export interface DocPlan {
   sourceId: string;
   /**
    * full: a change reverses what was posted and posts it again (money in and out, expenses, transfers);
-   * delta: a change posts the difference (an order, a factory's part, an account's opening balance).
+   * delta: a change posts the difference (an order, a supplier's part, an account's opening balance).
    */
   mode: "full" | "delta";
   /** Compared in the main currency too (exchange differences, whose amounts are 0 in the party's currency). */
@@ -76,7 +76,7 @@ export interface DocPlan {
 export interface RuleCtx {
   main: string;
   rates: Rates;
-  /** The expenses module: without it nothing is charged to a customer or taken off a factory (as positionOf). */
+  /** The expenses module: without it nothing is charged to a customer or taken off a supplier (as positionOf). */
   expensesOn: boolean;
 }
 
@@ -125,7 +125,7 @@ export interface OrderDoc {
   cancelled: { on: ISODate; reason: string | null } | null;
 }
 
-const NO_DIMS: Dims = { orderId: null, customerId: null, factoryId: null, userId: null };
+const NO_DIMS: Dims = { orderId: null, customerId: null, supplierId: null, userId: null };
 const dims = (d: Partial<Dims>): Dims => ({ ...NO_DIMS, ...d });
 
 /** The customer owes the order total from the day it is confirmed; cancelling reverses it. */
@@ -156,8 +156,8 @@ export function orderPlan(o: OrderDoc): DocPlan {
   };
 }
 
-export interface FactoryLineDoc {
-  factoryId: string;
+export interface SupplierLineDoc {
+  supplierId: string;
   currency: string;
   unitPriceMinor: Minor;
   taxRate: string | number;
@@ -166,34 +166,34 @@ export interface FactoryLineDoc {
 }
 
 /**
- * What we owe one factory on an order: what its lines owe (factoryPosition's "owed", with tax), in each of its
+ * What we owe one supplier on an order: what its lines owe (supplierPosition's "owed", with tax), in each of its
  * currencies, from the day the order was made. Referenced by the purchase order's number, else the order's and
- * the factory's names.
+ * the supplier's names.
  */
 export function purchasePlan(
   o: OrderDoc,
-  factory: { id: string; name: string },
-  lines: FactoryLineDoc[],
+  supplier: { id: string; name: string },
+  lines: SupplierLineDoc[],
   ref: string,
   ctx: RuleCtx,
 ): DocPlan {
-  const owing = factoryPosition(
-    lines.filter((l) => l.factoryId === factory.id),
+  const owing = supplierPosition(
+    lines.filter((l) => l.supplierId === supplier.id),
     [],
     [],
     { main: ctx.main, rates: ctx.rates },
   );
-  const d = dims({ orderId: o.id, customerId: o.customerId, factoryId: factory.id });
+  const d = dims({ orderId: o.id, customerId: o.customerId, supplierId: supplier.id });
   const out: Line[] = [];
   for (const r of owing) {
     if (r.owedMinor <= 0) continue;
     const rate = liveRate(ctx, r.currency);
     out.push({ account: "goods_cost", side: "debit", minor: r.owedMinor, currency: r.currency, rate });
-    out.push({ account: acc.factory(factory.id), side: "credit", minor: r.owedMinor, currency: r.currency, rate });
+    out.push({ account: acc.factory(supplier.id), side: "credit", minor: r.owedMinor, currency: r.currency, rate });
   }
   return {
     sourceType: "purchase_order",
-    sourceId: `${o.id}:${factory.id}`,
+    sourceId: `${o.id}:${supplier.id}`,
     mode: "delta",
     voided: o.cancelled,
     parts: out.length
@@ -203,7 +203,7 @@ export function purchasePlan(
             date: o.orderedOn,
             type: "purchase_order",
             ref,
-            memo: `Goods from ${factory.name} for ${o.refNo}`,
+            memo: `Goods from ${supplier.name} for ${o.refNo}`,
             dims: d,
             lines: out,
           },
@@ -409,7 +409,7 @@ export function allocationPlan(a: AllocationDoc, ctx: RuleCtx): DocPlan {
   };
 }
 
-export interface FactoryPaymentDoc {
+export interface SupplierPaymentDoc {
   id: string;
   ref: string;
   kind: PaymentKind;
@@ -424,8 +424,8 @@ export interface FactoryPaymentDoc {
   voided: { on: ISODate; reason: string | null } | null;
 }
 
-/** Money out to a factory: off what we owe it on the order, out of the account, in the currency we paid in. */
-export function factoryPaymentPlan(p: FactoryPaymentDoc, ctx: RuleCtx): DocPlan {
+/** Money out to a supplier: off what we owe it on the order, out of the account, in the currency we paid in. */
+export function supplierPaymentPlan(p: SupplierPaymentDoc, ctx: RuleCtx): DocPlan {
   const rate =
     p.currency === ctx.main
       ? 1
@@ -448,7 +448,7 @@ export function factoryPaymentPlan(p: FactoryPaymentDoc, ctx: RuleCtx): DocPlan 
         type: "money_out",
         ref: p.ref,
         memo: `${PAYMENT_KIND_LABEL[p.kind] ?? "Payment"} to ${p.factory.name} for ${p.order.refNo}`,
-        dims: dims({ orderId: p.order.id, customerId: p.order.customerId, factoryId: p.factory.id }),
+        dims: dims({ orderId: p.order.id, customerId: p.order.customerId, supplierId: p.factory.id }),
         lines: [
           { account: acc.factory(p.factory.id), side: "debit", minor: p.amountMinor, currency: p.currency, rate },
           { ...moneyLine(p.accountId, p.currency), side: "credit", minor: p.amountMinor, currency: p.currency, rate },
@@ -468,7 +468,7 @@ export interface ExpenseDoc {
   rate: number | string;
   spentOn: ISODate;
   customerId: string | null;
-  factoryId: string | null;
+  supplierId: string | null;
   paidBy: { id: string; name: string } | null;
   accountId: string | null;
   borneBy: string;
@@ -485,10 +485,10 @@ export interface ExpenseDoc {
     currency: string;
     rate: number | null;
     cancelled: boolean;
-    /** Money paid to the factories was written off when it was cancelled (order_cancellations.factory_money "loss"). */
+    /** Money paid to the suppliers was written off when it was cancelled (order_cancellations.factory_money "loss"). */
     lossOnCancel: boolean;
-    /** What each factory's lines owe on the order (to pick the currency an expense it bears counts in). */
-    factoryCurrencies: Map<string, string[]>;
+    /** What each supplier's lines owe on the order (to pick the currency an expense it bears counts in). */
+    supplierCurrencies: Map<string, string[]>;
   } | null;
   step: string | null;
   voided: { on: ISODate; reason: string | null } | null;
@@ -498,20 +498,20 @@ export interface ExpenseDoc {
  * An expense: the cost (by kind), paid from an account (or "not on an account"), or from a person's own money
  * (we owe it back until it is repaid: a second posting on that day), or a bill known before it is paid (it
  * sits in "Bills to pay" until it is paid: a second posting on that day). Charged to the customer: they owe it too
- * (in the order's currency, as positionOf counts it). Borne by a factory: taken off what we owe it (in its
- * currency, as factoryPosition counts it). On a cancelled order neither: the order owes nothing any more. The
- * money paid to a factory and lost when the order was cancelled comes off what the factory owed us back.
+ * (in the order's currency, as positionOf counts it). Borne by a supplier: taken off what we owe it (in its
+ * currency, as supplierPosition counts it). On a cancelled order neither: the order owes nothing any more. The
+ * money paid to a supplier and lost when the order was cancelled comes off what the supplier owed us back.
  */
 export function expensePlan(e: ExpenseDoc, ctx: RuleCtx): DocPlan {
   const ownRate = e.currency === ctx.main ? 1 : e.rate;
   const staff = e.ownMoney && e.paidBy ? e.paidBy : null;
   const o = e.order;
-  const d = dims({ orderId: o?.id ?? null, customerId: o?.customerId ?? e.customerId, factoryId: e.factoryId, userId: staff?.id ?? null });
+  const d = dims({ orderId: o?.id ?? null, customerId: o?.customerId ?? e.customerId, supplierId: e.supplierId, userId: staff?.id ?? null });
   const label = EXPENSE_CATEGORY_LABEL[e.category as ExpenseCategory] ?? e.category;
   const lossOnCancel = !!(
     o?.cancelled &&
     o.lossOnCancel &&
-    e.factoryId &&
+    e.supplierId &&
     !e.accountId &&
     !e.ownMoney &&
     !e.payLater &&
@@ -524,7 +524,7 @@ export function expensePlan(e: ExpenseDoc, ctx: RuleCtx): DocPlan {
     : bill
       ? { account: "bills", side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate }
       : lossOnCancel
-      ? { account: acc.factory(e.factoryId!), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate }
+      ? { account: acc.factory(e.supplierId!), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate }
       : { ...moneyLine(e.accountId, e.currency), side: "credit", minor: e.amountMinor, currency: e.currency, rate: ownRate };
   const lines: Line[] = [
     { account: acc.expense(e.category), side: "debit", minor: e.amountMinor, currency: e.currency, rate: ownRate },
@@ -542,15 +542,15 @@ export function expensePlan(e: ExpenseDoc, ctx: RuleCtx): DocPlan {
       memo += " (charged to the customer)";
     }
   }
-  if (ctx.expensesOn && o && !o.cancelled && e.borneBy === "factory" && e.factoryId) {
-    // Its currency when the factory is owed in it, else the factory's first currency (A→Z), as factoryPosition.
-    const owedIn = [...(o.factoryCurrencies.get(e.factoryId) ?? [])].sort();
+  if (ctx.expensesOn && o && !o.cancelled && e.borneBy === "factory" && e.supplierId) {
+    // Its currency when the supplier is owed in it, else the supplier's first currency (A→Z), as supplierPosition.
+    const owedIn = [...(o.supplierCurrencies.get(e.supplierId) ?? [])].sort();
     const target = owedIn.includes(e.currency) ? e.currency : owedIn[0];
     if (target) {
       const per = liveRate(ctx, target);
       const m = expenseIn({ amountMinor: e.amountMinor, currency: e.currency, rate: String(e.rate) }, target, per);
       if (m !== null && m > 0) {
-        lines.push({ account: acc.factory(e.factoryId), side: "debit", minor: m, currency: target, rate: per, takesRest: true }, recovered);
+        lines.push({ account: acc.factory(e.supplierId), side: "debit", minor: m, currency: target, rate: per, takesRest: true }, recovered);
         memo += " (the supplier bears it)";
       }
     }
@@ -690,7 +690,7 @@ export function openingPlan(
 }
 
 /**
- * The exchange difference of an order with its customer, or of a factory's part in one currency: once it is
+ * The exchange difference of an order with its customer, or of a supplier's part in one currency: once it is
  * settled in its own currency (the balance is 0) and its main-currency value is not, the rest is posted as an
  * exchange difference (a gain when we got more than it was worth when it was posted, a loss when less).
  */

@@ -608,7 +608,7 @@ export const companyCreateInput = z.object({
     .transform((v) => v ?? null),
   adminName: text(120, "Enter the tenant admin's name"),
   adminEmail: email,
-  /** Demos: fill with sample customers, factories and inquiries. */
+  /** Demos: fill with sample customers, suppliers and inquiries. */
   sampleData: z.boolean().default(false),
   /** Demos: how many days (default 3). */
   days: z.coerce.number().int().min(1).max(60).nullish(),

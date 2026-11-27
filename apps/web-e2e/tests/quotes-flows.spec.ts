@@ -7,7 +7,7 @@ import { accessibilityProblems, watchErrors } from "./check";
  * and they go together.
  */
 
-/** A deal of its own (through the API, as the signed-in person): a customer, one item, two factories' offers, three quotations (A and B priced, C own prices still at 0). */
+/** A deal of its own (through the API, as the signed-in person): a customer, one item, two suppliers' offers, three quotations (A and B priced, C own prices still at 0). */
 async function dealWithDrafts(page: Page) {
   const tag = Date.now().toString(36);
   const send = async (url: string, data: object) => {
@@ -20,10 +20,10 @@ async function dealWithDrafts(page: Page) {
   const inquiry = await send("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me.id, items: [{ description: "Blister packing machine", quantity: 1, unit: "set" }] });
   const item = (await (await page.request.get(`/api/inquiries/${inquiry.id}`)).json()).items[0].id;
   const received = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
-  const offer = async (factory: string, price: number, tax: object = {}) =>
+  const offer = async (supplier: string, price: number, tax: object = {}) =>
     (
       await send(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `${factory} ${tag}`,
+        newSupplierName: `${supplier} ${tag}`,
         receivedOn: received,
         currency: "USD",
         lines: [{ requestedItemId: item, description: "Blister packing machine", quantity: 1, unit: "set", unitPrice: price }],

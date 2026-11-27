@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { basisText } from "@kebo/shared";
 import { Badge, cn, Notice, Dash, RULES } from "@kebo/ui";
 import { date, dayMonth, money, qty } from "@/lib/format";
-import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
+import type { SupplierQuoteView, SourcingView } from "@/lib/types-deals";
 
 /*
  * An inquiry's supplier offers (design "RFQ Desk — list pages", 18 Nov 2026): each offer's figures as the list and
@@ -13,8 +13,8 @@ import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
  */
 
 /** What an offer comes to, with tax, before tax, and how its tax was given. */
-export function offerFigures(x: FactoryQuoteView) {
-  const lines = Number(x.factoryTotal) || 0;
+export function offerFigures(x: SupplierQuoteView) {
+  const lines = Number(x.supplierTotal) || 0;
   const tax = Number(x.taxTotal) || 0;
   const rate = Number(x.taxRate) || 0;
   const withTax = x.taxIncluded ? lines : lines + tax;
@@ -48,7 +48,7 @@ const Best = ({ children }: { children: ReactNode }) => (
  * main currency), then item by item, then the terms. Lowest goes by the total with tax (in the main currency, so
  * offers in different currencies compare); an item's lowest by our cost per unit.
  */
-export function OfferCompare({ view, status, dealId, waiting }: { view: SourcingView; status: (q: FactoryQuoteView) => ReactNode; dealId: string; waiting: string[] }) {
+export function OfferCompare({ view, status, dealId, waiting }: { view: SourcingView; status: (q: SupplierQuoteView) => ReactNode; dealId: string; waiting: string[] }) {
   const offers = view.quotes.filter((q) => q.lines.length);
   if (offers.length < 2)
     return <p className="px-5 py-8 text-center text-sm text-text-2">Compare needs two offers with their items{offers.length === 1 ? `; so far only ${offers[0]!.factory.name}'s` : ""}.</p>;
@@ -70,7 +70,7 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
   const group = (name: string) => (
     <div className={cn(RULES.box.inset, "col-span-full border-b border-line/70 bg-surface-2/70 py-1.5 text-xs font-bold tracking-[.03em] text-text-2 uppercase")}>{name}</div>
   );
-  const row = (name: ReactNode, value: (q: FactoryQuoteView) => ReactNode, best?: { id: string | null; word: string }, num = false) => (
+  const row = (name: ReactNode, value: (q: SupplierQuoteView) => ReactNode, best?: { id: string | null; word: string }, num = false) => (
     <>
       <div className={label}>{name}</div>
       {offers.map((q) => (
@@ -154,7 +154,7 @@ export function OfferCompare({ view, status, dealId, waiting }: { view: Sourcing
   );
 }
 
-function Row({ label, labelClass, cellClass, offers, value }: { label: ReactNode; labelClass: string; cellClass: string; offers: FactoryQuoteView[]; value: (q: FactoryQuoteView) => ReactNode }) {
+function Row({ label, labelClass, cellClass, offers, value }: { label: ReactNode; labelClass: string; cellClass: string; offers: SupplierQuoteView[]; value: (q: SupplierQuoteView) => ReactNode }) {
   return (
     <>
       <div className={labelClass}>{label}</div>
@@ -169,8 +169,8 @@ function Row({ label, labelClass, cellClass, offers, value }: { label: ReactNode
 
 const FROM = { shipment: "shipment", delivery: "delivery", sat: "the site test" } as const;
 /** The warranty as the offer says it, else its months and from when ("18 months from shipment"). */
-const warrantyWords = (q: FactoryQuoteView) =>
+const warrantyWords = (q: SupplierQuoteView) =>
   q.warranty ?? (q.warrantyMonths !== null ? `${q.warrantyMonths} months${q.warrantyFrom ? ` from ${FROM[q.warrantyFrom]}` : ""}` : null);
 
 /** "asked 15 Nov · answer due 20 Nov", "in 16 Nov · valid until 8 Dec". */
-export const offerLine = (x: FactoryQuoteView) => [`in ${dayMonth(x.receivedOn)}`, x.validUntil ? `valid until ${dayMonth(x.validUntil)}` : null].filter(Boolean).join(" · ");
+export const offerLine = (x: SupplierQuoteView) => [`in ${dayMonth(x.receivedOn)}`, x.validUntil ? `valid until ${dayMonth(x.validUntil)}` : null].filter(Boolean).join(" · ");

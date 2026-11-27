@@ -121,7 +121,7 @@ export class InquiriesService {
         include: {
           customer: { select: { id: true, name: true, country: true } },
           assignee: { select: { id: true, name: true } },
-          _count: { select: { items: true, factoryQuotes: { where: { deletedAt: null } }, factoryRequests: true } },
+          _count: { select: { items: true, supplierQuotes: { where: { deletedAt: null } }, supplierRequests: true } },
           quotations: {
             select: {
               refNo: true,
@@ -177,9 +177,9 @@ export class InquiriesService {
           customer: i.customer,
           assignee: i.assignee,
           items: i._count.items,
-          /** Factories asked for prices, and the offers in. */
-          asked: i._count.factoryRequests,
-          offers: i._count.factoryQuotes,
+          /** Suppliers asked for prices, and the offers in. */
+          asked: i._count.supplierRequests,
+          offers: i._count.supplierQuotes,
           /** The quotation that speaks for the deal (accepted, else the lowest still waiting…), with its newest revision. */
           quotation: deal ? { refNo: deal.refNo, latest: deal.revisions[0] ? revisionRow(deal.revisions[0]) : null } : null,
           /** How many quotations the deal has. */
@@ -225,7 +225,7 @@ export class InquiriesService {
         createdBy: { select: { id: true, name: true } },
         items: { orderBy: { sortOrder: "asc" } },
         notes: { orderBy: { createdAt: "desc" } },
-        attachments: { where: { deletedAt: null, factoryQuoteId: null, replacedById: null }, orderBy: { createdAt: "desc" } },
+        attachments: { where: { deletedAt: null, supplierQuoteId: null, replacedById: null }, orderBy: { createdAt: "desc" } },
         stageChanges: { orderBy: { changedAt: "asc" } },
         assignments: { orderBy: { assignedAt: "asc" } },
         quotations: {
@@ -254,7 +254,7 @@ export class InquiriesService {
         },
         ...(seeCosts
           ? {
-              factoryQuotes: {
+              supplierQuotes: {
                 where: { deletedAt: null },
                 include: { factory: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
                 orderBy: { receivedOn: "desc" },
@@ -280,8 +280,8 @@ export class InquiriesService {
     );
     const priced = new Set(
       (
-        await this.prisma.db.factoryQuoteLine.findMany({
-          where: { factoryQuote: { inquiryId: id, deletedAt: null }, requestedItemId: { not: null } },
+        await this.prisma.db.supplierQuoteLine.findMany({
+          where: { supplierQuote: { inquiryId: id, deletedAt: null }, requestedItemId: { not: null } },
           select: { requestedItemId: true },
         })
       ).map((l) => l.requestedItemId!),
@@ -297,7 +297,7 @@ export class InquiriesService {
       quotation: deal ? withRows(deal) : null,
       /** Every quotation, A, B, C…, each with its revisions (newest first). */
       quotations: all.map(withRows),
-      /** Items in order, parts right after their item: "3", "3.1"; `priced` once a factory has priced it (changing it then needs a reason). */
+      /** Items in order, parts right after their item: "3", "3.1"; `priced` once a supplier has priced it (changing it then needs a reason). */
       items: i.items.map((it, n) => ({ ...it, no: numbers[n], priced: priced.has(it.id) })),
       requiredBy: fromDbDateOrNull(i.requiredBy),
       people,
@@ -334,7 +334,7 @@ export class InquiriesService {
   }
 
   /**
-   * Requested items keep their ids (quotation lines and factory prices point at them).
+   * Requested items keep their ids (quotation lines and supplier prices point at them).
    * A part (parentId) stays right after its item; parts of a removed item go with it.
    */
   private async writeItems(tx: Tx, inquiryId: string, items: InquiryInput["items"]) {
@@ -374,10 +374,10 @@ export class InquiriesService {
     }
   }
 
-  /** What changes on the items a factory has priced (removed, quantity or unit changed): changing them needs a reason. */
+  /** What changes on the items a supplier has priced (removed, quantity or unit changed): changing them needs a reason. */
   private async pricedItemChanges(inquiryId: string, items: InquiryInput["items"]) {
     const before = await this.prisma.db.requestedItem.findMany({
-      where: { inquiryId, factoryLines: { some: { factoryQuote: { deletedAt: null } } } },
+      where: { inquiryId, supplierLines: { some: { supplierQuote: { deletedAt: null } } } },
       select: { id: true, description: true, quantity: true, unit: true },
     });
     const changes: string[] = [];
@@ -454,7 +454,7 @@ export class InquiriesService {
         where: { quotation: { inquiryId: id }, status: { not: "draft" }, deletedAt: null },
       });
       if (sent) throw new DomainError("A quotation was already sent to this customer, so the inquiry cannot move to another customer.");
-      if (await this.prisma.db.factoryQuote.count({ where: { inquiryId: id, deletedAt: null } })) changes.push("moved to another customer");
+      if (await this.prisma.db.supplierQuote.count({ where: { inquiryId: id, deletedAt: null } })) changes.push("moved to another customer");
     }
     changes.push(...(await this.pricedItemChanges(id, input.items)));
     const reason = changes.length
@@ -604,9 +604,9 @@ export class InquiriesService {
   }
 
   /**
-   * Split an item into parts (when a factory quotes it in parts): each part is
+   * Split an item into parts (when a supplier quotes it in parts): each part is
    * an item of its own, kept right after it and numbered under it (3.1, 3.2).
-   * Splitting an item a factory has already priced needs a reason.
+   * Splitting an item a supplier has already priced needs a reason.
    */
   async split(user: SessionUser, id: string, itemId: string, input: SplitItemInput) {
     await this.prisma.tx(async (tx) => {
@@ -615,11 +615,11 @@ export class InquiriesService {
       if (!isOpen(i.stage)) throw new DomainError("This inquiry is closed. Reopen it to change its items.");
       const item = await tx.requestedItem.findFirst({
         where: { id: itemId, inquiryId: id },
-        include: { _count: { select: { factoryLines: { where: { factoryQuote: { deletedAt: null } } } } } },
+        include: { _count: { select: { supplierLines: { where: { supplierQuote: { deletedAt: null } } } } } },
       });
       if (!item) throw new NotFoundError("Item");
       if (item.parentId) throw new DomainError("This is already a part of another item. Split that item instead.");
-      const reason = item._count.factoryLines
+      const reason = item._count.supplierLines
         ? requireReason(input.reason, "split", "an item a supplier has priced is split")
         : (input.reason ?? null);
       const all = await tx.requestedItem.findMany({
@@ -685,13 +685,13 @@ export class InquiriesService {
     user: SessionUser,
     id: string,
     file: { originalname: string; mimetype: string; size: number; buffer: Buffer },
-    meta: { kind: string; note: string | null; factoryQuoteId?: string | null } = { kind: "other", note: null },
+    meta: { kind: string; note: string | null; supplierQuoteId?: string | null } = { kind: "other", note: null },
   ) {
     await this.find(user, id);
-    // Evidence for a factory offer: only for people who see factory prices, and only that deal's offers.
-    if (meta.factoryQuoteId) {
+    // Evidence for a supplier offer: only for people who see supplier prices, and only that deal's offers.
+    if (meta.supplierQuoteId) {
       if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier prices.");
-      const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: meta.factoryQuoteId, inquiryId: id, deletedAt: null } });
+      const q = await this.prisma.db.supplierQuote.findFirst({ where: { id: meta.supplierQuoteId, inquiryId: id, deletedAt: null } });
       if (!q) throw new DomainError("That supplier offer is not on this inquiry any more.");
     }
     if (!this.storage.isAllowed(file.originalname))
@@ -699,7 +699,7 @@ export class InquiriesService {
     if (file.size > this.storage.maxBytes)
       throw new DomainError(`Files can be up to ${Math.round(this.storage.maxBytes / 1024 / 1024)} MB.`);
     const name = safeFileName(file.originalname);
-    const key = this.storage.keyFor(`inquiries/${id}/${meta.factoryQuoteId ? `offers/${meta.factoryQuoteId}/` : ""}${randomUUID()}-${name}`);
+    const key = this.storage.keyFor(`inquiries/${id}/${meta.supplierQuoteId ? `offers/${meta.supplierQuoteId}/` : ""}${randomUUID()}-${name}`);
     await this.storage.put(key, file.buffer, file.mimetype);
     try {
       return await this.prisma.tx(async (tx) => {
@@ -712,7 +712,7 @@ export class InquiriesService {
             storageKey: key,
             kind: meta.kind,
             note: meta.note,
-            factoryQuoteId: meta.factoryQuoteId ?? null,
+            supplierQuoteId: meta.supplierQuoteId ?? null,
             uploadedById: user.id,
           },
         });
@@ -721,7 +721,7 @@ export class InquiriesService {
           action: "upload",
           entityType: "attachment",
           entityId: row.id,
-          summary: meta.factoryQuoteId ? `Uploaded ${name} to a supplier offer` : `Uploaded ${name}`,
+          summary: meta.supplierQuoteId ? `Uploaded ${name} to a supplier offer` : `Uploaded ${name}`,
         });
         return row;
       });
@@ -731,15 +731,15 @@ export class InquiriesService {
     }
   }
 
-  /** A file the person may see: a factory offer's files only for people who see factory prices. */
+  /** A file the person may see: a supplier offer's files only for people who see supplier prices. */
   private async fileFor(user: SessionUser, attachmentId: string) {
     // A deal's file (a proof is on its own record, opened there).
     const a = await this.prisma.db.attachment.findFirst({ where: { id: attachmentId, deletedAt: null, inquiryId: { not: null } } });
-    if (!a || (a.factoryQuoteId && !can(user, "sourcing.manage"))) throw new NotFoundError("File");
+    if (!a || (a.supplierQuoteId && !can(user, "sourcing.manage"))) throw new NotFoundError("File");
     return { ...a, inquiryId: a.inquiryId! };
   }
 
-  /** Whether the person may open a deal's file: they see the deal (a factory offer's file: those who see costs). */
+  /** Whether the person may open a deal's file: they see the deal (a supplier offer's file: those who see costs). */
   async mayOpenFile(user: SessionUser, attachmentId: string) {
     const a = await this.fileFor(user, attachmentId);
     await this.find(user, a.inquiryId);
@@ -769,8 +769,8 @@ export class InquiriesService {
   /** Every file on a deal in one zip (names made unique; URS first), for "Download all". */
   async zipFiles(user: SessionUser, id: string): Promise<{ data: Uint8Array; fileName: string }> {
     const i = await this.find(user, id);
-    // The deal's own documents; factory offers' files stay on Factory prices.
-    const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null, factoryQuoteId: null, replacedById: null }, orderBy: [{ createdAt: "asc" }] });
+    // The deal's own documents; supplier offers' files stay on Supplier prices.
+    const files = await this.prisma.db.attachment.findMany({ where: { inquiryId: id, deletedAt: null, supplierQuoteId: null, replacedById: null }, orderBy: [{ createdAt: "asc" }] });
     if (!files.length) throw new DomainError("There are no files on this inquiry yet.");
     const total = files.reduce((t, f) => t + f.size, 0);
     if (total > 300 * 1024 * 1024) throw new DomainError("These files are over 300 MB together. Download them one by one.");

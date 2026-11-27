@@ -21,7 +21,7 @@ import { Button, cn, Field, Input, Select, Textarea, EmptyLine, linkClass } from
 import { SubmitButton } from "@kebo/ui/client";
 import { ActionForm } from "@/components/common/action-form";
 import type { ActionState } from "@/lib/actions";
-import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
+import type { SupplierOption, SupplierQuoteView } from "@/lib/types-deals";
 import { convertText, rateOf, rateSentence } from "@/lib/fx";
 import { CurrencySelect } from "@/components/common/currency-select";
 import { TypeToPick } from "@/components/common/type-to-pick";
@@ -50,7 +50,7 @@ import {
 const PORTS = ["Qingdao", "Shanghai", "Ningbo", "Tianjin", "Shenzhen", "Guangzhou", "Xiamen", "Dalian"];
 
 /**
- * The port (or the factory's town for EXW) as its own field: type it, or pick one of the usual ports from the
+ * The port (or the supplier's town for EXW) as its own field: type it, or pick one of the usual ports from the
  * list under it — the one list chooser (TypeToPick), as for a country. For EXW the town is typed, no list.
  */
 export function PortPicker({ id, value, onChange, exw }: { id: string; value: string; onChange: (v: string) => void; exw: boolean }) {
@@ -119,7 +119,7 @@ export interface QuoteState {
  * How the form opens. An older offer kept its lead time and warranty as words: where they say the days or
  * months plainly the form starts from them (and says so), else the words stay as they are.
  */
-function initialState(quote: FactoryQuoteView | null, today: string, usualAdvance: number): QuoteState {
+function initialState(quote: SupplierQuoteView | null, today: string, usualAdvance: number): QuoteState {
   const lead =
     quote?.leadDays !== null && quote?.leadDays !== undefined
       ? { days: quote.leadDays, from: quote.leadFrom ?? "after_payment" }
@@ -156,8 +156,8 @@ function initialState(quote: FactoryQuoteView | null, today: string, usualAdvanc
 function payload(s: QuoteState, convertible?: boolean) {
   const days = wholeOrNull(s.leadDays);
   return {
-    factoryId: s.factory?.id ?? null,
-    newFactoryName: s.factory && !s.factory.id ? s.factory.name : null,
+    supplierId: s.factory?.id ?? null,
+    newSupplierName: s.factory && !s.factory.id ? s.factory.name : null,
     reference: s.reference,
     receivedOn: s.receivedOn,
     validUntil: s.validUntil || null,
@@ -202,15 +202,15 @@ const OFFER_PRESETS: PartsPreset[] = [
   { label: "All after shipping", parts: [{ name: "Payment after shipping", share: 100, rule: "after_shipping", days: 30 }] },
 ];
 
-/** A factory asked for this inquiry (offered first in the picker): how it stands ("asked 15 Nov · no offer yet"). */
-export type AskedFactory = FactoryOption & { note?: string };
+/** A supplier asked for this inquiry (offered first in the picker): how it stands ("asked 15 Nov · no offer yet"). */
+export type AskedSupplier = SupplierOption & { note?: string };
 
 /**
  * Choose a known supplier, or "+ New supplier" with what was typed: the window's New supplier form (`onNew`), as a
  * new customer is added on an inquiry. The suppliers asked for this inquiry come first (design 18 Nov); typing
  * searches them all. Drawn by the one Picker.
  */
-export function FactoryPicker({
+export function SupplierPicker({
   value,
   onChange,
   onNew,
@@ -222,16 +222,16 @@ export function FactoryPicker({
   value: QuoteState["factory"];
   /** The chosen one's contact person, when it is not among those asked (a supplier just added). */
   contact?: string | null;
-  onChange: (f: QuoteState["factory"], known?: FactoryOption) => void;
+  onChange: (f: QuoteState["factory"], known?: SupplierOption) => void;
   /** "+ New supplier": opens the New supplier form with what was typed (without it: added on save, by name). */
   onNew?: (typed: string) => void;
-  search: (q: string) => Promise<FactoryOption[]>;
-  asked?: AskedFactory[];
+  search: (q: string) => Promise<SupplierOption[]>;
+  asked?: AskedSupplier[];
   error?: string[];
 }) {
   const known = value ? asked.find((a) => a.id === value.id) : undefined;
   return (
-    <Picker<AskedFactory>
+    <Picker<AskedSupplier>
       inputId="factory"
       placeholder="Search suppliers"
       listLabel="Suppliers"
@@ -255,7 +255,7 @@ export function FactoryPicker({
 /* ---------------------------------------------------------------- the offer's window, in steps (design 18 Nov) */
 
 /**
- * The offer's steps (design 18 Nov, the inquiry's rules): Factory (who sent it, when, and their paper) · Prices (the
+ * The offer's steps (design 18 Nov, the inquiry's rules): Supplier (who sent it, when, and their paper) · Prices (the
  * currency and tax above the lines) · Delivery & payment · Warranty & conditions, then Review (a new offer) or Changes (an edit).
  */
 export type OfferStep = "factory" | "prices" | "terms" | "conditions" | "review" | "changes";
@@ -306,7 +306,7 @@ export function offerChanges(a: QuoteState, b: QuoteState): OfferChange[] {
 }
 
 /** The quick reasons for changing an offer (design rules 18 Nov: Why? is asked only when something changed). */
-const OFFER_REASONS = [...REASON_CHOICES.factoryPrice.slice(0, 2), "Typed wrong", "Mistake fixed"];
+const OFFER_REASONS = [...REASON_CHOICES.supplierPrice.slice(0, 2), "Typed wrong", "Mistake fixed"];
 
 /** A row of the Changes table: Part · What · Was · Now · Undo on fixed columns; on a phone, What and Undo. */
 const CHANGE_ROW =
@@ -319,7 +319,7 @@ export type OfferSaved = { reason?: string; changes: OfferChange[] };
  * The offer's window, the same for a new offer and an edit (design 18 Nov, the inquiry's rules): the steps on the
  * left, two even columns of fields, one strong button. A new offer ends with Review and Add the offer; an edit
  * marks each change, counts them on its parts and its Save, ends with Changes, and asks why once. `only`: one part
- * in a smaller window. The lines (`lines`) and the factory's files (`files`) are the owner's; their changes are
+ * in a smaller window. The lines (`lines`) and the supplier's files (`files`) are the owner's; their changes are
  * counted here (`linesChanges`, `filesAdded`) so the counts, Undo and the leave guard cover them too.
  */
 export function OfferHeaderForm({
@@ -327,7 +327,7 @@ export function OfferHeaderForm({
   quote,
   today,
   defaults,
-  searchFactories,
+  searchSuppliers,
   asked,
   onDone,
   files,
@@ -352,18 +352,18 @@ export function OfferHeaderForm({
 }: {
   action: Action;
   /** The offer being edited; null: a new one. */
-  quote: FactoryQuoteView | null;
+  quote: SupplierQuoteView | null;
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
   /** A new offer's tax and advance: the company's defaults (Settings). */
   defaults?: { taxIncluded: boolean; taxRate: number; advancePercent?: number };
-  searchFactories: (q: string) => Promise<FactoryOption[]>;
-  /** The factories asked for this inquiry, offered first (design 18 Nov). */
-  asked?: AskedFactory[];
+  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
+  /** The suppliers asked for this inquiry, offered first (design 18 Nov). */
+  asked?: AskedSupplier[];
   /** Saved: the answer, the reason given and what changed. */
   onDone: (state: ActionState, saved: OfferSaved) => void;
-  /** Their quotation: the files it has, and the place to add more (in the Factory step). */
+  /** Their quotation: the files it has, and the place to add more (in the Supplier step). */
   files: ReactNode;
   /** Files added but not sent yet (an edit counts them as changes). */
   filesAdded?: string[];
@@ -505,7 +505,7 @@ export function OfferHeaderForm({
   }, [lostKey, create, reportLost, reportDirty]);
 
   // The payment's parts: what 100% is when the offer has lines, and what stops a save.
-  const totalText = quote && Number(quote.factoryTotal) > 0 ? money(quote.factoryTotal, quote.currency) : null;
+  const totalText = quote && Number(quote.supplierTotal) > 0 ? money(quote.supplierTotal, quote.currency) : null;
   const [partsTried, setPartsTried] = useState(false);
   const partsBad = partsProblem(s.parts);
   const daysTyped = s.leadDays.trim() !== "";
@@ -595,8 +595,8 @@ export function OfferHeaderForm({
         <>
           <input type="hidden" name="payload" value={JSON.stringify({ ...payload(s, canConvert), ...(typeof extra === "function" ? extra(h) : extra) })} />
           {needWhy && why.trim() && <input type="hidden" name="reason" value={why.trim()} />}
-          {/* The factory's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
-          <input type="hidden" name="factoryLabel" value={s.factory?.name ?? ""} />
+          {/* The supplier's name, for the note after saving ("Offer from Jinan Pharma Machinery added"). */}
+          <input type="hidden" name="supplierLabel" value={s.factory?.name ?? ""} />
           <StepsFrame
             steps={STEPS.map((x, k) => ({
               key: x.key,
@@ -620,7 +620,7 @@ export function OfferHeaderForm({
               <NewSupplierForm
                 initialName={adding}
                 add={quickSupplierAction}
-                search={searchFactories}
+                search={searchSuppliers}
                 onReady={(api) => {
                   newSupplier.current = api;
                 }}
@@ -638,10 +638,10 @@ export function OfferHeaderForm({
                   label="Supplier"
                   htmlFor="factory"
                   required
-                  error={st.errors?.factoryId ?? st.errors?.newFactoryName}
+                  error={st.errors?.supplierId ?? st.errors?.newSupplierName}
                   className={cn("md:col-span-2", changedField("factory"))}
                 >
-                  <FactoryPicker value={s.factory} search={searchFactories} asked={asked} error={st.errors?.factoryId} onChange={(f) => set("factory", f)} onNew={setAdding} contact={addedContact} />
+                  <SupplierPicker value={s.factory} search={searchSuppliers} asked={asked} error={st.errors?.supplierId} onChange={(f) => set("factory", f)} onNew={setAdding} contact={addedContact} />
                   {changedNote("factory")}
                 </Field>
                 <Field label="Received on" htmlFor="receivedOn" required error={st.errors?.receivedOn} className={changedField("receivedOn")}>
@@ -776,7 +776,7 @@ export function OfferHeaderForm({
                       onChange={(rows) => set("parts", rows)}
                       presets={OFFER_PRESETS}
                       amounts={totalText}
-                      totalMinor={linesTotalMinor || (quote && Number(quote.factoryTotal) > 0 ? toMinor(quote.factoryTotal) : null)}
+                      totalMinor={linesTotalMinor || (quote && Number(quote.supplierTotal) > 0 ? toMinor(quote.supplierTotal) : null)}
                       currency={currency || quote?.currency}
                       error={(partsTried ? partsBad : null) ?? st.errors?.paymentParts}
                     />
@@ -1001,8 +1001,8 @@ const OFFER_STEPS: { key: OfferStep; label: string }[] = [
 
 /** Where each field the API can refuse is typed. */
 const FIELD_STEP: Record<string, OfferStep> = {
-  factoryId: "factory",
-  newFactoryName: "factory",
+  supplierId: "factory",
+  newSupplierName: "factory",
   reference: "factory",
   receivedOn: "factory",
   validUntil: "factory",
@@ -1025,7 +1025,7 @@ const FIELD_STEP: Record<string, OfferStep> = {
   notes: "conditions",
 };
 
-/** What the API said about the lines of a new offer ("lines.2.unitPrice") as "Line 3: Enter the factory's price". */
+/** What the API said about the lines of a new offer ("lines.2.unitPrice") as "Line 3: Enter the supplier's price". */
 function lineErrors(errors: ActionState["errors"]): string[] {
   const out: string[] = [];
   for (const [key, list] of Object.entries(errors ?? {})) {

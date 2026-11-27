@@ -34,7 +34,7 @@ export class QuotationsController {
     return this.quotations.get(user, id);
   }
 
-  /** What a revision can offer: each factory offer (lines, costs in ?currency, which items it covers) and the customer's items. */
+  /** What a revision can offer: each supplier offer (lines, costs in ?currency, which items it covers) and the customer's items. */
   @Get("inquiries/:id/quotation/offers")
   @RequirePermissions("quotations.manage")
   offers(
@@ -45,7 +45,7 @@ export class QuotationsController {
     return this.quotations.offers(user, id, q.currency);
   }
 
-  /** Starting values for the next revision (copy of the latest, or the best factory offer at the default margin). */
+  /** Starting values for the next revision (copy of the latest, or the best supplier offer at the default margin). */
   @Get("inquiries/:id/quotation/draft")
   @RequirePermissions("quotations.manage")
   draft(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -58,7 +58,7 @@ export class QuotationsController {
     return this.quotations.createRevision(user, id, body);
   }
 
-  /** New quotations: one draft for each factory offer ticked (or own prices), lettered A, B, C… */
+  /** New quotations: one draft for each supplier offer ticked (or own prices), lettered A, B, C… */
   @Post("inquiries/:id/quotations")
   @RequirePermissions("quotations.manage")
   createMany(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(newQuotationsInput)) body: NewQuotationsInput) {

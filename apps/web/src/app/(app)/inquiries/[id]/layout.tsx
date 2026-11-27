@@ -22,7 +22,7 @@ const TONE = { action: "text-action", ok: "text-ok", bad: "text-bad", mute: "tex
  * Every page of an inquiry shares one top (design "the record page", 17 Nov): its title, then one line with
  * its status in words ("Sourcing · 2 of 3 offers in"), the customer and the category; the next thing it
  * needs is the header's orange button, and everything else is in ⋯ (edit, hold, lost, files, link); one
- * row of tabs (Overview · Factory offers · Quotations · Costs · History · Order).
+ * row of tabs (Overview · Supplier offers · Quotations · Costs · History · Order).
  */
 export default async function DealLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;

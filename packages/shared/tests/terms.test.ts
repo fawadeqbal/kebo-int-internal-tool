@@ -121,7 +121,7 @@ describe("the payment is parts", () => {
       { label: "Deposit", percent: 30, rule: "on_order", days: null },
       { label: "B/L", percent: 70, rule: "after_shipping", days: 14 },
     ]);
-    // A factory's parts have the factory's rules only.
+    // A supplier's parts have the supplier's rules only.
     expect(offerPartsInput.safeParse([{ label: "All", percent: 100, rule: "before_shipment" }]).success).toBe(false);
     expect(offerPartsInput.safeParse([{ label: "All", percent: 100, rule: "on_ready" }]).success).toBe(true);
   });
@@ -176,7 +176,7 @@ describe("what we promise, beside what the supplier gives", () => {
       word: "Covered",
       text: "Covered: the customer pays USD 9,037.50 with the order and USD 27,112.50 in all by shipping; Jinan wants USD 7,859.15 when we order and USD 26,197.18 in all by then.",
     });
-    // The balance after shipping: we pay the factory before the customer pays us.
+    // The balance after shipping: we pay the supplier before the customer pays us.
     const late = ours({ parts: [part("Deposit 30%", 30, "on_order"), part("Against B/L 70%", 70, "against_bl_copy")] });
     expect(paymentCheck(late, theirs())).toEqual({
       key: "payment",

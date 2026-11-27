@@ -4,6 +4,7 @@ import { z } from "zod";
 import { can, FLOW_STEPS, STEP_OF_ACTION } from "@kebo/shared";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import { changesOf } from "../../common/audit/changes";
+import { savedHistory } from "../../common/names/old-names";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
@@ -28,7 +29,7 @@ export type HistoryQuery = z.infer<typeof historyQuery>;
 
 /**
  * A record's history for everyone who may see the record: who changed what,
- * when, old → new, and why. A deal's history includes its factory prices,
+ * when, old → new, and why. A deal's history includes its supplier prices,
  * quotation revisions, files and orders; an order's includes its payments.
  */
 @Injectable()
@@ -47,9 +48,9 @@ export class HistoryService {
         where: { id: q.id, deletedAt: null, ...inquiryAccess(user) },
         select: {
           id: true,
-          factoryQuotes: { select: { id: true } },
+          supplierQuotes: { select: { id: true } },
           quotations: { select: { revisions: { select: { id: true } } } },
-          attachments: { select: { id: true, factoryQuoteId: true } },
+          attachments: { select: { id: true, supplierQuoteId: true } },
           orders: { select: { id: true } },
         },
       });
@@ -57,11 +58,11 @@ export class HistoryService {
       const seeCosts = can(user, "sourcing.manage");
       return [
         { entityType: "inquiry", ids: [i.id] },
-        { entityType: "factory_quote", ids: seeCosts ? i.factoryQuotes.map((f) => f.id) : [] },
+        { entityType: "factory_quote", ids: seeCosts ? i.supplierQuotes.map((f) => f.id) : [] },
         // Every quotation's revisions (A, B, C…).
         { entityType: "quotation", ids: i.quotations.flatMap((q) => q.revisions.map((r) => r.id)) },
-        // A factory offer's files only for people who see factory prices.
-        { entityType: "attachment", ids: i.attachments.filter((a) => seeCosts || !a.factoryQuoteId).map((a) => a.id) },
+        // A supplier offer's files only for people who see supplier prices.
+        { entityType: "attachment", ids: i.attachments.filter((a) => seeCosts || !a.supplierQuoteId).map((a) => a.id) },
         { entityType: "order", ids: i.orders.map((o) => o.id) },
       ];
     }
@@ -82,7 +83,7 @@ export class HistoryService {
 
   async list(user: SessionUser, q: HistoryQuery) {
     const scope = (await this.scope(user, q)).filter((s) => s.ids.length);
-    // Expenses are for managers only; payments to factories for people who see costs.
+    // Expenses are for managers only; payments to suppliers for people who see costs.
     const hidden = [
       // Expenses: managers, and only with the expenses feature of the plan.
       ...(can(user, "expenses.manage") && (await this.limits.allows("expenses")) ? [] : ["expense"]),
@@ -101,7 +102,7 @@ export class HistoryService {
     const paged = q.page !== undefined;
     const skip = paged && !q.step ? (q.page! - 1) * q.pageSize : 0;
     const [rows, counted] = await Promise.all([
-      this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: paged ? (q.step ? 2000 : q.pageSize) : 100 }),
+      this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: paged ? (q.step ? 2000 : q.pageSize) : 100 }).then((all) => all.map(savedHistory)),
       paged && !q.step ? this.prisma.db.auditLog.count({ where }) : null,
     ]);
     const ids = [...new Set(rows.map((r) => r.userId).filter((v): v is string => !!v))];

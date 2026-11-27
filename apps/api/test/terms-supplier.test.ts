@@ -5,7 +5,7 @@ import { api, signIn, startApp } from "./app";
 import { Clock } from "../src/common/time/clock.service";
 
 /**
- * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 3a: the factory's side of the order starts from its
+ * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 3a: the supplier's side of the order starts from its
  * offer — the plan from the offer's parts (an advance and the rest when ready stays the usual plan, as before), and
  * the purchase order says which offer it was made from and prints its delivery basis, lead time, warranty and the
  * payment note. An offer that says none of it prints as before.
@@ -28,7 +28,7 @@ describe("the supplier's side starts from its offer", () => {
     await app?.close();
   });
 
-  /** A deal with one factory offer (these terms), quoted and accepted: the order and its factory. */
+  /** A deal with one supplier offer (these terms), quoted and accepted: the order and its supplier. */
   async function accepted(offer: Record<string, unknown>) {
     const me = (await api(app, sana).get("/auth/me")).body.id;
     const n = Math.random().toString(36).slice(2, 6);
@@ -45,7 +45,7 @@ describe("the supplier's side starts from its offer", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0].id;
     await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Jinan Factory Terms ${tag} ${n}`,
+        newSupplierName: `Jinan Factory Terms ${tag} ${n}`,
         receivedOn: addDays(today, -3),
         currency: "CNY",
         lines: [{ requestedItemId: item, description: "Blister packing machine", quantity: 1, unit: "set", unitPrice: 186000 }],
@@ -93,7 +93,7 @@ describe("the supplier's side starts from its offer", () => {
       ["Ready 60%", "111600.00", "on_ready", null],
       ["After shipping 10%", "18600.00", "on_ship_plus_days", 30],
     ]);
-    // Sent (before the deposit, with a reason): the factory is ordered from, and its plan is kept as it was shown.
+    // Sent (before the deposit, with a reason): the supplier is ordered from, and its plan is kept as it was shown.
     const po = (await purchaseOrders(id)).items[0];
     await api(app, sana).post(`/orders/${id}/purchase-orders/${po.id}/send`, { sentOn: today, reason: "The supplier needs the order this week" }).expect(200);
     const saved = (await money(id)).factories.plans[0];
@@ -140,16 +140,16 @@ describe("the supplier's side starts from its offer", () => {
     const changed = (await purchaseOrders(id)).items[0];
     expect(changed.agreed).toMatchObject({ leadDays: 35, leadTime: "35 days after the deposit", changes: 2, offered: { leadDays: 30 } });
     // The advance paid in full: the ready date is worked out from it.
-    const factoryId = (await money(id)).factories.plans[0].factory.id;
-    await api(app, manager).post(`/orders/${id}/factory-payments`, { factoryId, kind: "deposit", amount: 55800, currency: "CNY", paidOn: today }).expect(201);
+    const supplierId = (await money(id)).factories.plans[0].factory.id;
+    await api(app, manager).post(`/orders/${id}/factory-payments`, { supplierId, kind: "deposit", amount: 55800, currency: "CNY", paidOn: today }).expect(201);
     expect((await purchaseOrders(id)).items[0].agreed.readyBy).toEqual({ by: "advance", on: today, readyOn: addDays(today, 35) });
     // The paper and the customer's side by side use what was agreed.
     const paper = await poPaper(id);
     expect(paper.bullets).toContain("Delivery: FOB Qingdao, ready 35 days after our deposit.");
     expect(paper.bullets.at(-1)).toBe("Pack each machine in a fumigated case.");
     const order = (await api(app, sana).get(`/orders/${id}`).expect(200)).body;
-    expect(order.factoryTerms[0].terms.leadDays).toBe(35);
-    // The history: what changed, in words, under the factory order.
+    expect(order.supplierTerms[0].terms.leadDays).toBe(35);
+    // The history: what changed, in words, under the supplier order.
     const history = (await api(app, sana).get(`/history?type=order&id=${id}`).expect(200)).body as { summary: string; step: string | null; reason: string | null; changes: { field: string; from: string | null; to: string | null }[] }[];
     const lead = history.find((e) => e.summary.includes(`${po.number}: what was agreed with`) && e.summary.includes("lead time 35 days after the deposit"));
     expect(lead).toMatchObject({ step: "factory", reason: "Agreed a new lead time" });
@@ -158,10 +158,10 @@ describe("the supplier's side starts from its offer", () => {
 
   it("ordered from the supplier by its day (no purchase order sent one by one): what was agreed is kept too", async () => {
     const id = await accepted(THREE);
-    await api(app, sana).patch(`/orders/${id}/factory-order`, { factoryOrderedOn: today }).expect(200);
+    await api(app, sana).patch(`/orders/${id}/factory-order`, { supplierOrderedOn: today }).expect(200);
     const po = (await purchaseOrders(id)).items[0];
     expect(po.agreed).toMatchObject({ copied: true, leadDays: 30, paymentNote: "By T/T to their account in Jinan." });
-    // It went to the factory: a lead time other than the offer's asks why.
+    // It went to the supplier: a lead time other than the offer's asks why.
     await api(app, sana).patch(`/orders/${id}/purchase-orders/${po.id}/terms`, { leadDays: 40 }).expect(409);
   });
 

@@ -72,7 +72,7 @@ export interface LedgerEntry {
     id: string;
     orderId: string | null;
     customerId: string | null;
-    factoryId: string | null;
+    supplierId: string | null;
     userId: string | null;
     label: string;
     /** The payment on an order it is (its receipt prints from it). */

@@ -17,7 +17,7 @@ export interface InquiryTab {
 const UNDER_OVERVIEW = ["edit", "files", "needs"];
 
 /**
- * The inquiry's one row of tabs: Overview · Factory offers · Quotations · Costs · History, then Order.
+ * The inquiry's one row of tabs: Overview · Supplier offers · Quotations · Costs · History, then Order.
  * Order is grey ("when accepted") until the customer accepts; then it is the way to the sales order.
  * On a phone the row scrolls sideways.
  */

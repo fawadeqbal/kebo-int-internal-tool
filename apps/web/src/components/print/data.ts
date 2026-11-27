@@ -39,7 +39,7 @@ export function backTo(back: string | undefined, fallback: string) {
   return localPath(back, fallback);
 }
 
-/** Optional reads (e.g. factory details for people who may not see factories) fall back to nothing. */
+/** Optional reads (e.g. supplier details for people who may not see suppliers) fall back to nothing. */
 export async function optional<T>(fn: () => Promise<T>): Promise<T | null> {
   try {
     return await fn();

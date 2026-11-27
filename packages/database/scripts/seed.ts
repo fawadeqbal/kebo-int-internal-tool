@@ -3,7 +3,7 @@
  * stage (for development only — refused against a non-local database).
  *
  *   pnpm db:seed               accounts + settings (safe to run again)
- *   pnpm db:seed --demo        plus sample customers, factories and deals
+ *   pnpm db:seed --demo        plus sample customers, suppliers and deals
  *   pnpm db:seed --no-people   settings only, nobody in the company: a platform admin opens it and adds its people
  *
  * In production (NODE_ENV=production) SEED_ADMIN_PASSWORD, SEED_MANAGER_PASSWORD

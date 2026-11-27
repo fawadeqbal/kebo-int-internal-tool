@@ -10,20 +10,20 @@ export const REASON_CHOICES = {
   reassign: ["Workload", "Person is away", "Better fit for this product"],
   hold: ["Customer is deciding", "Waiting for the supplier", "Waiting for documents"],
   reopen: ["Customer came back", "Marked lost by mistake"],
-  factoryPrice: ["Supplier changed its price", "Supplier changed its terms", "Mistake fixed"],
-  factoryChoice: ["Cheaper supplier", "Better quality", "Faster delivery", "Supplier can't make it"],
+  supplierPrice: ["Supplier changed its price", "Supplier changed its terms", "Mistake fixed"],
+  supplierChoice: ["Cheaper supplier", "Better quality", "Faster delivery", "Supplier can't make it"],
   newRevision: ["Customer asked for a discount", "Quantities changed", "Supplier price changed", "Terms changed"],
   quoteAnswer: ["Price too high", "Customer bought elsewhere", "No reply from the customer", "Project cancelled"],
   orderBack: ["Moved forward by mistake", "Goods not ready after all", "Customer claim"],
   shipping: ["Ship date was wrong", "B/L number corrected", "Shipped on another vessel"],
   closeWithDue: ["Customer pays with the next order", "Agreed discount", "Written off"],
   customerDetails: ["Company renamed", "Spelling fixed", "Wrong country"],
-  factoryDetails: ["Supplier renamed", "Spelling fixed", "Another person handles this supplier"],
+  supplierDetails: ["Supplier renamed", "Spelling fixed", "Another person handles this supplier"],
   settings: ["New exchange rate", "New company policy", "Mistake fixed"],
   plan: ["Customer asked for more time", "Agreed a new schedule", "Order changed", "Mistake fixed"],
   /** Changing what was agreed with the customer after the quotation was accepted (design "terms that travel"). */
   agreed: ["Customer asked for it", "Agreed a new port", "Supplier changed its lead time", "Typed wrong", "Mistake fixed"],
-  /** Changing what was agreed with a factory after its purchase order was sent (design "terms that travel"). */
+  /** Changing what was agreed with a supplier after its purchase order was sent (design "terms that travel"). */
   factory_terms: ["The supplier asked for it", "Agreed a new lead time", "Agreed a longer warranty", "Typed wrong", "Mistake fixed"],
   /** Changing what a card already saved (lines or values): Save changes asks why. */
   /** Saving something the order's checks asked about (a date out of order). */

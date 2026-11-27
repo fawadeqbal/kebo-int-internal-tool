@@ -13,7 +13,7 @@ import {
   baseOf,
   allocationPlan,
   expensePlan,
-  factoryPaymentPlan,
+  supplierPaymentPlan,
   fxPlan,
   openingPlan,
   orderPlan,
@@ -61,7 +61,7 @@ interface Existing {
   rate: string | null;
   orderId: string | null;
   customerId: string | null;
-  factoryId: string | null;
+  supplierId: string | null;
   userId: string | null;
   moneyAccountId: string | null;
   debit: Minor;
@@ -89,10 +89,10 @@ const key = (r: {
   currency: string;
   orderId?: string | null;
   customerId?: string | null;
-  factoryId?: string | null;
+  supplierId?: string | null;
   userId?: string | null;
   moneyAccountId?: string | null;
-}) => [r.account, r.currency, r.orderId ?? "", r.customerId ?? "", r.factoryId ?? "", r.userId ?? "", r.moneyAccountId ?? ""].join("|");
+}) => [r.account, r.currency, r.orderId ?? "", r.customerId ?? "", r.supplierId ?? "", r.userId ?? "", r.moneyAccountId ?? ""].join("|");
 
 const isFx = (sourceType: string) => sourceType === "fx_order" || sourceType === "fx_factory";
 /** The lines a comparison looks at: not the exchange-difference line that only balances a posting in the main currency. */
@@ -113,9 +113,9 @@ const SOURCE_ORDER: Record<LedgerSource, number> = {
 /**
  * Posts documents to the ledger: works out the rows each document should have now (rules.ts), compares them
  * with what is posted for it, and writes only the difference — reversal rows and new rows (or, for an order and
- * a factory's part, the difference), with the person's reason. Calling it again changes nothing, so every write
+ * a supplier's part, the difference), with the person's reason. Calling it again changes nothing, so every write
  * path calls it on every save, inside its own transaction. Afterwards the exchange differences of the orders and
- * factory parts touched, and the opening balances of the accounts touched, follow.
+ * supplier parts touched, and the opening balances of the accounts touched, follow.
  *
  * One company's postings never run at once (a transaction-level advisory lock), so two saves never post the same
  * document twice.
@@ -172,19 +172,19 @@ export class LedgerPosting {
     for (const r of refs) if (r.type !== "order_all") add(r.type, r.id);
     if (orders.length) {
       const all = refs.filter((r) => r.type === "order_all").map((r) => r.id);
-      // An order's factory parts go with it: the factories of its lines, and any posted before (removed since).
+      // An order's supplier parts go with it: the suppliers of its lines, and any posted before (removed since).
       const [lines, posted] = await Promise.all([
         tx.orderLine.findMany({
-          where: { orderId: { in: orders }, factoryId: { not: null } },
-          select: { orderId: true, factoryId: true },
-          distinct: ["orderId", "factoryId"],
+          where: { orderId: { in: orders }, supplierId: { not: null } },
+          select: { orderId: true, supplierId: true },
+          distinct: ["orderId", "supplierId"],
         }),
         tx.$queryRaw<{ sourceId: string }[]>`
           select distinct source_id as "sourceId" from ledger_entries
            where source_type = 'purchase_order' and split_part(source_id, ':', 1) = any(${orders}::text[])`,
       ]);
       for (const id of orders) add("order", id);
-      for (const l of lines) add("purchase_order", `${l.orderId}:${l.factoryId}`);
+      for (const l of lines) add("purchase_order", `${l.orderId}:${l.supplierId}`);
       for (const p of posted) add("purchase_order", p.sourceId);
       if (all.length) {
         const [parts, expenses] = await Promise.all([
@@ -216,7 +216,7 @@ export class LedgerPosting {
     const rateOf = (o: { currency: string; mainCurrency: string | null; mainRate: Prisma.Decimal | null }) =>
       orderRate(o, ctx.main, ctx.rates);
 
-    // Orders and their factories' parts.
+    // Orders and their suppliers' parts.
     const poIds = ids("purchase_order");
     const orderIds = [...new Set([...ids("order"), ...poIds.map((s) => s.split(":")[0]!)])];
     if (orderIds.length) {
@@ -234,22 +234,22 @@ export class LedgerPosting {
           mainCurrency: true,
           mainRate: true,
           lines: {
-            where: { factoryId: { not: null } },
+            where: { supplierId: { not: null } },
             select: {
-              factoryId: true,
-              factoryUnitPrice: true,
-              factoryCurrency: true,
-              factoryTaxRate: true,
-              factoryTaxIncluded: true,
+              supplierId: true,
+              supplierUnitPrice: true,
+              supplierCurrency: true,
+              supplierTaxRate: true,
+              supplierTaxIncluded: true,
               quantity: true,
             },
           },
           papers: { where: { kind: "purchase-order" }, select: { ref: true, number: true, version: true }, orderBy: { version: "desc" } },
         },
       });
-      const factoryIds = [...new Set(poIds.map((s) => s.split(":")[1]!))];
-      const factories = new Map(
-        (await tx.party.findMany({ where: { ...isSupplier, id: { in: factoryIds } }, select: { id: true, name: true } })).map((f) => [f.id, f]),
+      const supplierIds = [...new Set(poIds.map((s) => s.split(":")[1]!))];
+      const suppliers = new Map(
+        (await tx.party.findMany({ where: { ...isSupplier, id: { in: supplierIds } }, select: { id: true, name: true } })).map((f) => [f.id, f]),
       );
       const byId = new Map(orders.map((o) => [o.id, o]));
       const docOf = (o: (typeof orders)[number]): OrderDoc => ({
@@ -270,21 +270,21 @@ export class LedgerPosting {
         if (o) out.push(orderPlan(docOf(o)));
       }
       for (const sid of poIds) {
-        const [orderId, factoryId] = sid.split(":") as [string, string];
+        const [orderId, supplierId] = sid.split(":") as [string, string];
         const o = byId.get(orderId);
-        const f = factories.get(factoryId);
+        const f = suppliers.get(supplierId);
         if (!o || !f) continue;
-        const po = o.papers.find((p) => p.ref === factoryId);
+        const po = o.papers.find((p) => p.ref === supplierId);
         const ref = (po?.number ?? `${o.refNo} · ${f.name}`).slice(0, 60);
         const lines = o.lines.flatMap((l) =>
-          l.factoryId && l.factoryUnitPrice !== null && l.factoryCurrency
+          l.supplierId && l.supplierUnitPrice !== null && l.supplierCurrency
             ? [
                 {
-                  factoryId: l.factoryId,
-                  currency: l.factoryCurrency,
-                  unitPriceMinor: decimalToMinor(l.factoryUnitPrice),
-                  taxRate: l.factoryTaxRate?.toString() ?? 0,
-                  taxIncluded: l.factoryTaxIncluded,
+                  supplierId: l.supplierId,
+                  currency: l.supplierCurrency,
+                  unitPriceMinor: decimalToMinor(l.supplierUnitPrice),
+                  taxRate: l.supplierTaxRate?.toString() ?? 0,
+                  taxIncluded: l.supplierTaxIncluded,
                   quantity: l.quantity.toString(),
                 },
               ]
@@ -364,7 +364,7 @@ export class LedgerPosting {
           const po = p?.purchaseOrder;
           if (!p || !po) continue;
           out.push(
-            factoryPaymentPlan(
+            supplierPaymentPlan(
               {
                 id: m.id,
                 ref: `FP-${po.refNo.replace(/^[A-Za-z]+-/, "")}-${rank.get(p.id) ?? 1}`,
@@ -460,10 +460,10 @@ export class LedgerPosting {
             select: {
               ...orderSel.select,
               status: true,
-              cancellation: { select: { factoryMoney: true } },
+              cancellation: { select: { supplierMoney: true } },
               lines: {
-                where: { factoryId: { not: null }, factoryUnitPrice: { not: null }, factoryCurrency: { not: null } },
-                select: { factoryId: true, factoryCurrency: true },
+                where: { supplierId: { not: null }, supplierUnitPrice: { not: null }, supplierCurrency: { not: null } },
+                select: { supplierId: true, supplierCurrency: true },
               },
             },
           },
@@ -472,9 +472,9 @@ export class LedgerPosting {
       for (const e of rows) {
         const currencies = new Map<string, string[]>();
         for (const l of e.order?.lines ?? []) {
-          const list = currencies.get(l.factoryId!) ?? [];
-          if (!list.includes(l.factoryCurrency!)) list.push(l.factoryCurrency!);
-          currencies.set(l.factoryId!, list);
+          const list = currencies.get(l.supplierId!) ?? [];
+          if (!list.includes(l.supplierCurrency!)) list.push(l.supplierCurrency!);
+          currencies.set(l.supplierId!, list);
         }
         out.push(
           expensePlan(
@@ -487,7 +487,7 @@ export class LedgerPosting {
               rate: e.rate.toString(),
               spentOn: fromDbDate(e.spentOn),
               customerId: e.customerId,
-              factoryId: e.factoryId,
+              supplierId: e.supplierId,
               paidBy: e.paidBy,
               accountId: e.accountId,
               borneBy: e.borneBy,
@@ -499,8 +499,8 @@ export class LedgerPosting {
               order: e.order && {
                 ...orderOf(e.order),
                 cancelled: e.order.status === "cancelled",
-                lossOnCancel: e.order.cancellation?.factoryMoney === "loss",
-                factoryCurrencies: currencies,
+                lossOnCancel: e.order.cancellation?.supplierMoney === "loss",
+                supplierCurrencies: currencies,
               },
               step: e.step,
               voided: this.voidOf(e.voidedAt, e.voidReason),
@@ -541,7 +541,7 @@ export class LedgerPosting {
     );
   }
 
-  /** Exchange differences of the orders and factory parts touched (from what is posted on them now). */
+  /** Exchange differences of the orders and supplier parts touched (from what is posted on them now). */
   private async fxPlans(tx: Tx, touched: Touched, ctx: RuleCtx): Promise<DocPlan[]> {
     const out: DocPlan[] = [];
     const orderIds = [...touched.orders];
@@ -565,7 +565,7 @@ export class LedgerPosting {
             {
               account: ledgerAccount.customer(o.customerId),
               currency: o.currency,
-              dims: { orderId: o.id, customerId: o.customerId, factoryId: null, userId: null },
+              dims: { orderId: o.id, customerId: o.customerId, supplierId: null, userId: null },
               ref: o.refNo,
               memo: `Exchange difference on ${o.refNo}`,
             },
@@ -580,7 +580,7 @@ export class LedgerPosting {
         );
       }
     }
-    const parts = [...touched.factoryParts].map((k) => k.split(":") as [string, string, string]);
+    const parts = [...touched.supplierParts].map((k) => k.split(":") as [string, string, string]);
     if (parts.length) {
       const orderIdsF = [...new Set(parts.map((p) => p[0]))];
       const [orders, sums, refs] = await Promise.all([
@@ -598,19 +598,19 @@ export class LedgerPosting {
       const ordersById = new Map(orders.map((o) => [o.id, o]));
       const sumOf = new Map(sums.map((s) => [`${s.orderId}:${s.account.slice("factory:".length)}:${s.currency}`, s]));
       const refOf = new Map(refs.map((r) => [r.sourceId, r.ref]));
-      for (const [orderId, factoryId, currency] of parts) {
+      for (const [orderId, supplierId, currency] of parts) {
         const o = ordersById.get(orderId);
         if (!o) continue;
-        const s = sumOf.get(`${orderId}:${factoryId}:${currency}`);
+        const s = sumOf.get(`${orderId}:${supplierId}:${currency}`);
         out.push(
           fxPlan(
             "fx_factory",
-            `${orderId}:${factoryId}:${currency}`,
+            `${orderId}:${supplierId}:${currency}`,
             {
-              account: ledgerAccount.factory(factoryId),
+              account: ledgerAccount.factory(supplierId),
               currency,
-              dims: { orderId, customerId: o.customerId, factoryId, userId: null },
-              ref: refOf.get(`${orderId}:${factoryId}`) ?? o.refNo,
+              dims: { orderId, customerId: o.customerId, supplierId, userId: null },
+              ref: refOf.get(`${orderId}:${supplierId}`) ?? o.refNo,
               memo: `Exchange difference on what we paid for ${o.refNo}`,
             },
             {
@@ -654,7 +654,7 @@ export class LedgerPosting {
           rate: r.rate?.toString() ?? null,
           orderId: r.orderId,
           customerId: r.customerId,
-          factoryId: r.factoryId,
+          supplierId: r.supplierId,
           userId: r.userId,
           moneyAccountId: r.moneyAccountId,
           debit: decimalToMinor(r.debit),
@@ -668,9 +668,9 @@ export class LedgerPosting {
     return out;
   }
 
-  /** Make the posted rows of each document what its plan says; returns the orders, factory parts and accounts touched. */
+  /** Make the posted rows of each document what its plan says; returns the orders, supplier parts and accounts touched. */
   private async apply(tx: Tx, plans: DocPlan[], opts: PostOptions, ctx: RuleCtx, result: PostResult): Promise<Touched> {
-    const touched: Touched = { orders: new Set(), factoryParts: new Set(), accounts: new Set() };
+    const touched: Touched = { orders: new Set(), supplierParts: new Set(), accounts: new Set() };
     if (!plans.length) return touched;
     const existing = await this.existing(tx, plans);
     const today = this.clock.today();
@@ -680,7 +680,7 @@ export class LedgerPosting {
       for (const r of rows) {
         const a = parseLedgerAccount(r.account);
         if (a.kind === "customer" && r.orderId) touched.orders.add(r.orderId);
-        if (a.kind === "factory" && r.orderId && a.id) touched.factoryParts.add(`${r.orderId}:${a.id}:${r.currency}`);
+        if (a.kind === "factory" && r.orderId && a.id) touched.supplierParts.add(`${r.orderId}:${a.id}:${r.currency}`);
         if (r.moneyAccountId) touched.accounts.add(r.moneyAccountId);
       }
     };
@@ -789,7 +789,7 @@ export class LedgerPosting {
           rate: r.rate,
           orderId: r.orderId,
           customerId: r.customerId,
-          factoryId: r.factoryId,
+          supplierId: r.supplierId,
           userId: r.userId,
           moneyAccountId: r.moneyAccountId,
         },
@@ -802,7 +802,7 @@ export class LedgerPosting {
         ...l,
         orderId: l.orderId ?? want.dims.orderId,
         customerId: l.customerId ?? want.dims.customerId,
-        factoryId: l.factoryId ?? want.dims.factoryId,
+        supplierId: l.supplierId ?? want.dims.supplierId,
         userId: l.userId ?? want.dims.userId,
       };
       const k = key(full);
@@ -844,7 +844,7 @@ export class LedgerPosting {
       rate: rateOf(l, i),
       orderId: l.orderId ?? p.dims.orderId,
       customerId: l.customerId ?? p.dims.customerId,
-      factoryId: l.factoryId ?? p.dims.factoryId,
+      supplierId: l.supplierId ?? p.dims.supplierId,
       userId: l.userId ?? p.dims.userId,
       moneyAccountId: l.moneyAccountId ?? null,
       debit: l.side === "debit" ? l.minor : 0,
@@ -886,7 +886,7 @@ export class LedgerPosting {
       rate: r.rate,
       orderId: r.orderId,
       customerId: r.customerId,
-      factoryId: r.factoryId,
+      supplierId: r.supplierId,
       userId: r.userId,
       moneyAccountId: r.moneyAccountId,
       debit: r.credit,
@@ -926,7 +926,7 @@ export class LedgerPosting {
           ref: r.ref.slice(0, 60),
           orderId: r.orderId,
           customerId: r.customerId,
-          factoryId: r.factoryId,
+          supplierId: r.supplierId,
           userId: r.userId,
           moneyAccountId: r.moneyAccountId,
           account: r.account,
@@ -1060,7 +1060,7 @@ export class LedgerPosting {
 
 interface Touched {
   orders: Set<string>;
-  factoryParts: Set<string>;
+  supplierParts: Set<string>;
   accounts: Set<string>;
 }
 

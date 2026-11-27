@@ -2,12 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { accessibilityProblems, answerWhy, watchErrors } from "./check";
 
 /**
- * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 1, done in a browser: the factory offer and the
+ * Design "RFQ Desk — terms that travel" (16 Nov 2026), step 1, done in a browser: the supplier offer and the
  * quotation are typed in the same four groups (Delivery · Payment · Warranty · Conditions); the quotation shows
- * each option's lead time beside what its factory gives and says where we promise more; the paper prints the parts.
+ * each option's lead time beside what its supplier gives and says where we promise more; the paper prints the parts.
  */
 
-/** A deal of its own (through the API, as the signed-in person): a customer, one item, one factory's offer (its words only, unless more is given). */
+/** A deal of its own (through the API, as the signed-in person): a customer, one item, one supplier's offer (its words only, unless more is given). */
 async function newDeal(page: Page, more: object = {}) {
   const tag = Date.now().toString(36);
   const send = async (url: string, data: object) => {
@@ -21,7 +21,7 @@ async function newDeal(page: Page, more: object = {}) {
   const item = (await (await page.request.get(`/api/inquiries/${inquiry.id}`)).json()).items[0].id;
   const received = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
   const offer = await send(`/inquiries/${inquiry.id}/factory-quotes`, {
-    newFactoryName: `Jinan Terms ${tag}`,
+    newSupplierName: `Jinan Terms ${tag}`,
     receivedOn: received,
     currency: "CNY",
     basis: "FOB",
@@ -37,14 +37,14 @@ test("the offer and the quotation in four groups; the quotation checked against 
   const errors = watchErrors(page);
   const deal = await newDeal(page);
 
-  // The factory's offer: its lead time as days from a moment, its payment as parts, its warranty as months.
-  // (The old link to the offer on the Factory offers tab opens the offer's own page.)
+  // The supplier's offer: its lead time as days from a moment, its payment as parts, its warranty as months.
+  // (The old link to the offer on the Supplier offers tab opens the offer's own page.)
   await page.goto(`/inquiries/${deal.id}/sourcing?offer=${deal.offer}#offer`);
   await expect(page).toHaveURL(new RegExp(`/inquiries/${deal.id}/offers/${deal.offer}`));
   await page.getByRole("button", { name: /^More for .*offer/ }).click();
   await page.getByRole("menuitem", { name: "Edit offer" }).click();
   const offer = page.getByRole("dialog", { name: "Edit offer" });
-  // The offer in steps (design 18 Nov): Factory · Prices · Delivery & payment · Warranty & conditions, then Changes.
+  // The offer in steps (design 18 Nov): Supplier · Prices · Delivery & payment · Warranty & conditions, then Changes.
   const rail = offer.getByRole("navigation", { name: "Steps" });
   for (const step of ["Supplier", "Prices", "Delivery & payment", "Warranty & conditions", "Changes"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
   await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
@@ -71,7 +71,7 @@ test("the offer and the quotation in four groups; the quotation checked against 
   await expect(page.getByRole("region", { name: "Warranty & conditions", exact: true })).toContainText("12 months from shipment");
 
   // The quotation: New quotations makes its draft from the offer; a pencil opens the draft's steps window on its
-  // step, where the factory's lead time is beside ours, a usual payment is one tap, and the warranty is checked.
+  // step, where the supplier's lead time is beside ours, a usual payment is one tap, and the warranty is checked.
   await page.goto(`/inquiries/${deal.id}/quotation`);
   await page.getByRole("button", { name: "New quotations" }).first().click();
   const make = page.getByRole("dialog", { name: "New quotations" });
@@ -182,7 +182,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   const items = page.getByRole("region", { name: "Items", exact: true });
   await expect(items.getByRole("columnheader", { name: "Where it is" })).toBeVisible();
   await expect(items.getByRole("gridcell", { name: "Not ordered yet" }).or(items.getByRole("cell", { name: "Not ordered yet" })).first()).toBeVisible();
-  // The customer beside the factory is hidden for now (16 Nov 2026).
+  // The customer beside the supplier is hidden for now (16 Nov 2026).
   await expect(page.getByRole("region", { name: "The customer and the supplier, side by side" })).toHaveCount(0);
   expect(await accessibilityProblems(page), "the order's Overview meets WCAG 2.2 AA").toEqual([]);
 
@@ -225,21 +225,21 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await page.goto(`/orders/${orderId}/documents`);
   await expect(page.getByRole("region", { name: "How the documents print" }).getByText("Agreed payment conditions")).toBeVisible();
 
-  // The factory's side, in the same groups: its offer's terms until the purchase order is sent.
+  // The supplier's side, in the same groups: its offer's terms until the purchase order is sent.
   await page.goto(`/orders/${orderId}/factory`);
   await expect(page.getByRole("region", { name: "Purchase order" }).getByText("Made from their offer")).toBeVisible();
-  const factory = page.getByRole("region", { name: "Agreed with the supplier" });
-  await expect(factory.getByText("30 days after the deposit")).toBeVisible();
-  await expect(factory.getByText("12 months", { exact: true })).toBeVisible();
+  const supplier = page.getByRole("region", { name: "Agreed with the supplier" });
+  await expect(supplier.getByText("30 days after the deposit")).toBeVisible();
+  await expect(supplier.getByText("12 months", { exact: true })).toBeVisible();
   expect(await accessibilityProblems(page), "the purchase order meets WCAG 2.2 AA").toEqual([]);
-  await factory.getByRole("button", { name: "Edit what we agreed with the supplier" }).click();
+  await supplier.getByRole("button", { name: "Edit what we agreed with the supplier" }).click();
   const terms = page.getByRole("dialog", { name: /What we agreed with Jinan Terms/ });
   await expect(terms.getByText(/Not sent yet/)).toBeVisible();
   expect(await accessibilityProblems(page), "the supplier's Change window meets WCAG 2.2 AA").toEqual([]);
   await terms.locator("#fac-lead").fill("35");
   await terms.getByRole("button", { name: /^Save \d+ changes?$/ }).click();
   await expect(terms).toBeHidden();
-  await expect(factory.getByText("35 days after the deposit")).toBeVisible();
+  await expect(supplier.getByText("35 days after the deposit")).toBeVisible();
   // The purchase order's paper prints it.
   await page.goto(`/print/orders/${orderId}/purchase-order`);
   await expect(page.getByText("Delivery: FOB Qingdao, ready 35 days after our deposit.")).toBeVisible();

@@ -3,7 +3,7 @@ import { liveFile, isCustomer } from "@kebo/database";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
-import { can, expenseInput, PAYMENT_METHOD_LABEL, paymentInput, rowsOf, type ExpenseInput, type Message, type PaymentInput } from "@kebo/shared";
+import { can, expenseInput, PAYMENT_METHOD_LABEL, paymentInput, rowsOf, type ExpenseInput, type Message, type PaymentInput, withNewNames, withOldNamesToo } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { z } from "zod";
 import { removeProof, setProof } from "../../common/storage/proofs";
@@ -49,6 +49,12 @@ const include = {
   files: liveFile,
 } satisfies Prisma.MoneySubmissionInclude;
 type Row = Prisma.MoneySubmissionGetPayload<{ include: typeof include }>;
+
+/** A submission's body as it was saved: one sent before "factory" became "supplier" says `factoryId`. */
+const saved = (body: Prisma.JsonValue): Record<string, unknown> => withNewNames((body ?? {}) as Record<string, unknown>);
+
+/** A body to save: both names for now, so the API from before the change can still read it if the deploy falls back. */
+const toSave = (body: Record<string, unknown>): Prisma.InputJsonValue => withOldNamesToo(body) as Prisma.InputJsonValue;
 
 /** A body that failed its check: the same 422 and field errors the usual endpoint gives. */
 const parseBody = <S extends z.ZodType>(schema: S, body: unknown): z.infer<S> => schema.parse(body ?? {});
@@ -165,7 +171,7 @@ export class ApprovalsService {
   /* ---------------------------------------------------------------- the view */
 
   private summary(kind: string, body: Prisma.JsonValue) {
-    const b = (body ?? {}) as Record<string, unknown>;
+    const b = saved(body);
     const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : null);
     if (kind === "payment") {
       const amount = num(b.receivedAmount) ?? num(b.amount);
@@ -199,7 +205,7 @@ export class ApprovalsService {
     const inquiries = new Set<string>();
     for (const r of rows) {
       if (r.order) continue;
-      const b = (r.body ?? {}) as Record<string, unknown>;
+      const b = saved(r.body);
       if (typeof b.customerId === "string") ids.add(b.customerId);
       else if (typeof b.inquiryId === "string") inquiries.add(b.inquiryId);
     }
@@ -226,7 +232,7 @@ export class ApprovalsService {
     const kinds = await this.kindsFor(user);
     const { customers, byInquiry } = await this.customersOf(rows);
     return rows.map((r) => {
-      const b = (r.body ?? {}) as Record<string, unknown>;
+      const b = saved(r.body);
       const deal = !r.order && typeof b.inquiryId === "string" ? (byInquiry.get(b.inquiryId) ?? null) : null;
       const customer =
         r.order?.customer ??
@@ -379,7 +385,7 @@ export class ApprovalsService {
     summary: string,
     extra: { reason?: string | null; newValues?: Record<string, unknown> } = {},
   ) {
-    const b = (row.body ?? {}) as Record<string, unknown>;
+    const b = saved(row.body);
     await this.audit.record(tx, {
       userId: user.id,
       action: row.kind === "payment" ? "payment_approval" : "expense_approval",
@@ -471,7 +477,7 @@ export class ApprovalsService {
     const { body, orderId } = await this.checked(user, input.kind, input.orderId, input.body);
     const id = await this.prisma.tx(async (tx) => {
       const row = await tx.moneySubmission.create({
-        data: { kind: input.kind, orderId, body: body as Prisma.InputJsonValue, submittedById: user.id },
+        data: { kind: input.kind, orderId, body: toSave(body), submittedById: user.id },
         include,
       });
       await this.addHistory(
@@ -495,7 +501,7 @@ export class ApprovalsService {
     await this.prisma.tx(async (tx) => {
       const done = await tx.moneySubmission.updateMany({
         where: { id, status: { in: ["pending", "sent_back"] } },
-        data: { body: body as Prisma.InputJsonValue, orderId, status: "pending", decidedById: null, decidedAt: null, reason: null },
+        data: { body: toSave(body), orderId, status: "pending", decidedById: null, decidedAt: null, reason: null },
       });
       if (!done.count) throw new ConflictError(this.closedMessage((await this.find(id, tx)).status));
       await this.addHistory(
@@ -549,7 +555,7 @@ export class ApprovalsService {
     const row = await this.forApprover(user, id);
     if (row.status !== "pending") throw new ConflictError(this.closedMessage(row.status));
     const kind = row.kind as SubmissionKind;
-    let body = row.body as Record<string, unknown>;
+    let body = saved(row.body);
     let orderId = row.orderId;
     if (input.body !== undefined)
       ({ body, orderId } = await this.checked(
@@ -563,7 +569,7 @@ export class ApprovalsService {
     const now = new Date();
     const taken = await this.prisma.db.moneySubmission.updateMany({
       where: { id, status: "pending" },
-      data: { status: "approved", decidedById: user.id, decidedAt: now, body: body as Prisma.InputJsonValue, orderId },
+      data: { status: "approved", decidedById: user.id, decidedAt: now, body: toSave(body), orderId },
     });
     if (!taken.count) throw new ConflictError(this.closedMessage((await this.find(id)).status));
 

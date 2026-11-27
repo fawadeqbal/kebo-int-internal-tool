@@ -26,9 +26,9 @@ export const factsInclude = {
   delivery: { select: { deliveredOn: true, satDoneOn: true, satSignedBy: true } },
   claims: { select: { status: true } },
   lines: {
-    select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, factoryId: true, factory: { select: { name: true } } },
+    select: { type: true, quantity: true, receivedQty: true, packages: true, grossWeightKg: true, cbm: true, supplierId: true, factory: { select: { name: true } } },
   },
-  // Each factory's ready date (the order's is the latest of them), and its factory test.
+  // Each supplier's ready date (the order's is the latest of them), and its factory test.
   ...readySelect,
   factories: { select: { ...readySelect.factories.select, fatPlannedOn: true, fatDoneOn: true, fatResult: true, factory: { select: { name: true } } } },
 } satisfies Prisma.OrderInclude;
@@ -37,9 +37,9 @@ export type FactsOrderRow = Prisma.OrderGetPayload<{ include: typeof factsInclud
 
 /**
  * The facts of one order (what every section's word is read from). `factories` comes from the order's money
- * (null when the person may not see factory money).
+ * (null when the person may not see supplier money).
  */
-export function orderFactsOf(o: FactsOrderRow, factories: SectionFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
+export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
   // Where the order stands with the customer, as everywhere: the plan's deposit, what was charged to them.
   const position = positionOf(o, fx);
   const percent = position.depositPercent;
@@ -72,14 +72,14 @@ export function orderFactsOf(o: FactsOrderRow, factories: SectionFacts["factorie
     due: fromMinor(position.dueMinor),
     received: fromMinor(Math.max(position.owedMinor - position.dueMinor, 0)),
     paidInFullOn: position.dueMinor === 0 ? reachedOn(o.allocations, position.owedMinor) : null,
-    factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-    factoryOrderNo: o.factoryOrderNo,
-    factories,
+    supplierOrderedOn: fromDbDateOrNull(o.supplierOrderedOn),
+    supplierOrderNo: o.supplierOrderNo,
+    factories: suppliers,
     lcChecks: lcChecksOf({ ...o, readyOn: readyOnOf(o) }, lcCourierDays),
     routeFromQuotation: routeFromQuotation(termsOf(o), o.balanceTerms),
     readyOn: readyOnOf(o),
-    // Each factory's own date (production items per factory); one row when the lines name no factory.
-    readyBy: readyByOf(o).map((r) => ({ factory: o.lines.find((l) => l.factoryId === r.factoryId)?.factory?.name ?? null, readyOn: r.readyOn })),
+    // Each supplier's own date (production items per supplier); one row when the lines name no supplier.
+    readyBy: readyByOf(o).map((r) => ({ factory: o.lines.find((l) => l.supplierId === r.supplierId)?.factory?.name ?? null, readyOn: r.readyOn })),
     goods: { lines: goods.length, received },
     packedAt: o.packedAt ? dateIn(o.packedAt, timeZone) : null,
     packing: o.packedAt

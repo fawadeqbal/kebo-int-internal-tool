@@ -2,13 +2,13 @@ import { Banknote, Pencil, Search } from "lucide-react";
 import { can, RECORD_KIND } from "@kebo/shared";
 import { ButtonLink, RefCode } from "@kebo/ui";
 import { requirePermission, hasFeature } from "@/lib/session";
-import { factoryOf } from "@/lib/party-data";
+import { supplierOf } from "@/lib/party-data";
 import { RecordTabs } from "@/components/common/record-tabs";
 import { RecordFrame } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
 import { MoreMenu } from "@/components/common/more-menu";
 import { SupplierSide } from "./side";
-import { removeFactoryAction } from "../actions";
+import { removeSupplierAction } from "../actions";
 
 /**
  * Every page of a supplier shares one top (design: Record): ← Suppliers, the name with a status from what it
@@ -16,10 +16,10 @@ import { removeFactoryAction } from "../actions";
  * ⋯ (remove last, red); then four figures (Payable, making for us now, answers when asked, price offers) and
  * the tabs: Overview · Orders · Price offers · Costs (managers) · Notes.
  */
-export default async function FactoryLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
+export default async function SupplierLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requirePermission("sourcing.manage");
-  const [f, managers] = await Promise.all([factoryOf(id), can(me, "expenses.manage") ? hasFeature("expenses") : false]);
+  const [f, managers] = await Promise.all([supplierOf(id), can(me, "expenses.manage") ? hasFeature("expenses") : false]);
   const r = f.record;
   const base = `/suppliers/${f.id}`;
 
@@ -57,7 +57,7 @@ export default async function FactoryLayout({ children, params }: { children: Re
                     label: "Remove this supplier",
                     danger: true,
                     confirm: { title: `Remove ${f.name}?`, body: "It will no longer appear in lists and pickers. Its past prices stay on their inquiries.", confirmLabel: "Remove" },
-                    action: removeFactoryAction.bind(null, f.id),
+                    action: removeSupplierAction.bind(null, f.id),
                   },
                 ]}
               />

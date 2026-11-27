@@ -13,7 +13,7 @@ import { date, money, whole } from "@/lib/format";
 import { PURCHASE_ORDER_STATUS, PURCHASE_ORDERS, type PurchaseOrderRow } from "@/lib/purchase-orders";
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
-import { PayFactoryWindow } from "@/components/order-sections/factory-windows";
+import { PaySupplierWindow } from "@/components/order-sections/supplier-windows";
 import type { PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLinesView } from "@/components/orders/order-lines";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
@@ -21,7 +21,7 @@ import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords } from "@/compo
 import { PaymentsList } from "@/components/order-sections/payments-list";
 import { ROW_LINK } from "@/components/order-sections/section-window";
 import { FileToolsProvider } from "@/components/files/file-tools";
-import { factoryPaymentAction } from "../../../../money/actions";
+import { supplierPaymentAction } from "../../../../money/actions";
 import { stageData } from "../../../../orders/[id]/stage-data";
 import { cache } from "react";
 import { RecordShell } from "@/components/records/record-frame";
@@ -39,12 +39,12 @@ export async function generateMetadata({ params }: { params: Promise<{ order: st
 }
 
 /** The supplier's items on the order, at its prices: what this purchase order buys. */
-const linesOf = (o: OrderView, supplier: string) => o.lines.filter((l) => l.type === "goods" && l.factoryPrice && l.factory?.id === supplier);
+const linesOf = (o: OrderView, supplier: string) => o.lines.filter((l) => l.type === "goods" && l.supplierPrice && l.factory?.id === supplier);
 
 /**
- * A purchase order's own page (board PDetail): what it says, shown. Its terms, the lines at the factory's
- * prices, the plan for paying the factory and the payments made, its files. A purchase order is made from
- * its sales order and changed there ("Open the order"); the one thing done here is paying the factory, in
+ * A purchase order's own page (board PDetail): what it says, shown. Its terms, the lines at the supplier's
+ * prices, the plan for paying the supplier and the payments made, its files. A purchase order is made from
+ * its sales order and changed there ("Open the order"); the one thing done here is paying the supplier, in
  * the same window as on the order.
  */
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ order: string; supplier: string }> }) {
@@ -78,10 +78,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     : defaults.priceBasis
       ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}`
       : null;
-  const taxes = [...new Set(lines.map((l) => `${l.factoryPrice!.taxIncluded ? "Tax included" : "Without tax"} · ${Number(l.factoryPrice!.taxRate)}%`))];
+  const taxes = [...new Set(lines.map((l) => `${l.supplierPrice!.taxIncluded ? "Tax included" : "Without tax"} · ${Number(l.supplierPrice!.taxRate)}%`))];
   const orderHref = `/orders/${o.id}/factory`;
   const byId = new Map(payments.map((x) => [x.id, x]));
-  // What each payment paid: the parts of the plan it went to, as on the order's Factory order tab.
+  // What each payment paid: the parts of the plan it went to, as on the order's Supplier order tab.
   const paidFor = new Map<string, string[]>();
   for (const plan of plans) for (const r of plan.rows) for (const x of r.payments) paidFor.set(x.id, [...(paidFor.get(x.id) ?? []), r.label]);
   const totalOf = (xs: typeof payments) => {
@@ -89,14 +89,14 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     for (const x of xs) by.set(x.currency, (by.get(x.currency) ?? 0) + Number(x.amount));
     return by.size ? [...by].map(([cur, v]) => money(v.toFixed(2), cur)).join(" + ") : money(0, plans[0]?.currency ?? po.currency ?? o.currency);
   };
-  // The same window as on the order's Factory order tab, for this factory only.
-  const pay = (label: string, main: boolean, prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null }) =>
+  // The same window as on the order's Supplier order tab, for this supplier only.
+  const pay = (label: string, main: boolean, prefill?: { supplierId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null }) =>
     canPay ? (
-      <PayFactoryWindow
+      <PaySupplierWindow
         label={label}
         main={main}
         sub={`${po.number} · ${po.supplier.name}`}
-        action={factoryPaymentAction.bind(null, o.id, null, null)}
+        action={supplierPaymentAction.bind(null, o.id, null, null)}
         factories={owing}
         people={people ?? []}
         orderCurrency={o.currency}
@@ -288,7 +288,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   <SupplierPlanTable
                     plan={plan}
                     payments={byId}
-                    pay={(r) => pay("Pay", true, { factoryId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance", reference: r.supplierRef })}
+                    pay={(r) => pay("Pay", true, { supplierId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance", reference: r.supplierRef })}
                     orderCurrency={o.currency}
                     paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
                     overpaid={of?.overpaid ?? null}

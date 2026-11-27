@@ -2,9 +2,9 @@ import { Search, X } from "lucide-react";
 import { LOST_REASON_LABEL } from "@kebo/shared";
 import { ButtonLink, DataRow, EmptyState, PAGE_SIZE, Pager, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead, toPage } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
-import { factoryOf } from "@/lib/party-data";
+import { supplierOf } from "@/lib/party-data";
 import { date, whole, countOf } from "@/lib/format";
-import type { FactoryDetail } from "@/lib/types-people";
+import type { SupplierDetail } from "@/lib/types-people";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { supplierTitle } from "@/lib/titles";
@@ -12,7 +12,7 @@ import { TabList } from "@/components/lists/tab-list";
 
 export const generateMetadata = supplierTitle("Offers");
 
-type Offer = FactoryDetail["quotes"][number];
+type Offer = SupplierDetail["quotes"][number];
 
 const RESULTS = [
   { value: "won", label: "Won" },
@@ -39,7 +39,7 @@ function result(q: Offer): { key: string; label: string; meaning: "ok" | "info" 
  * offer with its inquiry, their reference, when it came, until when it holds, the basis, lines, total, lead
  * time and the quotation it went into.
  */
-export default async function FactoryOffers({
+export default async function SupplierOffers({
   params,
   searchParams,
 }: {
@@ -48,7 +48,7 @@ export default async function FactoryOffers({
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   await requirePermission("sourcing.manage");
-  const f = await factoryOf(id);
+  const f = await supplierOf(id);
   const q = sp.q?.trim().toLowerCase();
   const inquiries = [...new Map(f.quotes.map((x) => [x.inquiry.id, x.inquiry])).values()];
   const rows = f.quotes.filter(

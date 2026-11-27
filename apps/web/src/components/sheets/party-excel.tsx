@@ -5,36 +5,36 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, X } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
-import type { CustomerInput, FactoryInput, ImportResult } from "@kebo/shared";
+import type { CustomerInput, SupplierInput, ImportResult } from "@kebo/shared";
 import type { ReadSheet } from "@/lib/sheet-spec";
 import { useFocusTrap } from "@/components/common/dialog";
 import { ExcelMenu } from "./excel-menu";
-import { customersFromSheet, customersTemplate, factoriesFromSheet, factoriesTemplate, type PartyRead } from "./party-sheets";
+import { customersFromSheet, customersTemplate, suppliersFromSheet, suppliersTemplate, type PartyRead } from "./party-sheets";
 
 type ImportAction<T> = (items: T[], fileName: string) => Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }>;
 
 type Props =
   | { kind: "customers"; importAction?: ImportAction<CustomerInput>; exportHref?: string }
-  | { kind: "factories"; importAction?: ImportAction<FactoryInput>; exportHref?: string };
+  | { kind: "factories"; importAction?: ImportAction<SupplierInput>; exportHref?: string };
 
 /**
- * The Excel button on the customers or factories list: a template, a filled
+ * The Excel button on the customers or suppliers list: a template, a filled
  * file shown to check (new ones only are added, together), and an export.
  */
 export function PartyExcel(props: Props) {
   const { kind, importAction, exportHref } = props;
-  const [review, setReview] = useState<{ file: string; read: PartyRead<CustomerInput | FactoryInput> } | null>(null);
+  const [review, setReview] = useState<{ file: string; read: PartyRead<CustomerInput | SupplierInput> } | null>(null);
   const one = kind === "customers" ? "customer" : "supplier";
   const many = kind;
 
   const upload = (sheet: ReadSheet, file: string) =>
-    setReview({ file, read: kind === "customers" ? customersFromSheet(sheet) : factoriesFromSheet(sheet) });
+    setReview({ file, read: kind === "customers" ? customersFromSheet(sheet) : suppliersFromSheet(sheet) });
 
   return (
     <>
       <ExcelMenu
         noun={many}
-        template={importAction ? (kind === "customers" ? customersTemplate : factoriesTemplate) : undefined}
+        template={importAction ? (kind === "customers" ? customersTemplate : suppliersTemplate) : undefined}
         onUpload={importAction ? upload : undefined}
         exportHref={exportHref}
       />
@@ -44,7 +44,7 @@ export function PartyExcel(props: Props) {
           read={review.read}
           one={one}
           many={many}
-          add={(items) => (importAction as ImportAction<CustomerInput | FactoryInput>)(items, review.file)}
+          add={(items) => (importAction as ImportAction<CustomerInput | SupplierInput>)(items, review.file)}
           onClose={() => setReview(null)}
         />
       )}
@@ -61,10 +61,10 @@ function Review({
   onClose,
 }: {
   file: string;
-  read: PartyRead<CustomerInput | FactoryInput>;
+  read: PartyRead<CustomerInput | SupplierInput>;
   one: string;
   many: string;
-  add: (items: (CustomerInput | FactoryInput)[]) => ReturnType<ImportAction<CustomerInput | FactoryInput>>;
+  add: (items: (CustomerInput | SupplierInput)[]) => ReturnType<ImportAction<CustomerInput | SupplierInput>>;
   onClose: () => void;
 }) {
   const router = useRouter();

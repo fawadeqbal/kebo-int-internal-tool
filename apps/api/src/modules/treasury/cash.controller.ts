@@ -128,7 +128,7 @@ class CashController {
     return this.report.report(user, q);
   }
 
-  /** Put a payment, a factory payment or an expense on an account afterwards: { accountId | null }. */
+  /** Put a payment, a supplier payment or an expense on an account afterwards: { accountId | null }. */
   @RequireFeature("cash_book")
   @SignedIn("checked inside: expenses.manage")
   @Put("money/entries/:kind/:id/account")
@@ -145,7 +145,7 @@ class CashController {
   /**
    * multipart/form-data with one `file`: a photo or PDF proving a payment (bank
    * slip, transfer screenshot). `payments` is money in from a customer,
-   * `factory-payments` money out to a factory. A new one replaces the one there.
+   * `factory-payments` money out to a supplier. A new one replaces the one there.
    */
   @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Post("payments/:id/file")
@@ -157,7 +157,7 @@ class CashController {
   @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Post("factory-payments/:id/file")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
-  attachFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
+  attachSupplierPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
     return this.attachFile(user, "out", id, file);
   }
 
@@ -169,7 +169,7 @@ class CashController {
 
   @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
   @Delete("factory-payments/:id/file")
-  removeFactoryPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
+  removeSupplierPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.paymentFiles.remove(user, "out", id);
   }
 

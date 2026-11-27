@@ -45,7 +45,7 @@ export async function generateMetadata({
 }
 
 /**
- * A customer's, factory's or person's statement of account, in Kebo's one document template (KeboDoc): made from
+ * A customer's, supplier's or person's statement of account, in Kebo's one document template (KeboDoc): made from
  * their ledger for the period, in one currency, numbered per party and year when issued.
  */
 export default async function StatementPrint({

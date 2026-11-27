@@ -167,7 +167,7 @@ describe("the entry in the side panel", () => {
       partId: "p1",
       orderId: "o1",
       customerId: "c1",
-      factoryId: null,
+      supplierId: null,
       userId: null,
       label: "Payment on SO-2026-0447",
       file: { id: "f1", name: "bank-slip-0447.jpg" },
@@ -195,7 +195,7 @@ describe("the entry in the side panel", () => {
     const s = entry.source;
     expect(sourceHref({ ...s, type: "expense", orderId: null })?.href).toBe("/money/company-costs");
     expect(sourceHref({ ...s, type: "movement", orderId: null, customerId: null })?.href).toBe("/finance/cash-book");
-    expect(sourceHref({ ...s, type: "movement", factoryId: "f1" })?.href).toBe("/orders/o1/factory");
+    expect(sourceHref({ ...s, type: "movement", supplierId: "f1" })?.href).toBe("/orders/o1/factory");
     expect(sourceHref({ ...s, type: "purchase_order" })?.href).toBe("/orders/o1/factory");
     expect(sourceHref({ ...s, type: "allocation", orderId: null })?.href).toBe("/customers/c1");
   });
