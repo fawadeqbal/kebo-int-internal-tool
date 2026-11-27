@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Plus } from "lucide-react";
 import { insidePackage, itemPacked, tooBigForContainer, type CaseRow } from "@kebo/shared";
-import { Badge, cn, Dash, RULES } from "@kebo/ui";
+import { Badge, Button, cn, Dash, RULES } from "@kebo/ui";
 import { uploadToOrder, useFileTools } from "@/components/files/file-tools";
 import { useSectionFiles } from "@/components/order-sections/section-files";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
@@ -65,16 +65,11 @@ function PackagePhotos({ orderId, packageNo, canAdd }: { orderId: string; packag
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-1">
       {photos.length > 0 && tools && (
-        <button
-          type="button"
-          className="tap inline-flex min-h-6 items-center gap-1 rounded-full border border-line bg-surface-2 px-2 py-0.5 text-xs font-medium hover:border-primary/50"
-          onClick={() => tools.view(photos[0]!, photos)}
-          title={`Photos of package ${packageNo}`}
-        >
+        <Button variant="soft" size="sm" onClick={() => tools.view(photos[0]!, photos)} title={`Photos of package ${packageNo}`}>
           <Camera className="size-3.5 text-muted" aria-hidden />
           {photos.length}
           <span className="sr-only">{` photo${photos.length === 1 ? "" : "s"} of package ${packageNo}`}</span>
-        </button>
+        </Button>
       )}
       {canAdd && (
         <>
@@ -87,12 +82,7 @@ function PackagePhotos({ orderId, packageNo, canAdd }: { orderId: string; packag
             aria-label={`Add photos of package ${packageNo}`}
             onChange={(e) => (send(e.target.files), (e.target.value = ""))}
           />
-          <button
-            type="button"
-            disabled={busy}
-            className="tap inline-flex min-h-6 min-w-6 items-center justify-center gap-0.5 text-xs font-medium text-text-2 hover:text-primary hover:underline disabled:opacity-60"
-            onClick={() => input.current?.click()}
-          >
+          <Button variant="link" disabled={busy} className="tap gap-0.5 text-xs" onClick={() => input.current?.click()}>
             {busy ? (
               "Sending…"
             ) : (
@@ -107,7 +97,7 @@ function PackagePhotos({ orderId, packageNo, canAdd }: { orderId: string; packag
                 )}
               </>
             )}
-          </button>
+          </Button>
         </>
       )}
       {error && (
