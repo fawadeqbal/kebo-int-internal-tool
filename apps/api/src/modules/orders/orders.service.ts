@@ -56,7 +56,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { orderAccess } from "../../common/auth/order-access";
-import { caseRowOf, caseRowsSelect, caseView, rowsFromTotals, setLineCases } from "./line-cases";
+import { caseRowOf, caseRowsSelect, caseView, rowsFromTotals, setLineCases, settlePackages } from "./line-cases";
 import { SettingsService } from "../settings/settings.service";
 import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
@@ -1575,6 +1575,12 @@ export class OrdersService {
         id,
         input.lines.map((l) => l.lineId),
       );
+      // A package goes only in one of this order's shipments.
+      const given = [...new Set(input.lines.flatMap((l) => l.cases.map((c) => c.shipmentId).filter((s): s is string => !!s)))];
+      if (given.length) {
+        const found = await tx.shipment.count({ where: { orderId: o.id, id: { in: given } } });
+        if (found !== given.length) throw new DomainError("A package is in a shipment of another order.");
+      }
       const said: string[] = [];
       for (const l of input.lines) {
         const line = byId.get(l.lineId)!;
@@ -1582,7 +1588,7 @@ export class OrdersService {
         const t = await setLineCases(tx, l.lineId, l.cases);
         const name = line.description.split("\n")[0]!.slice(0, 40);
         const sum = (x: typeof t) =>
-          [`${x.packages ?? 0} case${x.packages === 1 ? "" : "s"}`, x.cbm !== null ? `${x.cbm} m³` : null, x.grossWeightKg !== null ? `${x.grossWeightKg} kg` : null]
+          [`${x.packages ?? 0} package${x.packages === 1 ? "" : "s"}`, x.cbm !== null ? `${x.cbm} m³` : null, x.grossWeightKg !== null ? `${x.grossWeightKg} kg` : null]
             .filter(Boolean)
             .join(" · ");
         said.push(`${name}: ${sum(before)} → ${sum(t)}`);
@@ -1594,16 +1600,18 @@ export class OrdersService {
         action: "packing_list",
         entityType: "order",
         entityId: o.id,
-        summary: `${o.refNo}: packing list case by case, ${said.join("; ")}${complete ? "" : " (not complete: some items have no packages)"}`,
+        summary: `${o.refNo}: packing list package by package, ${said.join("; ")}${complete ? "" : " (not complete: some items have no packages)"}`,
       });
     });
     return this.get(user, id);
   }
 
-  /** The order is packed once every goods line has its packages counted; answers whether it is. */
+  /**
+   * The order is packed once every goods line has its packages counted (or is inside another's package); answers
+   * whether it is. Packages inside others are checked here, after every change to the packing.
+   */
   private async packedNow(tx: Tx, o: { id: string; packedAt: Date | null }) {
-    const lines = await tx.orderLine.findMany({ where: { orderId: o.id, type: "goods" }, select: { packages: true } });
-    const complete = lines.length > 0 && lines.every((l) => (l.packages ?? 0) > 0);
+    const complete = await settlePackages(tx, o.id);
     await tx.order.update({ where: { id: o.id }, data: { packedAt: complete ? (o.packedAt ?? new Date()) : null } });
     return complete;
   }

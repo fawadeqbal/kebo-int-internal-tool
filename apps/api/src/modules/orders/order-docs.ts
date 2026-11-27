@@ -3,6 +3,8 @@ import { documentTotals, fromMinor } from "@kebo/money";
 import {
   BALANCE_TERMS_LABEL,
   balanceTermsOf,
+  caseTotals,
+  shipmentOfCase,
   leadWords,
   packingListNo,
   portsOf,
@@ -15,7 +17,7 @@ import {
   type BuyerSnapshot,
   type Settings,
 } from "@kebo/shared";
-import type { ISODate } from "@kebo/utils";
+import { NotFoundError, type ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 import { chargedExpenses, positionOf, type MoneyCtx } from "../billing/api";
 import { termsOf } from "../billing/api";
@@ -23,7 +25,7 @@ import { buyerOf } from "./buyer";
 import { makeFinal } from "../documents/api";
 import { orderLineNumbers } from "./orders.service";
 import { orderShipments, shipFacts } from "./shipment-facts";
-import { caseRowsSelect, caseView } from "./line-cases";
+import { caseRowOf, caseRowsSelect, caseView } from "./line-cases";
 import { readyOnOf, readySelect } from "@kebo/database";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
 
@@ -102,17 +104,28 @@ export const quotedTermsPrinted = (o: Parameters<typeof termsOf>[0] & { balanceT
   o.printQuotedTerms || routeAsAccepted(termsOf(o), o.balanceTerms);
 
 /** The document made from the order as it is now (a draft, or what a final version keeps). */
-export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
+export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx, only?: { shipmentId: string }) {
   const rev = o.revision;
   const t = documentTotals(o.lines.map((l) => ({ quantity: l.quantity.toString(), unitPrice: l.unitPrice.toString() })), figuresOf(rev).discount);
   // Where the order stands, as on every screen: the plan's deposit (a plan edited to 50% says 50%), what was charged.
   const position = positionOf(o, c.fx);
   const depositPercent = position.depositPercent;
   // The shipment's, never the order's: shipped on (the earliest departure), Shipment 1's B/L, container and ports.
-  const ship = shipFacts(o.shipments);
+  const all = shipFacts(o.shipments);
+  // One shipment's packing list (packing for machines, 25 Nov 2026): its own B/L, container, ports and date, and
+  // only the packages it takes.
+  const one = only ? (all.list.find((x) => x.id === only.shipmentId) ?? null) : null;
+  if (only && (!one || kind !== "packing-list")) throw new NotFoundError("Shipment");
+  const ship = one
+    ? { ...all, primary: one, shippedOn: fromDbDateOrNull(one.departedOn), blNo: one.blNo, containerNo: one.containerNo, containerType: one.containerType }
+    : all;
   const shippedOn = ship.shippedOn;
   const goodsOnly = kind === "packing-list";
-  const lines = o.lines.filter((l) => !goodsOnly || l.type === "goods");
+  const shipmentIds = all.list.map((x) => x.id);
+  const lines = o.lines
+    .filter((l) => !goodsOnly || l.type === "goods")
+    .map((l) => (one ? packedIn(l, one.id, shipmentIds) : l))
+    .filter((l) => !one || l.cases.length > 0);
   const numbers = orderLineNumbers(lines);
   // The terms follow the route; the quotation's own text only while the route is still the accepted one (or chosen).
   const terms = termsOf(o);
@@ -150,7 +163,7 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
     kind,
     title: TITLE[kind],
     // The proforma has its own number once issued (KEB260916TN07); before that it is a draft without one.
-    number: docNumber(o, kind),
+    number: one ? `${docNumber(o, kind)}-${all.list.indexOf(one) + 1}` : docNumber(o, kind),
     /** The proforma not issued yet: printed as a draft, without a number (a next version's draft: see DocumentsService.get). */
     draft: kind === "proforma" && !o.proformaNo,
     date: kind === "proforma" ? (fromDbDateOrNull(o.proformaIssuedOn) ?? c.today) : (shippedOn ?? c.today),
@@ -277,6 +290,15 @@ export function buildOrderDoc(o: DocOrder, kind: OrderDocKind, c: DocCtx) {
     notes: kind === "packing-list" ? null : rev.notes,
     footer: c.settings.company.invoiceFooter || null,
   };
+}
+
+/** A line with only the packages one shipment takes, and its totals as those add up. */
+function packedIn<L extends DocOrder["lines"][number]>(l: L, shipmentId: string, shipmentIds: string[]): L {
+  const cases = l.cases.filter((x) => shipmentOfCase(caseRowOf(x), shipmentIds) === shipmentId);
+  const t = caseTotals(cases.map(caseRowOf));
+  // Read as the stored decimals are (toFixed, Number()).
+  const dec = (n: number | null) => (n === null ? null : ({ toFixed: (p: number) => n.toFixed(p), toString: () => String(n), valueOf: () => n } as unknown as NonNullable<L["cbm"]>));
+  return { ...l, cases, packages: t.packages, packageType: t.packageType, netWeightKg: dec(t.netWeightKg), grossWeightKg: dec(t.grossWeightKg), cbm: dec(t.cbm) };
 }
 
 export type OrderDocData = ReturnType<typeof buildOrderDoc>;

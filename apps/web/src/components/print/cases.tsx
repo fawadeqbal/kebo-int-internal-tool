@@ -34,7 +34,8 @@ export function casesOf(lines: Line[]): CaseLine[] {
   const rows: CaseLine[] = [];
   for (const line of lines) {
     const cases: (LineCase | null)[] = line.packing?.cases?.length ? line.packing.cases : [null];
-    const numbers = cases.map((c) => c?.caseNo?.trim() || line.no);
+    // Goods inside another package print under that package's number.
+    const numbers = cases.map((c) => c?.inPackage?.trim() || c?.caseNo?.trim() || line.no);
     numbers.forEach((n, i) => {
       let span = 0;
       if (i === 0 || numbers[i - 1] !== n) {
@@ -69,9 +70,21 @@ export const caseColumns = (lang: DocLang): DocColumn<CaseLine>[] => [
     wrap: true,
     render: (r) => {
       if (!r.c) return "";
-      const zh = lang === "zh" ? zhTerm(r.c.packageType) : null;
+      const into = r.c.inPackage?.trim();
+      const zh = lang === "zh" ? (into ? `装于第 ${into} 件内` : zhTerm(r.c.packageType)) : null;
       const many = r.c.count > 1 ? `${r.c.count} × ` : "";
-      return overZh(`${many}${r.c.packageType}`, zh && `${many}${zh}`);
+      // Inside another package (a mixed pallet): it says so; its size and weights are that package's.
+      const packed = into ? overZh(`In package ${into}`, zh) : overZh(`${many}${r.c.packageType}`, zh && `${many}${zh}`);
+      // What is in it, under the package ("Compression unit").
+      return r.c.contents ? (
+        <>
+          {packed}
+          <br />
+          {r.c.contents}
+        </>
+      ) : (
+        packed
+      );
     },
   },
   size("L (mm)", (c) => c.lengthMm),
@@ -93,7 +106,7 @@ export function CaseTotals({
   lang: DocLang;
 }) {
   const n = totals.packages;
-  const cases = rows.every((r) => !r.c || /\b(case|crate|box)/i.test(r.c.packageType));
+  const cases = rows.every((r) => !r.c || !!r.c.inPackage || /\b(case|crate|box)/i.test(r.c.packageType));
   const word = cases ? (n === 1 ? "case" : "cases") : n === 1 ? "package" : "packages";
   return (
     <tr style={{ breakInside: "avoid" }}>

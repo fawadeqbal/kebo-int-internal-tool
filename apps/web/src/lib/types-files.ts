@@ -17,6 +17,8 @@ export interface OrderFile {
   stepLabel: string;
   /** The section of the order's page it belongs to (null: only its stage, or the inquiry). */
   section: OrderSection | null;
+  /** A photo of one package and its marks (section "packing"): its number as marked. */
+  packageNo?: string | null;
   sectionLabel: string | null;
   group: OrderFileGroup;
   by: { id: string; name: string } | null;

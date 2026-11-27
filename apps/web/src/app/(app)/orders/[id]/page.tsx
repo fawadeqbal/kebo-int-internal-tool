@@ -59,7 +59,8 @@ function whereOf(l: OrderLineView, o: OrderView, poSent: boolean): { text: strin
       quantity: Number(l.quantity),
       deliveredQty: l.delivered ? Number(l.delivered.qty) : 0,
       deliveredMarked: !!l.delivered?.condition && l.delivered.condition !== "good",
-      packed: !!l.packing.packages,
+      // A line counts as packed once it has packages of its own or one of its cases sits inside a package.
+      packed: !!l.packing.packages || !!l.packing.cases?.some((c) => c.inPackage),
       receivedQty: Number(l.receivedQty),
       receivedOn: l.receivedOn,
     },

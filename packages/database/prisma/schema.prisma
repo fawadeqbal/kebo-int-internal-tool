@@ -862,6 +862,8 @@ model Attachment {
   step            String?          @db.VarChar(20)
   /// The section of the order's page the file belongs to (see @kebo/shared ORDER_SECTIONS): booking, vessel, fat…
   section         String?          @db.VarChar(30)
+  /// A photo of one package and its marks (section "packing"): the package's number as marked ("3", "7-10").
+  packageNo       String?          @map("package_no") @db.VarChar(20)
   /// "Replace with a newer one": the newer file. The old one is kept (as an earlier version), out of the lists.
   replacedById    String?          @map("replaced_by") @db.Uuid
   replacedBy      Attachment?      @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
@@ -1400,9 +1402,20 @@ model OrderLineCase {
   netWeightKg   Decimal?  @map("net_weight_kg") @db.Decimal(12, 2)
   grossWeightKg Decimal?  @map("gross_weight_kg") @db.Decimal(12, 2)
   cbm           Decimal?  @db.Decimal(10, 3)
+  /// What is in it, when an item takes more than one package ("Main body", "Feeder and hopper").
+  contents      String?   @db.VarChar(120)
+  /// The shipment that takes it (packing for machines, 25 Nov 2026): an order sent in more than one lot packs each
+  /// lot apart. Empty: not given to a shipment yet (with one shipment, it goes in that one).
+  shipmentId    String?   @map("shipment_id") @db.Uuid
+  shipment      Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  /// Inside another package of the same order (a mixed pallet: the spare parts in the control cabinet's crate): that
+  /// package's number as marked. Such a row has no count, size or weight of its own and goes in that package's
+  /// shipment.
+  inPackage     String?   @map("in_package") @db.VarChar(20)
 
   @@index([lineId])
   @@index([companyId])
+  @@index([shipmentId])
   @@map("order_line_cases")
 }
 
@@ -1631,55 +1644,57 @@ model OrderBankContract {
 /// the container, seal, vessel, ports and ETD/ETA; Shipment 1 (the first made) is the one the papers print.
 /// An order without the shipping module still has one, typed from the order's Details card.
 model Shipment {
-  id                   String         @id @default(uuid()) @db.Uuid
+  id                   String          @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId            String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company              Company        @relation(fields: [companyId], references: [id])
-  orderId              String         @map("order_id") @db.Uuid
-  order                Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  mode                 ShipMode       @default(sea)
-  status               ShipmentStatus @default(planned)
-  forwarder            String?        @db.VarChar(120)
-  bookingNo            String?        @map("booking_no") @db.VarChar(60)
+  companyId            String          @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company              Company         @relation(fields: [companyId], references: [id])
+  orderId              String          @map("order_id") @db.Uuid
+  order                Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  mode                 ShipMode        @default(sea)
+  status               ShipmentStatus  @default(planned)
+  forwarder            String?         @db.VarChar(120)
+  bookingNo            String?         @map("booking_no") @db.VarChar(60)
   /// The bill of lading (sea) or air waybill (air) number.
-  blNo                 String?        @map("bl_no") @db.VarChar(60)
-  vessel               String?        @db.VarChar(120)
-  portOfLoading        String?        @map("port_of_loading") @db.VarChar(120)
-  portOfDischarge      String?        @map("port_of_discharge") @db.VarChar(120)
-  containerNo          String?        @map("container_no") @db.VarChar(120)
+  blNo                 String?         @map("bl_no") @db.VarChar(60)
+  vessel               String?         @db.VarChar(120)
+  portOfLoading        String?         @map("port_of_loading") @db.VarChar(120)
+  portOfDischarge      String?         @map("port_of_discharge") @db.VarChar(120)
+  containerNo          String?         @map("container_no") @db.VarChar(120)
   /// 20GP, 40HQ, LCL…
-  containerType        String?        @map("container_type") @db.VarChar(20)
-  sealNo               String?        @map("seal_no") @db.VarChar(40)
+  containerType        String?         @map("container_type") @db.VarChar(20)
+  sealNo               String?         @map("seal_no") @db.VarChar(40)
   /// The day the container was loaded.
-  loadedOn             DateTime?      @map("loaded_on") @db.Date
+  loadedOn             DateTime?       @map("loaded_on") @db.Date
   /// The container's verified gross mass (VGM), kg.
-  vgmKg                Decimal?       @map("vgm_kg") @db.Decimal(10, 2)
-  etd                  DateTime?      @db.Date
-  eta                  DateTime?      @db.Date
-  departedOn           DateTime?      @map("departed_on") @db.Date
-  arrivedOn            DateTime?      @map("arrived_on") @db.Date
+  vgmKg                Decimal?        @map("vgm_kg") @db.Decimal(10, 2)
+  etd                  DateTime?       @db.Date
+  eta                  DateTime?       @db.Date
+  departedOn           DateTime?       @map("departed_on") @db.Date
+  arrivedOn            DateTime?       @map("arrived_on") @db.Date
   note                 String?
   /// The forwarder's person and phone, the customs broker, and the carrier's tracking number.
-  forwarderContact     String?        @map("forwarder_contact") @db.VarChar(120)
-  forwarderPhone       String?        @map("forwarder_phone") @db.VarChar(40)
-  customsBroker        String?        @map("customs_broker") @db.VarChar(120)
-  trackingNo           String?        @map("tracking_no") @db.VarChar(80)
+  forwarderContact     String?         @map("forwarder_contact") @db.VarChar(120)
+  forwarderPhone       String?         @map("forwarder_phone") @db.VarChar(40)
+  customsBroker        String?         @map("customs_broker") @db.VarChar(120)
+  trackingNo           String?         @map("tracking_no") @db.VarChar(80)
   /// The freight agreed with the forwarder, and the insurance on the goods.
-  freightAmount        Decimal?       @map("freight_amount") @db.Decimal(14, 2)
-  freightCurrency      String?        @map("freight_currency") @db.Char(3)
-  insurer              String?        @db.VarChar(120)
-  insurancePolicyNo    String?        @map("insurance_policy_no") @db.VarChar(60)
+  freightAmount        Decimal?        @map("freight_amount") @db.Decimal(14, 2)
+  freightCurrency      String?         @map("freight_currency") @db.Char(3)
+  insurer              String?         @db.VarChar(120)
+  insurancePolicyNo    String?         @map("insurance_policy_no") @db.VarChar(60)
   /// prepaid | collect
-  freightTerms         String?        @map("freight_terms") @db.VarChar(10)
-  insuredValue         Decimal?       @map("insured_value") @db.Decimal(14, 2)
+  freightTerms         String?         @map("freight_terms") @db.VarChar(10)
+  insuredValue         Decimal?        @map("insured_value") @db.Decimal(14, 2)
   /// What the insurance costs us (the premium), in `insuranceCurrency`: it is a cost of the order by itself.
-  insurancePremium     Decimal?       @map("insurance_premium") @db.Decimal(14, 2)
-  insuranceCurrency    String?        @map("insurance_currency") @db.Char(3)
+  insurancePremium     Decimal?        @map("insurance_premium") @db.Decimal(14, 2)
+  insuranceCurrency    String?         @map("insurance_currency") @db.Char(3)
   /// Customs at the destination.
-  customsDeclarationNo String?        @map("customs_declaration_no") @db.VarChar(60)
-  clearedOn            DateTime?      @map("cleared_on") @db.Date
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  customsDeclarationNo String?         @map("customs_declaration_no") @db.VarChar(60)
+  clearedOn            DateTime?       @map("cleared_on") @db.Date
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  /// The packages it takes.
+  cases                OrderLineCase[]
 
   documents OrderDocument[]
 

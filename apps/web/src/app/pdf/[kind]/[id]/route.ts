@@ -48,11 +48,13 @@ const orderDocument =
   (kind: "proforma" | "packing-list"): Kind =>
   async (id, token, url) => {
     const v = url.searchParams.get("v");
-    const q = v && /^\d{1,3}$/.test(v) ? { v } : undefined;
+    // One shipment's packing list (its packages only), else a version, else the latest.
+    const shipment = url.searchParams.get("shipment");
+    const q: Record<string, string> | undefined = shipment && UUID.test(shipment) ? { shipment } : v && /^\d{1,3}$/.test(v) ? { v } : undefined;
     const d = await ask<OrderDocument>(token, `/orders/${id}/documents/${kind}`, q);
     return {
       name: `${d.title} ${d.number}${d.paper && d.versions.length > 1 ? ` v${d.paper.version}` : ""}${d.order.status === "cancelled" ? " (cancelled)" : ""}`,
-      path: `/print/orders/${id}/${kind}${q ? `?v=${q.v}` : ""}`,
+      path: `/print/orders/${id}/${kind}${q ? `?${new URLSearchParams(q)}` : ""}`,
     };
   };
 

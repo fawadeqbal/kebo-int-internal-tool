@@ -32,12 +32,12 @@ test("the LC's reference and bank, the packing case by case, and the packing lis
   await page.goto(`/orders/${id}/shipping`);
   await page.getByRole("button", { name: "Edit items" }).click();
   const w = page.getByRole("dialog", { name: "Edit packing list" });
-  await w.getByRole("button", { name: "Add a case" }).click();
-  await w.getByRole("button", { name: "Add a case" }).click();
+  await w.getByRole("button", { name: "Add a package" }).click();
+  await w.getByRole("button", { name: "Add a package" }).click();
   const rows = w.getByRole("row").filter({ has: page.getByRole("textbox") });
   const fill = async (n: number, [l, wd, h, net, gross]: string[]) => {
     const row = rows.nth(n);
-    await row.getByLabel(/^Case No\./).fill("1");
+    await row.getByLabel(/^Package No\./).fill("1");
     await row.getByLabel(/^Packed in/).fill("Fumigated solid wooden case (IPPC)");
     await row.getByLabel(/^L \(mm\)/).fill(l!);
     await row.getByLabel(/^W \(mm\)/).fill(wd!);
@@ -48,8 +48,8 @@ test("the LC's reference and bank, the packing case by case, and the packing lis
   await fill(0, ["2400", "1190", "1960", "600", "700"]);
   await fill(1, ["1430", "1130", "690", "100", "150"]);
   await expect(rows.nth(0)).toContainText("5.598");
-  await expect(w).toContainText("2 cases · 6.713 m³ · net 700 kg · gross 850 kg");
-  expect(await accessibilityProblems(page, '[role="dialog"]'), "the case editor meets WCAG 2.2 AA").toEqual([]);
+  await expect(w).toContainText("2 packages · 6.713 m³ · net 700 kg · gross 850 kg");
+  expect(await accessibilityProblems(page, '[role="dialog"]'), "the packages editor meets WCAG 2.2 AA").toEqual([]);
   await w.getByRole("button", { name: "Save the packing" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
