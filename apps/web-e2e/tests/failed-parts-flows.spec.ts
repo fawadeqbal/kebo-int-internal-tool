@@ -197,3 +197,47 @@ test.describe("Reports with the sales and the cash failing", () => {
     expect(await res.text()).toContain("Could not load the cash report, so the file was not made");
   });
 });
+
+test.describe("notes and what we owe a supplier failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:~/notes,/money/payables" });
+
+  test("a customer's notes say they could not be read, never 'No notes yet' or 'Nothing yet'", async ({ page }) => {
+    const customer = foundPages()["/customers/[id]"];
+    test.skip(!customer, "no customer in the demo data");
+    await page.goto(`${customer}/notes`);
+    await expect(page.getByRole("heading", { name: "Notes and calls" })).toBeVisible();
+    // The tab, and the side panel's Activity beside it.
+    await expect(page.getByText("Could not load the notes")).toHaveCount(2);
+    await expect(page.getByText(/No notes yet|Nothing yet\. Notes/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add a note" })).toBeVisible();
+    expect(await accessibilityProblems(page), "the notes tab with its list failed meets WCAG 2.2 AA").toEqual([]);
+  });
+
+  test("a supplier's Orders tab and money box say what we owe could not be read, never 'Nothing bought or owed yet'", async ({ page }) => {
+    const supplier = foundPages()["/suppliers/[id]"];
+    test.skip(!supplier, "no supplier in the demo data");
+    await page.goto(`${supplier}/orders`);
+    await expect(page.getByText("Could not load what we still owe them").first()).toBeVisible();
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
+    await page.goto(`${supplier}/notes`);
+    await expect(page.getByText("Could not load the notes")).toBeVisible();
+    await expect(page.getByText("Nothing bought or owed yet")).toHaveCount(0);
+  });
+});
+
+test.describe("reports' counts and the books' order list failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/customers,/orders" });
+
+  test("Reports › Customers says it could not count them, never 'of 0'", async ({ page }) => {
+    await page.goto("/reports/customers");
+    await expect(page.getByText("Could not load how many customers there are")).toBeVisible();
+    await expect(page.getByText(/^of 0 ·/)).toHaveCount(0);
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
+  });
+
+  test("the books' Orders view says the orders could not be read, never 'No orders yet'", async ({ page }) => {
+    await page.goto("/finance/ledger?view=orders");
+    await expect(page.getByText("Could not load the orders")).toBeVisible();
+    await expect(page.getByText("No orders yet")).toHaveCount(0);
+  });
+});
