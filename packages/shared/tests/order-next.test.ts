@@ -31,7 +31,8 @@ const next = (f: Partial<OrderStepFacts>) => orderNextStep({ ...base, ...f }, to
 describe("the order record type", () => {
   it("has the pill the lists and the board show for every state", () => {
     for (const [w, s] of Object.entries(ORDER.states)) expect(s.words).toBe(w);
-    expect(ORDER.states.Confirmed.tone).toBe(ORDER_WORD_TONE.Confirmed);
+    for (const [w, s] of Object.entries(ORDER.states)) expect(ORDER_WORD_TONE[w as keyof typeof ORDER_WORD_TONE]).toBe(s.tone);
+    expect(ORDER_WORD_TONE).toEqual({ Confirmed: "warn", "In production": "info", Shipped: "info", Arrived: "info", Delivered: "ok", Done: "ok", Cancelled: "neutral" });
     expect(ORDER.states.Delivered.tone).toBe("ok");
   });
 });
