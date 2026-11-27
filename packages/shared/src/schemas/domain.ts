@@ -26,7 +26,7 @@ import { DEFAULT_TAX_RATE } from "../workflows/tax";
 import { HS_CODE, HS_CODE_HINT } from "../workflows/hs";
 import { LEAD_FROMS, OFFER_PART_RULES, PART_RULE_DAYS, partsAddUp, QUOTE_PART_RULES, WARRANTY_FROMS, type TermsSide } from "../workflows/terms";
 import { PLAN_DUE_RULES } from "../workflows/money-route";
-import { CANCEL_CUSTOMER_MONEY, CANCEL_FACTORY_MONEY, FACTORY_DUE_RULES } from "../workflows/money-route";
+import { CANCEL_CUSTOMER_MONEY, CANCEL_SUPPLIER_MONEY, SUPPLIER_DUE_RULES } from "../workflows/money-route";
 import { FLOW_STEPS } from "../workflows/flow";
 
 /** A yes/no that may be left out (left out on a change: kept as it was). */
@@ -87,7 +87,7 @@ export const customerInput = z.object({
 });
 export type CustomerInput = z.infer<typeof customerInput>;
 
-export const factoryInput = z.object({
+export const supplierInput = z.object({
   name: text(200, "Enter the supplier's name"),
   contactPerson: optionalText(120),
   phone,
@@ -96,24 +96,24 @@ export const factoryInput = z.object({
   address: optionalText(500),
   bankDetails: optionalText(1000),
   notes: optionalText(5000),
-  /** The person in our team who looks after this factory. */
+  /** The person in our team who looks after this supplier. */
   ownerId: optionalId,
   reason: reasonField,
 });
-export type FactoryInput = z.infer<typeof factoryInput>;
+export type SupplierInput = z.infer<typeof supplierInput>;
 
-/** Customers or factories from an uploaded Excel file (the page has read and checked the rows). */
+/** Customers or suppliers from an uploaded Excel file (the page has read and checked the rows). */
 export const customerImport = z.object({
   customers: z.array(customerInput).min(1, "No customers to add").max(500, "Up to 500 customers at once"),
   fileName: optionalText(200),
 });
 export type CustomerImport = z.infer<typeof customerImport>;
 
-export const factoryImport = z.object({
-  factories: z.array(factoryInput).min(1, "No suppliers to add").max(500, "Up to 500 suppliers at once"),
+export const supplierImport = z.object({
+  factories: z.array(supplierInput).min(1, "No suppliers to add").max(500, "Up to 500 suppliers at once"),
   fileName: optionalText(200),
 });
-export type FactoryImport = z.infer<typeof factoryImport>;
+export type SupplierImport = z.infer<typeof supplierImport>;
 
 /** What an import did: how many were added, and which were left out and why. */
 export interface ImportResult {
@@ -146,7 +146,7 @@ export const inquiryInput = z
   priority: z.enum(PRIORITIES).default("normal"),
   requiredBy: optionalDate,
   assigneeId: optionalId,
-  /** Optional: often the customer sends only a requirement or a URS; the lines are made at factory prices. */
+  /** Optional: often the customer sends only a requirement or a URS; the lines are made at supplier prices. */
   items: z.array(requestedItemInput).max(1000).default([]),
   reason: reasonField,
 })
@@ -169,7 +169,7 @@ export type StageMoveInput = z.infer<typeof stageMoveInput>;
 export const holdInput = z.object({ onHold: bool, note: optionalText(2000), reason: reasonField });
 export const assignInput = z.object({ assigneeId: optionalId, reason: reasonField });
 
-/** Split an item into parts (at factory pricing): each part is an item of its own, numbered under it (3.1, 3.2). */
+/** Split an item into parts (at supplier pricing): each part is an item of its own, numbered under it (3.1, 3.2). */
 export const splitItemInput = z.object({
   parts: z
     .array(z.object({ description: text(2000, "Each part needs a description"), model: optionalText(120), quantity, unit: z.string().trim().max(20).default("pcs") }))
@@ -183,8 +183,8 @@ export type SplitItemInput = z.infer<typeof splitItemInput>;
 export const attachmentInput = z.object({
   kind: z.enum(ATTACHMENT_KINDS).default("other"),
   note: optionalText(300),
-  /** Evidence for a factory offer (only people who see factory prices see it). */
-  factoryQuoteId: optionalId,
+  /** Evidence for a supplier offer (only people who see supplier prices see it). */
+  supplierQuoteId: optionalId,
 });
 export type AttachmentInput = z.infer<typeof attachmentInput>;
 
@@ -222,7 +222,7 @@ export const quotePartInput = z
     days: keptInt(0, 3650),
   })
   .transform(partDays("customer"));
-/** One part of what a factory asks (its offer's): its name, its share, and when we pay it. */
+/** One part of what a supplier asks (its offer's): its name, its share, and when we pay it. */
 export const offerPartInput = z
   .object({
     label: text(80, "Give each part a name"),
@@ -236,9 +236,9 @@ export const offerPartsInput = z.array(offerPartInput).min(1, "Add a part").max(
 
 /* ---------------------------------------------------------------- sourcing */
 
-export const factoryQuoteLineInput = z.object({
+export const supplierQuoteLineInput = z.object({
   id: optionalId,
-  /** Which of the customer's items this answers (empty for extras the factory added). */
+  /** Which of the customer's items this answers (empty for extras the supplier added). */
   requestedItemId: optionalId,
   /** A part of an earlier line of this offer: that line's position in `lines` (0-based). */
   partOf: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().int().min(0).nullable()).default(null),
@@ -253,23 +253,23 @@ export const factoryQuoteLineInput = z.object({
   taxRate: optionalPercent,
 });
 
-export const factoryQuoteInput = z
+export const supplierQuoteInput = z
   .object({
-    /** An existing factory, or a new one by name. */
-    factoryId: optionalId,
-    newFactoryName: optionalText(200),
+    /** An existing supplier, or a new one by name. */
+    supplierId: optionalId,
+    newSupplierName: optionalText(200),
     reference: optionalText(80),
     receivedOn: isoDate(),
     validUntil: optionalDate,
     currency: currency.default("CNY"),
     /**
-     * The factory's prices have the tax in them (true) or the tax is added on top (false), and the
+     * The supplier's prices have the tax in them (true) or the tax is added on top (false), and the
      * offer's tax %, applied to its lines (a line can have its own). Left out: a new offer takes the
      * company's default (Settings), an edited one keeps what it has.
      */
     taxIncluded: bool.optional(),
     taxRate: optionalPercent,
-    /** The factory's price basis (EXW, FOB…) and its place ("Zhangjiagang", "Qingdao"). */
+    /** The supplier's price basis (EXW, FOB…) and its place ("Zhangjiagang", "Qingdao"). */
     basis: z.preprocess((v) => (v === "" ? null : v), z.enum(INCOTERMS).nullable().default(null)),
     basisPlace: optionalText(60),
     /** The lead time's words; with leadDays they are worked out from them ("30 days after the advance"). */
@@ -285,19 +285,19 @@ export const factoryQuoteInput = z
     warrantyMonths: keptInt(0, 240, "Enter the months"),
     warrantyFrom: keptEnum(WARRANTY_FROMS, "Choose what the months count from"),
     /**
-     * The advance the factory asks when we order, in % (seeds its payment plan on the order and is printed on
+     * The advance the supplier asks when we order, in % (seeds its payment plan on the order and is printed on
      * the purchase order; the payment terms text stays as a note). Empty: the company's default (Settings).
      * With paymentParts it is worked out from them.
      */
     advancePercent: optionalPercent,
     /**
-     * What the factory asks, as parts (like its plan on an order): their "when we order" parts are the advance.
+     * What the supplier asks, as parts (like its plan on an order): their "when we order" parts are the advance.
      * Left out: the advance % as it is (and the rest when ready).
      */
     paymentParts: offerPartsInput.nullish(),
     notes: optionalText(5000),
-    /** Left out: the lines are not touched (they are added one by one, see factoryLinesInput). */
-    lines: z.array(factoryQuoteLineInput).max(1000).optional(),
+    /** Left out: the lines are not touched (they are added one by one, see supplierLinesInput). */
+    lines: z.array(supplierQuoteLineInput).max(1000).optional(),
     /**
      * When the currency changes: true turns every line's price into the new
      * currency at the Settings rates (CNY 7,100 → USD 1,000); false keeps the
@@ -306,25 +306,25 @@ export const factoryQuoteInput = z
     convertPrices: bool.default(false),
     reason: reasonField,
   })
-  .refine((v) => v.factoryId || v.newFactoryName, { message: "Choose a supplier or type a new one", path: ["factoryId"] });
-export type FactoryQuoteInput = z.infer<typeof factoryQuoteInput>;
+  .refine((v) => v.supplierId || v.newSupplierName, { message: "Choose a supplier or type a new one", path: ["supplierId"] });
+export type SupplierQuoteInput = z.infer<typeof supplierQuoteInput>;
 
 /**
  * Lines added to an offer as they are typed or pasted: after a line (or at the
  * end), at the same level as that line or as parts of `parentId`.
  */
-export const factoryLinesInput = z.object({
-  lines: z.array(factoryQuoteLineInput.omit({ id: true })).min(1, "Add an item").max(1000),
+export const supplierLinesInput = z.object({
+  lines: z.array(supplierQuoteLineInput.omit({ id: true })).min(1, "Add an item").max(1000),
   /** Insert after this line (and its parts); empty = at the end. */
   afterId: optionalId,
   /** All new lines become parts of this line (pasting under a line). */
   parentId: optionalId,
   reason: reasonField,
 });
-export type FactoryLinesInput = z.infer<typeof factoryLinesInput>;
+export type SupplierLinesInput = z.infer<typeof supplierLinesInput>;
 
 /** One line changed in place (only the fields sent). */
-export const factoryLinePatch = z.object({
+export const supplierLinePatch = z.object({
   requestedItemId: optionalId.optional(),
   description: text(2000, "Each item needs a description").optional(),
   model: optionalText(120).optional(),
@@ -336,23 +336,23 @@ export const factoryLinePatch = z.object({
   alternativeOfId: optionalId.optional(),
   reason: reasonField,
 });
-export type FactoryLinePatch = z.infer<typeof factoryLinePatch>;
+export type SupplierLinePatch = z.infer<typeof supplierLinePatch>;
 
 /** Up / down among its neighbours, into the line above as a part, or out to a line of its own. */
 export const lineMoveInput = z.object({ to: z.enum(["up", "down", "indent", "outdent"]), reason: reasonField });
 export type LineMoveInput = z.infer<typeof lineMoveInput>;
 
-/** Start an offer from another factory's lines (same products, this factory's models and prices). */
+/** Start an offer from another supplier's lines (same products, this supplier's models and prices). */
 export const copyLinesInput = z.object({ fromQuoteId: id("Choose the offer to copy"), withPrices: bool.default(false) });
 export type CopyLinesInput = z.infer<typeof copyLinesInput>;
 
 
 /* ---------------------------------------------------------------- quotations */
 
-/** Our selling price for one line of an option: a factory line, or (without factory prices) one of the customer's items. */
+/** Our selling price for one line of an option: a supplier line, or (without supplier prices) one of the customer's items. */
 export const optionPriceInput = z.object({ lineId: id("Unknown item"), unitPrice: amount("Enter a price") });
 
-/** An extra the factory does not supply: sea freight, inspection, insurance… (our own price and, if known, cost). */
+/** An extra the supplier does not supply: sea freight, inspection, insurance… (our own price and, if known, cost). */
 export const chargeInput = z.object({
   type: z.enum(LINE_TYPES).exclude(["goods"]).default("charge"),
   description: text(2000, "Each charge needs a description"),
@@ -363,12 +363,12 @@ export const chargeInput = z.object({
 });
 
 /**
- * One option (A, B…): one factory's offer — its lines exactly as the factory
+ * One option (A, B…): one supplier's offer — its lines exactly as the supplier
  * gave them, locked — with our prices, discount and lead time, plus charges.
- * Without factory prices (factoryQuoteId empty) the lines are the customer's items.
+ * Without supplier prices (supplierQuoteId empty) the lines are the customer's items.
  */
 /**
- * A cost between the factory's price basis and ours (EXW → FOB: to the port;
+ * A cost between the supplier's price basis and ours (EXW → FOB: to the port;
  * FOB → CFR: sea freight…), in any currency; it is part of the option's cost
  * and spread into its prices.
  */
@@ -381,7 +381,7 @@ export const basisCostInput = z.object({
 export type BasisCostInput = z.infer<typeof basisCostInput>;
 
 export const optionInput = z.object({
-  factoryQuoteId: optionalId,
+  supplierQuoteId: optionalId,
   prices: z.array(optionPriceInput).max(1000),
   charges: z.array(chargeInput).max(20).default([]),
   costs: z.array(basisCostInput).max(BASIS_STEPS.length).default([]),
@@ -441,7 +441,7 @@ export const revisionMoveInput = z.object({
 });
 
 /**
- * New quotations (any number per inquiry, A, B, C…): one draft for each factory offer ticked, or null for one
+ * New quotations (any number per inquiry, A, B, C…): one draft for each supplier offer ticked, or null for one
  * priced by hand from the customer's items ("Own prices"); an offer can be quoted again on other terms. Each
  * starts in this currency, valid until this day, its lines priced at this margin (on the price).
  */
@@ -498,11 +498,11 @@ export const revisionEmailInput = z.object({
  * payment is changed in its plan. Left out: kept as it is. Changed from what the quotation said: Why? is asked.
  */
 /**
- * Changing what was agreed with a factory (design "terms that travel", step 3b): Delivery (the basis and its place,
+ * Changing what was agreed with a supplier (design "terms that travel", step 3b): Delivery (the basis and its place,
  * the lead time), the payment's note (the parts are its plan's), Warranty and Conditions (minimum order, notes).
  * Left out: kept as it is. Changed from what its offer said: Why? is asked.
  */
-export const factoryTermsInput = z.object({
+export const supplierTermsInput = z.object({
   basis: z.preprocess((v) => (v === "" ? null : v), z.enum(INCOTERMS).nullish()),
   basisPlace: keptText(60),
   leadDays: keptInt(0, 3650, "Enter the days"),
@@ -515,7 +515,7 @@ export const factoryTermsInput = z.object({
   notes: keptText(5000),
   reason: reasonField,
 });
-export type FactoryTermsInput = z.infer<typeof factoryTermsInput>;
+export type SupplierTermsInput = z.infer<typeof supplierTermsInput>;
 
 export const agreedTermsInput = z.object({
   incotermPlace: keptText(80),
@@ -540,7 +540,7 @@ export const moveStageInput = z.object({
   /** Going ahead although there is a warning (no deposit, money still due). */
   confirm: bool.default(false),
   note: optionalText(2000),
-  /** In production: when the factory expects the goods ready. */
+  /** In production: when the supplier expects the goods ready. */
   readyOn: optionalDate,
   /** Shipped: the ship date (today when empty) and the B/L number. */
   shippedOn: optionalDate,
@@ -556,11 +556,11 @@ export type MoveStageInput = z.infer<typeof moveStageInput>;
  */
 export const orderDetailsInput = z.object({
   shipBy: optionalDate.optional(),
-  /** One date for every factory of the order (each factory's own: readyBy). */
+  /** One date for every supplier of the order (each supplier's own: readyBy). */
   readyOn: optionalDate.optional(),
-  /** Each factory's ready date (one per factory; the order's is the latest of them). Only the factories sent change. */
+  /** Each supplier's ready date (one per supplier; the order's is the latest of them). Only the suppliers sent change. */
   readyBy: z
-    .array(z.object({ factoryId: optionalId, readyOn: optionalDate }))
+    .array(z.object({ supplierId: optionalId, readyOn: optionalDate }))
     .max(50)
     .optional(),
   shippedOn: optionalDate.optional(),
@@ -582,7 +582,7 @@ export const orderDetailsInput = z.object({
 });
 export type OrderDetailsInput = z.infer<typeof orderDetailsInput>;
 
-/** How many of each goods line came in from the factory (the total so far, not an addition). */
+/** How many of each goods line came in from the supplier (the total so far, not an addition). */
 export const receiptInput = z.object({
   on: optionalDate,
   lines: z
@@ -680,7 +680,7 @@ const receivedQty = z.preprocess(
 
 /**
  * One line of an order, changed in the step's line table: what came in from the
- * factory (Production), its packing (Shipping) or what reached the customer
+ * supplier (Production), its packing (Shipping) or what reached the customer
  * (Delivery & SAT). Only the fields sent change; an empty one is cleared.
  */
 export const orderLineInput = z.discriminatedUnion("set", [
@@ -718,8 +718,8 @@ export type OrderLineInput = z.infer<typeof orderLineInput>;
 /**
  * Cancelling an order. With money received: keep it as the customer's credit
  * (the default), refund it (now: account and date; or later, from the credit),
- * or keep it as a cancellation fee. With money paid to the factory: a refund
- * expected from the factory, or a loss on the order.
+ * or keep it as a cancellation fee. With money paid to the supplier: a refund
+ * expected from the supplier, or a loss on the order.
  */
 export const cancelOrderInput = z.object({
   reason: text(2000, "Say why the order is cancelled"),
@@ -728,7 +728,7 @@ export const cancelOrderInput = z.object({
   refundNow: bool.default(false),
   refundAccountId: optionalId,
   refundOn: optionalDate,
-  factoryMoney: z.preprocess((v) => (v === "" ? undefined : v), z.enum(CANCEL_FACTORY_MONEY).optional()),
+  supplierMoney: z.preprocess((v) => (v === "" ? undefined : v), z.enum(CANCEL_SUPPLIER_MONEY).optional()),
 });
 export type CancelOrderInput = z.infer<typeof cancelOrderInput>;
 
@@ -826,16 +826,16 @@ export const creditRefundInput = z.object({
 });
 export type CreditRefundInput = z.infer<typeof creditRefundInput>;
 
-/** The factory's payment plan on an order: its parts in order (they add up to what we owe it). */
-export const factoryPlanInput = z.object({
-  factoryId: id("Choose the supplier"),
+/** The supplier's payment plan on an order: its parts in order (they add up to what we owe it). */
+export const supplierPlanInput = z.object({
+  supplierId: id("Choose the supplier"),
   items: z
     .array(
       z.object({
         label: text(80, "Name each part, e.g. Advance"),
         percent: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.number().min(0).max(100).nullable()),
         amount: amount(),
-        dueRule: z.enum(FACTORY_DUE_RULES),
+        dueRule: z.enum(SUPPLIER_DUE_RULES),
         dueOn: optionalDate,
         /** on_ship_plus_days: how many days after the goods leave. */
         dueDays: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.coerce.number().int().min(0).max(3650).optional()),
@@ -846,7 +846,7 @@ export const factoryPlanInput = z.object({
     .min(1, "Add at least one part")
     .max(12),
 });
-export type FactoryPlanInput = z.infer<typeof factoryPlanInput>;
+export type SupplierPlanInput = z.infer<typeof supplierPlanInput>;
 
 /** Billing: an invoice is the customer's (receivable) or a supplier's (payable). */
 export const INVOICE_SIDES = ["receivable", "payable"] as const;
@@ -892,22 +892,22 @@ export const paymentPlanInput = z.object({
 });
 export type PaymentPlanInput = z.infer<typeof paymentPlanInput>;
 
-/* ---------------------------------------------------------------- factory payments */
+/* ---------------------------------------------------------------- supplier payments */
 
 /**
- * Money we sent a factory for an order, in the currency we paid in. `rate` is
+ * Money we sent a supplier for an order, in the currency we paid in. `rate` is
  * how many of that currency make one unit of the order's currency (CNY 7.10
  * per USD), so profit can be worked out; it starts from Settings.
  */
-export const factoryPaymentInput = z.object({
-  factoryId: id("Choose the supplier"),
+export const supplierPaymentInput = z.object({
+  supplierId: id("Choose the supplier"),
   kind: z.enum(PAYMENT_KINDS).default("deposit"),
   amount: amount().refine((v) => (v as number) > 0, "The amount must be more than 0"),
   currency,
   rate: optionalRate,
   paidOn: isoDate(),
   method: z.enum(PAYMENT_METHODS).default("bank_transfer"),
-  /** Who in our team paid it (defaults to the person who looks after the factory). */
+  /** Who in our team paid it (defaults to the person who looks after the supplier). */
   paidById: optionalId,
   reference: optionalText(120),
   note: optionalText(2000),
@@ -920,7 +920,7 @@ export const factoryPaymentInput = z.object({
   bankCharges: amount().optional(),
   reason: optionalText(500).optional(),
 });
-export type FactoryPaymentInput = z.infer<typeof factoryPaymentInput>;
+export type SupplierPaymentInput = z.infer<typeof supplierPaymentInput>;
 
 /* ---------------------------------------------------------------- expenses */
 
@@ -936,8 +936,8 @@ export const expenseInput = z.object({
   /** A deal it was spent on (won or lost); an order's deal is filled in. */
   inquiryId: optionalId,
   customerId: optionalId,
-  /** The factory visited or paid for. */
-  factoryId: optionalId,
+  /** The supplier visited or paid for. */
+  supplierId: optionalId,
   /** Which of our accounts it was paid from (same currency). */
   accountId: optionalId,
   category: z.enum(EXPENSE_CATEGORIES),
@@ -954,7 +954,7 @@ export const expenseInput = z.object({
    * on a new expense: the usual step of its kind.
    */
   step: z.enum(FLOW_STEPS).nullish(),
-  /** Who bears it: us (profit), the customer (added to what they owe) or the factory (taken off what we owe it; needs `factoryId`). */
+  /** Who bears it: us (profit), the customer (added to what they owe) or the supplier (taken off what we owe it; needs `supplierId`). */
   borneBy: z.enum(EXPENSE_BEARERS).optional(),
   /** Paid by `paidById` from their own money: shows under "To repay" until it is repaid. */
   ownMoney: optionalBool,

@@ -1,17 +1,17 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { PAYMENT_METHOD_LABEL, type CustomerMoneyState, type FactoryDueRule, type PaymentRoute, type Tone } from "@kebo/shared";
+import { PAYMENT_METHOD_LABEL, type CustomerMoneyState, type SupplierDueRule, type PaymentRoute, type Tone } from "@kebo/shared";
 import { Badge, cn, Table, Td, Th, THead, Tr, EmptyLine, RULES, PhoneList, PhoneRow } from "@kebo/ui";
 import { date, dayMonth, dueText, money, num2 as grouped } from "@/lib/format";
-import type { FactoryPaymentView, FactoryPlanView } from "@/lib/types-money";
+import type { SupplierPaymentView, SupplierPlanView } from "@/lib/types-money";
 import { ROW_LINK } from "./section-window";
 import { PlanTotals } from "./plan-totals";
 import { BoxNote } from "@/components/common/record-box";
 
-type Row = FactoryPlanView["rows"][number];
+type Row = SupplierPlanView["rows"][number];
 
 /** When a part of a supplier's plan falls due, in the words the customer's plan uses (a fixed date: none, its date says it). */
-export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | null }): string | null {
+export function supplierRule(r: { dueRule: SupplierDueRule; dueDays?: number | null }): string | null {
   if (r.dueRule === "on_order") return "when we order";
   if (r.dueRule === "on_ready") return "when they say ready";
   if (r.dueRule === "on_ship_plus_days") return `${r.dueDays ?? 0} days after shipping`;
@@ -22,11 +22,11 @@ export function supplierRule(r: { dueRule: FactoryDueRule; dueDays?: number | nu
 export const partName = (r: Pick<Row, "label">) => r.label.replace(/\s+\d+(?:\.\d+)?%$/, "") || r.label;
 
 /** The plan in a few words: "Advance 30% when we order · Balance 70% when they say ready". */
-export const supplierPlanWords = (plan: FactoryPlanView) =>
+export const supplierPlanWords = (plan: SupplierPlanView) =>
   plan.rows.map((r) => `${r.label} ${supplierRule(r) ?? (r.due ? `on ${date(r.due)}` : "on a date")}`).join(" · ");
 
-/** The invoices the factory sent, each with the part it is for: "JP-INV-301 (advance)". */
-export const theirInvoices = (plan: FactoryPlanView) =>
+/** The invoices the supplier sent, each with the part it is for: "JP-INV-301 (advance)". */
+export const theirInvoices = (plan: SupplierPlanView) =>
   plan.rows.filter((r) => r.supplierRef).map((r) => `${r.supplierRef} (${partName(r).toLowerCase()})`);
 
 const TONE: Record<Row["status"], Tone> = { paid: "ok", part: "warn", due: "warn", late: "bad", later: "neutral" };
@@ -61,7 +61,7 @@ function Stand({ r, paidOn }: { r: Row; paidOn: string | null }) {
 }
 
 /**
- * What we pay one supplier on an order (Order › Factory order, and the purchase order's page), drawn as the
+ * What we pay one supplier on an order (Order › Supplier order, and the purchase order's page), drawn as the
  * customer's payment plan is: one row per part (a card on a phone) with where it stands and what to do on
  * it — Pay on the part that is next, Receipt beside a paid one — then PO total · Paid · Still to pay. Money
  * pays the parts in order, so only the first open part offers Pay.
@@ -75,9 +75,9 @@ export function SupplierPlanTable({
   overpaid,
   after,
 }: {
-  plan: FactoryPlanView;
-  /** The order's payments to its factories, by id: how a part was paid, and when. */
-  payments: Map<string, FactoryPaymentView>;
+  plan: SupplierPlanView;
+  /** The order's payments to its suppliers, by id: how a part was paid, and when. */
+  payments: Map<string, SupplierPaymentView>;
   /** "Pay" for the next open part (the payment form filled in), when this person may record it. */
   pay: (row: Row) => ReactNode;
   orderCurrency: string;
@@ -91,7 +91,7 @@ export function SupplierPlanTable({
   const c = plan.currency;
   if (!plan.rows.length) return <EmptyLine className={RULES.box.inset}>No plan yet.</EmptyLine>;
   const next = plan.rows.find((r) => r.status !== "paid");
-  const paidBy = (r: Row) => r.payments.map((x) => payments.get(x.id)).filter((x): x is FactoryPaymentView => !!x);
+  const paidBy = (r: Row) => r.payments.map((x) => payments.get(x.id)).filter((x): x is SupplierPaymentView => !!x);
   /** Under a part's name: their invoice for it, and how it was paid. */
   const under = (r: Row) => {
     const how = [...new Set(paidBy(r).map((x) => PAYMENT_METHOD_LABEL[x.method]))];
@@ -205,7 +205,7 @@ export function SupplierPlanTable({
 
 /**
  * Under a supplier's plan: what the customer has paid on the order, so the other side is in view before a
- * factory is paid. "The customer has paid USD 2,881.80 of USD 9,606.00 (the deposit is in)."
+ * supplier is paid. "The customer has paid USD 2,881.80 of USD 9,606.00 (the deposit is in)."
  */
 export function CustomerMoneyLine({
   orderId,

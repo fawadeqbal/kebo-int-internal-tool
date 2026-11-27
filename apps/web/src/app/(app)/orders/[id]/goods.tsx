@@ -127,7 +127,7 @@ const MODE_OF: Record<CaseField, "text" | "number"> = {
   cbm: "number",
 };
 
-/** Other headings a factory's own packing list may use. */
+/** Other headings a supplier's own packing list may use. */
 const PACK_HEADINGS: Record<CaseField, string[]> = {
   caseNo: ["caseno", "case", "cno", "caseno.", "boxno", "packageno", "cartonno", "ctnno", "markno"],
   count: ["cases", "packages", "pkgs", "ctns", "cartons", "noofpackages", "qtyofpackages", "packagesqty", "noofcases"],

@@ -13,7 +13,7 @@ const person = { select: { id: true, name: true } } as const;
 
 /** Kinds spent to sell (on a customer, an inquiry or an order): trips, hotels, meals, gifts, samples, courier, checks. */
 const SELLING = new Set<string>(["travel", "hotel", "meals", "gifts", "samples", "courier", "inspection"]);
-/** Kinds that are a visit to a factory when one is named. */
+/** Kinds that are a visit to a supplier when one is named. */
 const VISITS = new Set<string>(["travel", "hotel", "meals", "inspection"]);
 
 type Event = {
@@ -44,13 +44,13 @@ export class AccountsService {
     if (!can(user, "expenses.manage")) throw new ForbiddenError("Only managers can see what was spent and earned.");
   }
 
-  /** What an expense can be for: customers, their deals and orders, and factories. */
+  /** What an expense can be for: customers, their deals and orders, and suppliers. */
   async expenseTargets(user: SessionUser) {
     this.assertManager(user);
     // Every open deal and order, and those of the last year: an expense is almost always on one of them. No cap
     // (review 24 Nov: the 400 newest left older open orders such as SO-2026-0002 without a way to get a cost).
     const since = new Date(`${addDays(this.clock.today(), -365)}T00:00:00Z`);
-    const [customers, deals, orders, factories] = await Promise.all([
+    const [customers, deals, orders, suppliers] = await Promise.all([
       this.prisma.db.party.findMany({ where: { ...isCustomer, deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
       this.prisma.db.inquiry.findMany({
         where: { deletedAt: null, OR: [{ stage: { in: ["new", "sourcing", "quoted"] } }, { createdAt: { gte: since } }] },
@@ -75,7 +75,7 @@ export class AccountsService {
         customer: d.customer.name,
       })),
       orders: orders.map((o) => ({ id: o.id, refNo: o.refNo, dealId: o.inquiryId, customerId: o.customer.id, customer: o.customer.name })),
-      factories,
+      factories: suppliers,
     };
   }
 
@@ -174,7 +174,7 @@ export class AccountsService {
       }
       const d = byDeal.get(e.inquiryId) ?? { beforeSale: 0, onOrder: 0, basisPaid: 0 };
       if (e.orderId) {
-        // Charged to the customer or taken off what we owe a factory: not a cost of the order.
+        // Charged to the customer or taken off what we owe a supplier: not a cost of the order.
         if (e.borneBy !== "us") continue;
         d.onOrder += v;
         if (paysBasis(e.category)) d.basisPaid += v;
@@ -191,7 +191,7 @@ export class AccountsService {
       openDeals: 0,
       otherCosts,
       received: 0,
-      factoryPaid: 0,
+      supplierPaid: 0,
       uncosted: 0,
       profit: 0,
       bankCharges: 0,
@@ -218,7 +218,7 @@ export class AccountsService {
           goodsCostMinor: inMain(c.goodsCostMinor),
           basisCostMinor: inMain(c.basisCostMinor),
           receivedMinor: 0,
-          factoryPaidMinor: 0,
+          supplierPaidMinor: 0,
           expensesMinor: spent.onOrder,
           basisPaidMinor: spent.basisPaid,
           bankChargesMinor: bank,
@@ -234,7 +234,7 @@ export class AccountsService {
         t.beforeSale += spent.beforeSale;
         t.uncosted += revenue - costedRevenue;
         t.profit += profit;
-        t.factoryPaid += order.supplierPaid.reduce((s, x) => s + inMain(convert(decimalToMinor(x.share), Number(x.movement.rate))), 0);
+        t.supplierPaid += order.supplierPaid.reduce((s, x) => s + inMain(convert(decimalToMinor(x.share), Number(x.movement.rate))), 0);
       } else if (d.stage === "lost") {
         t.lostDeals += spent.beforeSale + spent.onOrder;
         const key = d.lostReason ?? "not_said";
@@ -356,9 +356,9 @@ export class AccountsService {
         /** Spent to win business (before sales, on lost deals, on them in general) for each order won. */
         sellingCostPerWin: won > 0 ? fromMinor(roundHalfAway(sellingCosts / won)) : null,
         received: fromMinor(t.received),
-        factoryPaid: fromMinor(t.factoryPaid),
-        /** Cash so far: in from them, less paid to factories for their orders, less everything spent on them. */
-        cash: fromMinor(t.received - t.factoryPaid - spentTotal),
+        supplierPaid: fromMinor(t.supplierPaid),
+        /** Cash so far: in from them, less paid to suppliers for their orders, less everything spent on them. */
+        cash: fromMinor(t.received - t.supplierPaid - spentTotal),
         uncostedRevenue: fromMinor(t.uncosted),
       },
       /** Profit ÷ sales on their orders, in percent (one decimal); null before any order. */
@@ -525,7 +525,7 @@ export class AccountsService {
     const kinds = new Map<string, number>();
     const reasons = new Map<string, { deals: Set<string>; spent: number }>();
     const months = new Map<string, number>();
-    const factories = new Map<string, { factory: { id: string; name: string }; visits: number; spent: number }>();
+    const suppliers = new Map<string, { factory: { id: string; name: string }; visits: number; spent: number }>();
     const customers = new Map<string, { customer: { id: string; name: string }; spent: number }>();
     let company = 0;
     let onWon = 0;
@@ -549,10 +549,10 @@ export class AccountsService {
         reasons.set(key, r);
       }
       if (e.factory && VISITS.has(e.category)) {
-        const f = factories.get(e.factory.id) ?? { factory: e.factory, visits: 0, spent: 0 };
+        const f = suppliers.get(e.factory.id) ?? { factory: e.factory, visits: 0, spent: 0 };
         f.visits += 1;
         f.spent += v;
-        factories.set(e.factory.id, f);
+        suppliers.set(e.factory.id, f);
       }
       if (!toSell(e)) continue;
       p.toSell += v;
@@ -583,7 +583,7 @@ export class AccountsService {
       lostReasons: [...reasons]
         .map(([reason, r]) => ({ reason: reason as LostReason | "not_said", deals: r.deals.size, spent: fromMinor(r.spent) }))
         .sort((a, b) => Number(b.spent) - Number(a.spent)),
-      factories: [...factories.values()].map((f) => ({ factory: f.factory, visits: f.visits, spent: fromMinor(f.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
+      factories: [...suppliers.values()].map((f) => ({ factory: f.factory, visits: f.visits, spent: fromMinor(f.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
       /** Everything spent on each customer in the period (on them, their inquiries and their orders). */
       customers: [...customers.values()].map((c) => ({ customer: c.customer, spent: fromMinor(c.spent) })).sort((a, b) => Number(b.spent) - Number(a.spent)),
       months: monthList.map((m) => ({ month: m, toSell: fromMinor(months.get(m) ?? 0) })),

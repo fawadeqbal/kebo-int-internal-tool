@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-// Every new factory offer starts fresh (decided 16 Nov 2026): choosing a factory fills nothing from its last offer;
+// Every new supplier offer starts fresh (decided 16 Nov 2026): choosing a supplier fills nothing from its last offer;
 // the window keeps the company's usual tax and advance (Settings) and what was typed.
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 
-const { OfferHeaderForm } = await import("@/components/deals/factory-quote-form");
+const { OfferHeaderForm } = await import("@/components/deals/supplier-quote-form");
 
 describe("a new supplier offer starts fresh", () => {
   const show = () =>
@@ -17,7 +17,7 @@ describe("a new supplier offer starts fresh", () => {
         today="2026-11-14"
         mainCurrency="USD"
         rates={{ USD: 1, CNY: 7.2 }}
-        searchFactories={async () => [{ id: "f1", name: "Jiangsu Filling Machinery", contactPerson: null }]}
+        searchSuppliers={async () => [{ id: "f1", name: "Jiangsu Filling Machinery", contactPerson: null }]}
         onDone={() => {}}
         defaults={{ taxIncluded: false, taxRate: 0, advancePercent: 30 }}
         files={null}
@@ -28,7 +28,7 @@ describe("a new supplier offer starts fresh", () => {
 
   it("choosing a supplier fills nothing from its last offer", async () => {
     show();
-    // The window is in steps (design 18 Nov): Factory · Prices · Delivery & payment · Warranty & conditions · Review.
+    // The window is in steps (design 18 Nov): Supplier · Prices · Delivery & payment · Warranty & conditions · Review.
     const step = (name: RegExp) =>
       fireEvent.click(screen.getByRole("navigation", { name: "Steps" }).querySelectorAll("button")[["Supplier", "Prices", "Delivery & payment", "Warranty & conditions", "Review"].findIndex((n) => name.test(n))]!);
     step(/Delivery/);

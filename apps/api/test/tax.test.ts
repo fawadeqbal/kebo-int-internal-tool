@@ -8,7 +8,7 @@ import { PrismaService } from "../src/database/prisma.service";
 import { api, signIn, startApp } from "./app";
 
 /**
- * Tax is only on factory items: each offer's prices are without tax (each line's tax % added on top) or
+ * Tax is only on supplier items: each offer's prices are without tax (each line's tax % added on top) or
  * have the tax included (the price is our cost). Sales carry no tax.
  */
 describe("tax", () => {
@@ -49,18 +49,18 @@ describe("tax", () => {
   it("starts a new offer at the company's default: without tax, 0%", async () => {
     const { inquiryId, items } = await deal("NG");
     const id = await offer(inquiryId, {
-      newFactoryName: `Taizhou Plain ${tag}`,
+      newSupplierName: `Taizhou Plain ${tag}`,
       lines: [{ requestedItemId: items[0], description: "Gear pump", quantity: 10, unitPrice: 100 }],
     });
     const q = await quoteOf(inquiryId, id);
-    expect(q).toMatchObject({ taxIncluded: false, taxRate: 0, factoryTotal: "1000.00", taxTotal: "0.00" });
+    expect(q).toMatchObject({ taxIncluded: false, taxRate: 0, supplierTotal: "1000.00", taxTotal: "0.00" });
     expect(q.lines.map((l: Line) => [l.taxRate, l.costNote])).toEqual([[0, "CNY 100.00, no tax"]]);
   });
 
   it("without tax: adds each item's tax % (the offer's unless it has its own) on top of its price", async () => {
     const { inquiryId, items } = await deal("NG");
     const id = await offer(inquiryId, {
-      newFactoryName: `Taizhou Pumps ${tag}`,
+      newSupplierName: `Taizhou Pumps ${tag}`,
       taxIncluded: false,
       taxRate: 13,
       lines: [
@@ -77,37 +77,37 @@ describe("tax", () => {
       [0, "CNY 50.00, no tax"],
       [13, "CNY 10.00 + 13% tax = CNY 11.30"],
     ]);
-    // CNY 1,510 at the factory's prices, CNY 131.30 tax on top.
-    expect(q).toMatchObject({ taxIncluded: false, taxRate: 13, factoryTotal: "1510.00", taxTotal: "131.30" });
+    // CNY 1,510 at the supplier's prices, CNY 131.30 tax on top.
+    expect(q).toMatchObject({ taxIncluded: false, taxRate: 13, supplierTotal: "1510.00", taxTotal: "131.30" });
     expect(q.lines[0]).not.toHaveProperty("hsCode");
     expect(q.lines[0]).not.toHaveProperty("rebateRate");
   });
 
   it("tax included: the price is our cost, the tax inside is shown and never added again, down to the order", async () => {
-    // The same pump from two factories: CNY 1,000 + 13% on top, and CNY 1,130 with 13% included.
+    // The same pump from two suppliers: CNY 1,000 + 13% on top, and CNY 1,130 with 13% included.
     const a = await deal("KE");
     const without = await offer(a.inquiryId, {
-      newFactoryName: `Ruian Without ${tag}`,
+      newSupplierName: `Ruian Without ${tag}`,
       taxRate: 13,
       lines: [{ requestedItemId: a.items[0], description: "Gear pump", quantity: 10, unitPrice: 1000 }],
     });
     const b = await deal("KE");
     const included = await offer(b.inquiryId, {
-      newFactoryName: `Ruian Included ${tag}`,
+      newSupplierName: `Ruian Included ${tag}`,
       taxIncluded: true,
       taxRate: 13,
       lines: [{ requestedItemId: b.items[0], description: "Gear pump", quantity: 10, unitPrice: 1130 }],
     });
     const qa = await quoteOf(a.inquiryId, without);
     const qb = await quoteOf(b.inquiryId, included);
-    expect(qb).toMatchObject({ taxIncluded: true, taxRate: 13, factoryTotal: "11300.00", taxTotal: "1300.00" });
+    expect(qb).toMatchObject({ taxIncluded: true, taxRate: 13, supplierTotal: "11300.00", taxTotal: "1300.00" });
     expect(qb.lines[0]).toMatchObject({ taxRate: 13, costNote: "CNY 1,130.00, tax 13% included (CNY 130.00)" });
     // Our cost is the same either way: 1,130 a pump.
     expect(qb.lines[0].unitCost).not.toBeNull();
     expect(qb.lines[0].unitCost).toBe(qa.lines[0].unitCost);
     expect(qb.totalCost).toBe(qa.totalCost);
 
-    // The quotation is costed from it, and the order owes the factory its prices as they are.
+    // The quotation is costed from it, and the order owes the supplier its prices as they are.
     const draft = (await api(app, sana).get(`/inquiries/${b.inquiryId}/quotation/draft`).expect(200)).body;
     const options = [{ ...draft.options[0], prices: draft.options[0].prices.map((p: Record<string, unknown>) => ({ ...p, unitPrice: 200 })) }];
     const rev = (await api(app, sana).post(`/inquiries/${b.inquiryId}/quotation/revisions`, { ...draft, options }).expect(201)).body;
@@ -116,7 +116,7 @@ describe("tax", () => {
     await api(app, sana).post(`/revisions/${rev.id}/status`, { to: "accepted" }).expect(200);
     const orderId = (await api(app, sana).get(`/inquiries/${b.inquiryId}`)).body.orders[0].id;
     const order = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body;
-    expect(order.lines[0].factoryPrice).toMatchObject({ unitPrice: "1130.00", taxRate: "13", taxIncluded: true, currency: "CNY" });
+    expect(order.lines[0].supplierPrice).toMatchObject({ unitPrice: "1130.00", taxRate: "13", taxIncluded: true, currency: "CNY" });
     const m = (await api(app, sana).get(`/orders/${orderId}/money`).expect(200)).body;
     // 10 × 1,130, not 10 × (1,130 + 13%).
     expect(m.factories.rows.map((f: { owed: string; toPay: string }) => [f.owed, f.toPay])).toEqual([["11300.00", "11300.00"]]);
@@ -125,7 +125,7 @@ describe("tax", () => {
   it("changing the offer's % changes the items that had it, not an item with its own; the audit says so", async () => {
     const { inquiryId, items } = await deal("NG");
     const id = await offer(inquiryId, {
-      newFactoryName: `Yuhuan Valves ${tag}`,
+      newSupplierName: `Yuhuan Valves ${tag}`,
       lines: [
         { requestedItemId: items[0], description: "Ball valve", quantity: 2, unitPrice: 100 },
         { requestedItemId: items[1], description: "Gasket", quantity: 2, unitPrice: 10, taxRate: 9 },
@@ -133,11 +133,11 @@ describe("tax", () => {
     });
     const q0 = await quoteOf(inquiryId, id);
     expect(q0.lines.map((l: Line) => l.taxRate)).toEqual([0, 9]);
-    const body = { factoryId: q0.factory.id, receivedOn: q0.receivedOn, currency: "CNY" };
+    const body = { supplierId: q0.factory.id, receivedOn: q0.receivedOn, currency: "CNY" };
     await api(app, sana).put(`/factory-quotes/${id}`, { ...body, taxIncluded: true, taxRate: 13 }).expect(200);
     const q1 = await quoteOf(inquiryId, id);
     // The tax inside, on the total at each %: 200 − 200/1.13 = 23.01, 20 − 20/1.09 = 1.65.
-    expect(q1).toMatchObject({ taxIncluded: true, taxRate: 13, factoryTotal: "220.00", taxTotal: "24.66" });
+    expect(q1).toMatchObject({ taxIncluded: true, taxRate: 13, supplierTotal: "220.00", taxTotal: "24.66" });
     expect(q1.lines.map((l: Line) => [l.taxRate, l.costNote])).toEqual([
       [13, "CNY 100.00, tax 13% included (CNY 11.50)"],
       [9, "CNY 10.00, tax 9% included (CNY 0.83)"],
@@ -154,7 +154,7 @@ describe("tax", () => {
     // Offers as they were before tax was per offer: lines at 13% (or their own %), the tax added on top.
     const { inquiryId, items } = await deal("NG");
     const mixed = await offer(inquiryId, {
-      newFactoryName: `Old Mixed ${tag}`,
+      newSupplierName: `Old Mixed ${tag}`,
       taxRate: 13,
       lines: [
         { requestedItemId: items[0], description: "Gear pump", quantity: 3, unitPrice: "100.50" },
@@ -163,10 +163,10 @@ describe("tax", () => {
       ],
     });
     const nine = await offer(inquiryId, {
-      newFactoryName: `Old Nine ${tag}`,
+      newSupplierName: `Old Nine ${tag}`,
       lines: [{ requestedItemId: items[0], description: "Gear pump", quantity: 1, unitPrice: 100, taxRate: 9 }],
     });
-    const empty = await offer(inquiryId, { newFactoryName: `Old Empty ${tag}` });
+    const empty = await offer(inquiryId, { newSupplierName: `Old Empty ${tag}` });
     const ids = [mixed, nine, empty];
     const before = await sourcing(inquiryId);
     // As the migration found them: no choice or % of their own yet.
@@ -196,21 +196,21 @@ describe("tax", () => {
     const lines: [string, string, number][] = [["100.50", "3", 13], ["19.85", "4.10", 9], ["1.15", "1", 13]];
     const withTax = lines.reduce((t, [p, q, r]) => t + multiplyMinor(withTaxMinor(toMinor(p), r), q), 0);
     const plain = lines.reduce((t, [p, q]) => t + multiplyMinor(toMinor(p), q), 0);
-    expect([m.factoryTotal, m.taxTotal]).toEqual([fromMinor(plain), fromMinor(withTax - plain)]);
+    expect([m.supplierTotal, m.taxTotal]).toEqual([fromMinor(plain), fromMinor(withTax - plain)]);
   });
 
   it("takes the company's default for new offers from Settings", async () => {
     const sales = (await api(app, admin).get("/settings").expect(200)).body.sales;
-    expect(sales).toMatchObject({ factoryTaxIncluded: false, factoryTaxRate: 0 });
-    await api(app, admin).put("/settings/sales", { ...sales, factoryTaxIncluded: true, factoryTaxRate: 13 }).expect(200);
+    expect(sales).toMatchObject({ supplierTaxIncluded: false, supplierTaxRate: 0 });
+    await api(app, admin).put("/settings/sales", { ...sales, supplierTaxIncluded: true, supplierTaxRate: 13 }).expect(200);
     try {
       const { inquiryId, items } = await deal("NG");
       const id = await offer(inquiryId, {
-        newFactoryName: `Cixi Default ${tag}`,
+        newSupplierName: `Cixi Default ${tag}`,
         lines: [{ requestedItemId: items[0], description: "Gear pump", quantity: 1, unitPrice: 113 }],
       });
       const q = await quoteOf(inquiryId, id);
-      expect(q).toMatchObject({ taxIncluded: true, taxRate: 13, factoryTotal: "113.00", taxTotal: "13.00" });
+      expect(q).toMatchObject({ taxIncluded: true, taxRate: 13, supplierTotal: "113.00", taxTotal: "13.00" });
       expect(q.lines[0].taxRate).toBe(13);
     } finally {
       await api(app, admin).put("/settings/sales", sales).expect(200);
@@ -221,7 +221,7 @@ describe("tax", () => {
     const { inquiryId } = await deal("CN");
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(draft).not.toHaveProperty("vatRate");
-    // No factory prices: the option is the customer's own items, priced by hand.
+    // No supplier prices: the option is the customer's own items, priced by hand.
     const [pump, seals] = draft.options[0].prices.map((p: { lineId: string }) => p.lineId);
     const options = [{ ...draft.options[0], discount: 5, prices: [{ lineId: pump, unitPrice: 20 }, { lineId: seals, unitPrice: 0 }] }];
     const r = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, vatRate: 13, options }).expect(201)).body;

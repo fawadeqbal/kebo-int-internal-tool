@@ -29,7 +29,7 @@ async function newOrder(page: Page) {
   });
   const item = (await (await page.request.get(`/api/inquiries/${inquiry.id}`)).json()).items[0].id;
   await send("post", `/inquiries/${inquiry.id}/factory-quotes`, {
-    newFactoryName: `Jinan Pharma Machinery ${tag}`,
+    newSupplierName: `Jinan Pharma Machinery ${tag}`,
     receivedOn: new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10),
     currency: "CNY",
     lines: [{ requestedItemId: item, description: "Tablet press line ZP-35D", quantity: 1, unit: "set", unitPrice: 900000 }],

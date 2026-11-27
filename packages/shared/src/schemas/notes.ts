@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isoDate, optionalId, optionalText, text } from "./common";
 
-/** What a note records: a plain note, or a call, visit, WhatsApp or email with the customer or factory. */
+/** What a note records: a plain note, or a call, visit, WhatsApp or email with the customer or supplier. */
 export const NOTE_KINDS = ["note", "call", "visit", "whatsapp", "email"] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
 export const NOTE_KIND_LABEL: Record<NoteKind, string> = {
@@ -79,9 +79,9 @@ const targets = {
   inquiryId: optionalId,
   orderId: optionalId,
   customerId: optionalId,
-  factoryId: optionalId,
+  supplierId: optionalId,
 };
-const TARGET_KEYS = ["inquiryId", "orderId", "customerId", "factoryId"] as const;
+const TARGET_KEYS = ["inquiryId", "orderId", "customerId", "supplierId"] as const;
 const oneTarget = (v: Partial<Record<(typeof TARGET_KEYS)[number], string | null | undefined>>, ctx: z.RefinementCtx) => {
   const given = TARGET_KEYS.filter((k) => v[k]);
   if (given.length > 1)
@@ -109,7 +109,7 @@ export const followUpInput = z.object(followUpFields).superRefine(oneTarget);
 export type FollowUpInput = z.infer<typeof followUpInput>;
 
 /**
- * PATCH /follow-ups/:id — the fields that change. When any of inquiryId, orderId, customerId or factoryId
+ * PATCH /follow-ups/:id — the fields that change. When any of inquiryId, orderId, customerId or supplierId
  * is sent, the follow-up is on exactly what is sent (all null or "": a general one).
  */
 export const followUpEditInput = z
@@ -123,7 +123,7 @@ export const followUpEditInput = z
     inquiryId: optionalId.optional(),
     orderId: optionalId.optional(),
     customerId: optionalId.optional(),
-    factoryId: optionalId.optional(),
+    supplierId: optionalId.optional(),
     assigneeId: optionalId.optional(),
   })
   .superRefine(oneTarget);
@@ -163,7 +163,7 @@ const flag = z
   .transform((v) => (v === undefined ? undefined : v === "true"));
 const optionalDay = z.preprocess(blank, isoDate().optional());
 
-/** GET /follow-ups?mine=true&on=&from=&to=&open=true|false&inquiryId|orderId|customerId|factoryId&page&pageSize */
+/** GET /follow-ups?mine=true&on=&from=&to=&open=true|false&inquiryId|orderId|customerId|supplierId&page&pageSize */
 export const followUpListQuery = z
   .object({
     /** Only those for me. Without it: everyone's (followups.viewAll), else those for me or made by me. */

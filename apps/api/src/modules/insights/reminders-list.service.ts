@@ -51,7 +51,7 @@ const shortHash = (s: string) => createHash("sha1").update(s).digest("hex").slic
  * "Needs attention" on Home: what each person has to do now, worked out from
  * the data every time — orders that need a step or money, quotations about to
  * expire or with no answer, deals nobody started or past their needed-by date,
- * factory prices running out, and (for managers) the money warnings. A person
+ * supplier prices running out, and (for managers) the money warnings. A person
  * can mark one done or put it off; it comes back when it changes.
  */
 @Injectable()
@@ -207,9 +207,9 @@ export class RemindersListService {
         });
     }
 
-    // 4. Factory prices running out on deals still open.
+    // 4. Supplier prices running out on deals still open.
     if (can(user, "sourcing.manage")) {
-      const offers = await this.prisma.db.factoryQuote.findMany({
+      const offers = await this.prisma.db.supplierQuote.findMany({
         where: {
           deletedAt: null,
           validUntil: { lte: toDbDate(addDays(today, 3)) },
@@ -238,7 +238,7 @@ export class RemindersListService {
       }
     }
 
-    // 6. The order flow (each part only with its module): factories not answering, production
+    // 6. The order flow (each part only with its module): suppliers not answering, production
     //    running late, the LC's dates, arrivals, papers missing after sailing, the SAT, open claims.
     items.push(...(await this.flowItems(user, today, nameOf)));
 
@@ -290,9 +290,9 @@ export class RemindersListService {
     const soon = addDays(today, 3);
     const days = (from: ISODate) => daysBetween(from, today);
 
-    // Factories asked for a price that have not answered (people who see factory prices).
+    // Suppliers asked for a price that have not answered (people who see supplier prices).
     if ((await on("factory_requests")) && can(user, "sourcing.manage")) {
-      const waiting = await this.prisma.db.factoryRequest.findMany({
+      const waiting = await this.prisma.db.supplierRequest.findMany({
         where: {
           status: "sent",
           sentOn: { lte: toDbDate(addDays(today, -3)) },
@@ -302,21 +302,21 @@ export class RemindersListService {
           id: true,
           sentOn: true,
           replyBy: true,
-          factoryId: true,
+          supplierId: true,
           factory: { select: { name: true } },
           inquiry: {
             select: {
               id: true,
               refNo: true,
               assignee: { select: { name: true } },
-              factoryQuotes: { where: { deletedAt: null }, select: { factoryId: true } },
+              supplierQuotes: { where: { deletedAt: null }, select: { supplierId: true } },
             },
           },
         },
         take: 200,
       });
       for (const r of waiting) {
-        if (r.inquiry.factoryQuotes.some((q) => q.factoryId === r.factoryId)) continue; // their offer is in
+        if (r.inquiry.supplierQuotes.some((q) => q.supplierId === r.supplierId)) continue; // their offer is in
         const sent = fromDbDate(r.sentOn);
         const replyBy = fromDbDateOrNull(r.replyBy);
         out.push({
@@ -336,7 +336,7 @@ export class RemindersListService {
     const orders = { status: "open" as const, ...orderAccess(user) };
     const handler = { inquiry: { select: { assignee: { select: { name: true } } } } };
 
-    // What the order's sections say is late: the ready date passed and the goods not all in, a factory
+    // What the order's sections say is late: the ready date passed and the goods not all in, a supplier
     // test planned and not done (both with the production module), our ship-by date passed and nothing left.
     const [withProduction, withShipping] = [await on("production"), await on("shipping")];
     if (withProduction || withShipping) {
@@ -354,8 +354,8 @@ export class RemindersListService {
           refNo: true,
           shipBy: true,
           ...handler,
-          factories: { select: { factoryId: true, readyOn: true, fatPlannedOn: true, fatDoneOn: true, factory: { select: { name: true } } } },
-          lines: { where: { type: "goods" }, select: { quantity: true, receivedQty: true, factoryId: true } },
+          factories: { select: { supplierId: true, readyOn: true, fatPlannedOn: true, fatDoneOn: true, factory: { select: { name: true } } } },
+          lines: { where: { type: "goods" }, select: { quantity: true, receivedQty: true, supplierId: true } },
           shipments: { select: { status: true, departedOn: true } },
         },
         take: 200,

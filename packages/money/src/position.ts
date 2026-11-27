@@ -1,5 +1,5 @@
 import { divideMinor, multiplyMinor, percentOfMinor, roundHalfAway, type Minor } from "./core";
-import { factoryUnitCostMinor, fxRate, type Rates } from "./costing";
+import { supplierUnitCostMinor, fxRate, type Rates } from "./costing";
 import { settle, type PaymentLike, type SettlementStatus } from "./settlement";
 
 /**
@@ -127,11 +127,11 @@ export function expenseIn(e: { amountMinor: Minor; currency: string; rate: numbe
   return multiplyMinor(divideMinor(e.amountMinor, e.rate), perMain);
 }
 
-/* ---------------------------------------------------------------- factories */
+/* ---------------------------------------------------------------- suppliers */
 
-export interface FactoryLineFacts {
-  factoryId: string;
-  /** The factory's currency (frozen on the line). */
+export interface SupplierLineFacts {
+  supplierId: string;
+  /** The supplier's currency (frozen on the line). */
   currency: string;
   unitPriceMinor: Minor;
   taxRate: number | string;
@@ -139,25 +139,25 @@ export interface FactoryLineFacts {
   quantity: number | string;
 }
 
-export interface FactoryPaidFacts {
-  factoryId: string;
+export interface SupplierPaidFacts {
+  supplierId: string;
   currency: string;
   amountMinor: Minor;
 }
 
-/** An expense the factory bears: taken off what we owe it. */
-export interface FactoryBorneFacts {
-  factoryId: string;
+/** An expense the supplier bears: taken off what we owe it. */
+export interface SupplierBorneFacts {
+  supplierId: string;
   currency: string;
   amountMinor: Minor;
   /** Units of its currency per one unit of the main currency when it was spent. */
   rate: number | string;
 }
 
-export interface FactoryOwing {
-  /** "factoryId:currency". */
+export interface SupplierOwing {
+  /** "supplierId:currency". */
   key: string;
-  factoryId: string;
+  supplierId: string;
   currency: string;
   /** What its lines cost us (price with tax unless included, × quantity). */
   owedMinor: Minor;
@@ -175,40 +175,40 @@ export interface FactoryOwing {
 }
 
 /**
- * What we owe each factory on an order, in the factory's currency, and where it
- * stands: owed (with tax, through factoryUnitCostMinor) − paid − expenses it
- * bears. One row per factory and currency, in the order of the lines (then
- * factories only paid, owed 0). An expense the factory bears counts against its
+ * What we owe each supplier on an order, in the supplier's currency, and where it
+ * stands: owed (with tax, through supplierUnitCostMinor) − paid − expenses it
+ * bears. One row per supplier and currency, in the order of the lines (then
+ * suppliers only paid, owed 0). An expense the supplier bears counts against its
  * row in the expense's currency, else its row in the first currency (A→Z); in
  * another currency it is turned at its own rate into the main currency, then at
  * the Settings rate into the row's (left out when that rate is missing).
  */
-export function factoryPosition(lines: FactoryLineFacts[], paid: FactoryPaidFacts[], borne: FactoryBorneFacts[], fx: Fx): FactoryOwing[] {
-  const rows = new Map<string, FactoryOwing>();
-  const row = (factoryId: string, currency: string) => {
-    const key = `${factoryId}:${currency}`;
+export function supplierPosition(lines: SupplierLineFacts[], paid: SupplierPaidFacts[], borne: SupplierBorneFacts[], fx: Fx): SupplierOwing[] {
+  const rows = new Map<string, SupplierOwing>();
+  const row = (supplierId: string, currency: string) => {
+    const key = `${supplierId}:${currency}`;
     let r = rows.get(key);
     if (!r) {
-      r = { key, factoryId, currency, owedMinor: 0, lines: 0, paidMinor: 0, takenOffMinor: 0, settledMinor: 0, toPayMinor: 0, overpaidMinor: 0 };
+      r = { key, supplierId, currency, owedMinor: 0, lines: 0, paidMinor: 0, takenOffMinor: 0, settledMinor: 0, toPayMinor: 0, overpaidMinor: 0 };
       rows.set(key, r);
     }
     return r;
   };
   for (const l of lines) {
-    const r = row(l.factoryId, l.currency);
-    r.owedMinor += multiplyMinor(factoryUnitCostMinor(l.unitPriceMinor, l.taxRate, l.taxIncluded), l.quantity);
+    const r = row(l.supplierId, l.currency);
+    r.owedMinor += multiplyMinor(supplierUnitCostMinor(l.unitPriceMinor, l.taxRate, l.taxIncluded), l.quantity);
     r.lines += 1;
   }
-  // Expenses count only against what its lines owe (before the rows of factories only paid are added).
+  // Expenses count only against what its lines owe (before the rows of suppliers only paid are added).
   for (const e of borne) {
-    const mine = [...rows.values()].filter((r) => r.factoryId === e.factoryId);
+    const mine = [...rows.values()].filter((r) => r.supplierId === e.supplierId);
     const target = mine.find((r) => r.currency === e.currency) ?? [...mine].sort((a, b) => a.currency.localeCompare(b.currency))[0];
     if (!target) continue;
     const per = target.currency === fx.main ? 1 : fxRate(target.currency, fx.main, fx.main, fx.rates);
     const minor = expenseIn(e, target.currency, per);
     if (minor !== null) target.takenOffMinor += minor;
   }
-  for (const p of paid) row(p.factoryId, p.currency).paidMinor += p.amountMinor;
+  for (const p of paid) row(p.supplierId, p.currency).paidMinor += p.amountMinor;
   for (const r of rows.values()) {
     r.settledMinor = r.paidMinor + r.takenOffMinor;
     r.toPayMinor = Math.max(r.owedMinor - r.settledMinor, 0);

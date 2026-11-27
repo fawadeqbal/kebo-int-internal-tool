@@ -51,7 +51,7 @@ export interface StageWarning {
   message: string;
 }
 
-/** The goods side of an order: what came in from the factory, and whether the packing list is made. */
+/** The goods side of an order: what came in from the supplier, and whether the packing list is made. */
 export interface OrderGoods {
   /** Goods lines still short, e.g. "Maize sheller: 60 of 100 pcs". */
   short: string[];
@@ -115,7 +115,7 @@ export function checkMove(from: OrderStage, to: OrderStage, status: OrderStatus,
 export interface OrderReminderDays {
   /** Confirmed without the deposit for this many days. */
   depositDays: number;
-  /** In production this long when the factory gave no ready date. */
+  /** In production this long when the supplier gave no ready date. */
   productionDays: number;
   /** Shipped with money still due this many days after the ship date. */
   balanceDays: number;
@@ -129,7 +129,7 @@ export interface OrderFacts extends OrderMoney {
   currency: string;
   /** The day the stage was entered. */
   stageSince: ISODate;
-  /** Expected ready date from the factory, if known. */
+  /** Expected ready date from the supplier, if known. */
   readyOn: ISODate | null;
   shippedOn: ISODate | null;
   goods?: OrderGoods;

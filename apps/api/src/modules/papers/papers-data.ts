@@ -1,5 +1,5 @@
 import { asSupplierPayment, purchasesWithEntry, asPayment, decimalToMinor, fromDbDate, fromDbDateOrNull, livePartsWithEntry, type Prisma, routeOf } from "@kebo/database";
-import { documentTotals, factoryUnitCostMinor, formatMinor, fromMinor, multiplyMinor, spreadPayments, toMinor } from "@kebo/money";
+import { documentTotals, supplierUnitCostMinor, formatMinor, fromMinor, multiplyMinor, spreadPayments, toMinor } from "@kebo/money";
 import {
   DELIVERY_CONDITION_LABEL,
   deliveryConditionOf,
@@ -15,8 +15,8 @@ import {
   countText,
   orderPaymentSentence,
   planStatus,
-  FACTORY_DUE_RULE_LABEL,
-  type FactoryDueRule,
+  SUPPLIER_DUE_RULE_LABEL,
+  type SupplierDueRule,
   documentDone,
   documentsInUse,
   packingListNo,
@@ -42,15 +42,15 @@ import {
 } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import { orderLineNumbers } from "../orders/orders.service";
-import { factoryPositionOf, fxOf, positionOf as orderPositionOf } from "../billing/api";
+import { supplierPositionOf, fxOf, positionOf as orderPositionOf } from "../billing/api";
 import { lcBalanceMinor, termsOf } from "../billing/api";
 import { quotedTermsPrinted } from "../orders/order-docs";
 import { SHIPMENT_ORDER, shipFacts } from "../orders/shipment-facts";
-import { factoryReadyOf, readySelect } from "@kebo/database";
+import { supplierReadyOf, readySelect } from "@kebo/database";
 import { livePlanOfOrder } from "../billing/api";
 import { startingPlan } from "../billing/api";
 import { figuresOf, optionFigures } from "../quotations/revision-figures";
-import { factoryAgreed, offerTermsSelect, poTermsSelect } from "../flow/factory-terms";
+import { supplierAgreed, offerTermsSelect, poTermsSelect } from "../flow/supplier-terms";
 
 /** Everything one order's papers are made from, read in one query. */
 export const paperOrderInclude = {
@@ -62,13 +62,13 @@ export const paperOrderInclude = {
         select: {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
-          factoryQuoteLineId: true,
-          // The offer: the factory's plan starts from its payment (its parts, else its advance %), and the PO
+          supplierQuoteLineId: true,
+          // The offer: the supplier's plan starts from its payment (its parts, else its advance %), and the PO
           // prints which offer it was, its delivery basis, lead time and warranty (design "terms that travel").
-          factoryQuoteLine: {
+          supplierQuoteLine: {
             select: {
               parentId: true,
-              factoryQuote: { select: { advancePercent: true, ...offerTermsSelect } },
+              supplierQuote: { select: { advancePercent: true, ...offerTermsSelect } },
             },
           },
         },
@@ -78,18 +78,18 @@ export const paperOrderInclude = {
   },
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
   revision: { include: { quotation: { select: { refNo: true } }, ...optionFigures } },
-  // What was agreed with each factory, kept on its purchase order once sent (design "terms that travel").
+  // What was agreed with each supplier, kept on its purchase order once sent (design "terms that travel").
   purchaseOrders: { select: { supplierId: true, number: true, ...poTermsSelect } },
   // Receipts are numbered when the payment is recorded (its allocation's receiptNo); listed in date order.
   allocations: livePartsWithEntry,
   receivables: { orderBy: { sortOrder: "asc" } },
   supplierPaid: purchasesWithEntry,
   payables: { orderBy: { sortOrder: "asc" } },
-  // Charged to the customer (added to what they owe) or borne by a factory (taken off what we owe it).
+  // Charged to the customer (added to what they owe) or borne by a supplier (taken off what we owe it).
   expenses: {
     where: { voidedAt: null, borneBy: { in: ["customer", "factory"] } },
     orderBy: [{ spentOn: "asc" }, { createdAt: "asc" }],
-    select: { id: true, amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, factoryId: true, description: true, spentOn: true },
+    select: { id: true, amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, supplierId: true, description: true, spentOn: true },
   },
   bankContract: true,
   // Shipment 1 (the primary: the first made) first; the papers print it.
@@ -102,10 +102,10 @@ export const paperOrderInclude = {
   papers: { orderBy: [{ version: "asc" }] },
   delivery: { include: { satEngineer: { select: { name: true } } } },
   inquiry: { select: { id: true, contactId: true } },
-  // Each factory's ready date (its purchase order prints its own), and the papers' day at the customer's bank
+  // Each supplier's ready date (its purchase order prints its own), and the papers' day at the customer's bank
   // (an LC's instalment is due from it): what the plan's dates are worked out from.
   ...readySelect,
-  // Each factory's ready date, and its factory test (the FAT report prints from it).
+  // Each supplier's ready date, and its factory test (the FAT report prints from it).
   factories: {
     select: {
       ...readySelect.factories.select,
@@ -141,7 +141,7 @@ export interface PaperCtx {
   /** null: every module. */
   features: readonly string[] | null;
   options: PaperOptions;
-  /** Which payment, plan item ("balance": the rest) or factory. */
+  /** Which payment, plan item ("balance": the rest) or supplier. */
   ref: string;
   statement: StatementData | null;
   /** The paper's own number when it has one: a purchase order's PO-2026-0044 (purchase_orders), not one made from the order's. */
@@ -156,7 +156,7 @@ export interface PaperCtx {
 export interface Built {
   checks: PaperCheck[];
   doc: Omit<PaperDoc, "kind" | "title" | "numberLabel" | "number" | "company" | "party"> & { party?: Party };
-  /** The "-n" of the number (the second receipt, the second factory's order). */
+  /** The "-n" of the number (the second receipt, the second supplier's order). */
   n?: number | null;
 }
 
@@ -542,52 +542,52 @@ function commercialInvoice(c: PaperCtx): Built {
   };
 }
 
-/** The factories of the order's lines, in the order they first appear. */
-export function factoriesOf(o: PaperOrder) {
+/** The suppliers of the order's lines, in the order they first appear. */
+export function suppliersOf(o: PaperOrder) {
   return [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
 }
 
 /**
  * A purchase order's tax, from the prices frozen on the order's lines: whether
- * they had the tax in them and at what %. Its total is what we owe the factory
- * (factoryUnitCostMinor × quantity, as on the order's money); with tax added
+ * they had the tax in them and at what %. Its total is what we owe the supplier
+ * (supplierUnitCostMinor × quantity, as on the order's money); with tax added
  * on top, also the prices' own total. The sentence: "Prices include 13% tax.",
  * "Prices are without tax; 13% tax is added on top.", or none at 0%.
  */
-export function poTax(lines: { factoryUnitPrice: Prisma.Decimal | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[]) {
-  const taxed = lines.filter((l) => l.factoryUnitPrice !== null && Number(l.factoryTaxRate ?? 0) > 0);
-  const pricesMinor = lines.reduce((t, l) => t + multiplyMinor(decimalToMinor(l.factoryUnitPrice ?? 0), l.quantity.toString()), 0);
+export function poTax(lines: { supplierUnitPrice: Prisma.Decimal | null; supplierTaxRate: Prisma.Decimal | null; supplierTaxIncluded: boolean; quantity: Prisma.Decimal }[]) {
+  const taxed = lines.filter((l) => l.supplierUnitPrice !== null && Number(l.supplierTaxRate ?? 0) > 0);
+  const pricesMinor = lines.reduce((t, l) => t + multiplyMinor(decimalToMinor(l.supplierUnitPrice ?? 0), l.quantity.toString()), 0);
   const owedMinor = lines.reduce(
     (t, l) =>
-      t + multiplyMinor(factoryUnitCostMinor(decimalToMinor(l.factoryUnitPrice ?? 0), l.factoryTaxRate?.toString() ?? 0, l.factoryTaxIncluded), l.quantity.toString()),
+      t + multiplyMinor(supplierUnitCostMinor(decimalToMinor(l.supplierUnitPrice ?? 0), l.supplierTaxRate?.toString() ?? 0, l.supplierTaxIncluded), l.quantity.toString()),
     0,
   );
-  const rates = [...new Set(taxed.map((l) => Number(l.factoryTaxRate)))].sort((a, b) => a - b);
+  const rates = [...new Set(taxed.map((l) => Number(l.supplierTaxRate)))].sort((a, b) => a - b);
   const rate = rates.length === 1 ? rates[0]! : null;
   const pct = rate === null ? `${rates.join("% or ")}% (by item)` : `${rate}%`;
-  const included = taxed.length > 0 && taxed.every((l) => l.factoryTaxIncluded);
-  const added = taxed.some((l) => !l.factoryTaxIncluded);
+  const included = taxed.length > 0 && taxed.every((l) => l.supplierTaxIncluded);
+  const added = taxed.some((l) => !l.supplierTaxIncluded);
   const sentence = !taxed.length ? null : included ? `Prices include ${pct} tax.` : `Prices are without tax; ${pct} tax is added on top.`;
   return { pricesMinor, owedMinor, rate, added, sentence };
 }
 
 /**
  * "Payment: Advance 30%, CNY 3,390.00, when we order; Balance 70%, CNY 7,910.00,
- * on the ready date." from the factory's payment plan on the order (the
+ * on the ready date." from the supplier's payment plan on the order (the
  * company's default until one is saved), as the plan card shows it.
  */
-function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMinor: number): string | null {
-  const stored = c.o.payables.filter((r) => r.supplierId === factoryId && r.currency === currency);
+function poPaymentTerms(c: PaperCtx, supplierId: string, currency: string, owedMinor: number): string | null {
+  const stored = c.o.payables.filter((r) => r.supplierId === supplierId && r.currency === currency);
   const rows = stored.length
     ? stored.map((r) => ({
         label: r.label,
         percent: r.percent === null ? null : Number(r.percent),
         amountMinor: decimalToMinor(r.amount),
-        dueRule: r.dueRule as FactoryDueRule,
+        dueRule: r.dueRule as SupplierDueRule,
         dueOn: fromDbDateOrNull(r.dueOn),
         dueDays: r.dueDays,
       }))
-    : startingPlan(c.o.lines, factoryId, c.settings.sales.factoryAdvancePercent, owedMinor);
+    : startingPlan(c.o.lines, supplierId, c.settings.sales.supplierAdvancePercent, owedMinor);
   if (!rows.length || owedMinor <= 0) return null;
   const when = (r: (typeof rows)[number]) =>
     r.dueRule === "on_order"
@@ -598,26 +598,26 @@ function poPaymentTerms(c: PaperCtx, factoryId: string, currency: string, owedMi
           ? `${r.dueDays ?? 0} days after shipping`
           : r.dueOn
             ? `by ${paperDateText(r.dueOn)}`
-            : FACTORY_DUE_RULE_LABEL[r.dueRule];
+            : SUPPLIER_DUE_RULE_LABEL[r.dueRule];
   const named = (r: (typeof rows)[number]) =>
     r.percent !== null && !/%/.test(r.label) ? `${r.label} ${Math.round(r.percent * 100) / 100}%` : r.label;
   return `Payment: ${rows.map((r) => `${named(r)}, ${formatMinor(r.amountMinor, currency)}, ${when(r)}`).join("; ")}.`;
 }
 
-/** What the factory said in a PO paper's words: the lead time counts from our advance, our order, or the drawings. */
+/** What the supplier said in a PO paper's words: the lead time counts from our advance, our order, or the drawings. */
 const PO_LEAD_FROM: Record<string, string> = { after_payment: "after our deposit", after_order: "after our order", after_drawings: "after the drawings are approved" };
 
 /**
- * What was agreed with the factory, as its purchase order prints it (design "terms that travel", step 3): the offer
+ * What was agreed with the supplier, as its purchase order prints it (design "terms that travel", step 3): the offer
  * its lines were bought on ("Your offer", its number and day), the delivery basis, the lead time with the ready date,
  * the warranty, the payment note and our notes — the purchase order's own copy once sent, else the offer's. An offer
  * that says none of it prints as before.
  */
-function poOffer(c: PaperCtx, factoryId: string | null, lines: PaperCtx["o"]["lines"], readyOn: ISODate | null) {
-  const q = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((x) => !!x) ?? null;
-  const po = c.o.purchaseOrders.find((p) => p.supplierId === factoryId) ?? null;
+function poOffer(c: PaperCtx, supplierId: string | null, lines: PaperCtx["o"]["lines"], readyOn: ISODate | null) {
+  const q = lines.map((l) => l.quoteLine?.supplierQuoteLine?.supplierQuote).find((x) => !!x) ?? null;
+  const po = c.o.purchaseOrders.find((p) => p.supplierId === supplierId) ?? null;
   if (!q && !po?.termsCopied) return null;
-  const a = po ? factoryAgreed(po, q) : factoryAgreed({ termsCopied: false } as Parameters<typeof factoryAgreed>[0], q);
+  const a = po ? supplierAgreed(po, q) : supplierAgreed({ termsCopied: false } as Parameters<typeof supplierAgreed>[0], q);
   const basis = a.basis ? `${a.basis}${a.basisPlace ? ` ${a.basisPlace}` : ""}` : null;
   const lead =
     a.leadDays !== null
@@ -636,25 +636,25 @@ function poOffer(c: PaperCtx, factoryId: string | null, lines: PaperCtx["o"]["li
 }
 
 function purchaseOrder(c: PaperCtx): Built {
-  const factories = factoriesOf(c.o);
-  const f = factories.find((x) => x.id === c.ref) ?? factories[0] ?? null;
+  const suppliers = suppliersOf(c.o);
+  const f = suppliers.find((x) => x.id === c.ref) ?? suppliers[0] ?? null;
   const { lines } = linesOf(c);
-  const mine = lines.filter((l) => f && l.factoryId === f.id);
-  // The factory's currency, frozen on its lines (never guessed).
-  const currency = mine.find((l) => l.factoryCurrency)?.factoryCurrency ?? null;
-  const priced = mine.filter((l) => l.factoryUnitPrice !== null);
-  // This factory's own ready date (one per factory).
-  const readyOn = factoryReadyOf(c.o, f?.id ?? null);
+  const mine = lines.filter((l) => f && l.supplierId === f.id);
+  // The supplier's currency, frozen on its lines (never guessed).
+  const currency = mine.find((l) => l.supplierCurrency)?.supplierCurrency ?? null;
+  const priced = mine.filter((l) => l.supplierUnitPrice !== null);
+  // This supplier's own ready date (one per supplier).
+  const readyOn = supplierReadyOf(c.o, f?.id ?? null);
   const tax = poTax(priced);
-  const paid = c.o.supplierPaid.map(asSupplierPayment).filter((p) => f && p.factoryId === f.id);
-  // Where we stand with this factory, as on the order's money (factoryPosition): paid, what it bears, still to pay.
-  const position = f && currency ? (factoryPositionOf(c.o, fxOf(c.settings, has(c, "expenses"))).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
-  const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.factoryId === f.id);
+  const paid = c.o.supplierPaid.map(asSupplierPayment).filter((p) => f && p.supplierId === f.id);
+  // Where we stand with this supplier, as on the order's money (supplierPosition): paid, what it bears, still to pay.
+  const position = f && currency ? (supplierPositionOf(c.o, fxOf(c.settings, has(c, "expenses"))).find((r) => r.key === `${f.id}:${currency}`) ?? null) : null;
+  const borne = c.o.expenses.filter((e) => f && e.borneBy === "factory" && e.supplierId === f.id);
   const terms = f && currency ? poPaymentTerms(c, f.id, currency, tax.owedMinor) : null;
   const offer = poOffer(c, f?.id ?? null, mine, readyOn);
   const poNumber = (f && c.o.purchaseOrders.find((p) => p.supplierId === f.id)?.number) || null;
   return {
-    n: factories.length > 1 && f ? factories.indexOf(f) + 1 : null,
+    n: suppliers.length > 1 && f ? suppliers.indexOf(f) + 1 : null,
     checks: [
       check("factory", "Supplier", f?.name ?? "no item has a supplier", !!f, { required: true, href: "factory" }),
       check("lines", "Supplier items", `${mine.length} item${mine.length === 1 ? "" : "s"} from the order's item table`, mine.length > 0, {
@@ -674,7 +674,7 @@ function purchaseOrder(c: PaperCtx): Built {
     ],
     doc: {
       party: { name: f?.name ?? "Supplier", address: f?.address ?? null },
-      date: fromDbDateOrNull(c.o.factoryOrderedOn) ?? c.today,
+      date: fromDbDateOrNull(c.o.supplierOrderedOn) ?? c.today,
       meta: [
         // The purchase order's own number, with the sales order it is for (review 24 Nov: it asked the supplier to
         // quote the SO number).
@@ -690,12 +690,12 @@ function purchaseOrder(c: PaperCtx): Built {
         // The supplier reads Chinese: the item's Chinese prints under it on the order in English + 中文.
         item: { item: l.description, model: l.model, zh: l.descriptionZh },
         qty: qty(l.quantity, l.unit),
-        price: l.factoryUnitPrice !== null && currency ? money(l.factoryUnitPrice.toString(), currency) : "",
+        price: l.supplierUnitPrice !== null && currency ? money(l.supplierUnitPrice.toString(), currency) : "",
         // Exact: price × quantity in minor units (as what we owe is worked out), not floating point.
         amount:
-          l.factoryUnitPrice !== null && currency ? money(fromMinor(multiplyMinor(decimalToMinor(l.factoryUnitPrice), l.quantity.toString())), currency) : "",
+          l.supplierUnitPrice !== null && currency ? money(fromMinor(multiplyMinor(decimalToMinor(l.supplierUnitPrice), l.quantity.toString())), currency) : "",
       })),
-      // Tax added on top: the prices' total, the tax and the total with tax (what we owe the factory).
+      // Tax added on top: the prices' total, the tax and the total with tax (what we owe the supplier).
       sums:
         tax.added && currency
           ? [
@@ -713,7 +713,7 @@ function purchaseOrder(c: PaperCtx): Built {
         ...(offer?.note ? [offer.note] : []),
         ...(offer?.warranty ? [offer.warranty] : []),
         ...paid.map((p) => ({ label: `Paid on ${paperDateText(fromDbDate(p.paidOn))}:`, value: money(p.amount.toString(), p.currency) })),
-        // Expenses the factory bears come off what we owe it (as on the order's money).
+        // Expenses the supplier bears come off what we owe it (as on the order's money).
         ...borne.map((e) => ({ label: `Charged to you on ${paperDateText(fromDbDate(e.spentOn))}:`, value: money(e.amount.toString(), e.currency) })),
         ...(position && (paid.length || borne.length) ? [{ label: "Still to pay:", value: money(fromMinor(position.toPayMinor), position.currency) }] : []),
         `Please quote our order number ${poNumber ?? c.o.refNo} on every document and on the packing.`,

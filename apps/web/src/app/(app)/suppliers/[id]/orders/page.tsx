@@ -1,7 +1,7 @@
 import { DataRow, EmptyState, PhoneList, PhoneRow, RefCode, StatusBadge, Td, Th, THead } from "@kebo/ui";
 import { requirePermission } from "@/lib/session";
 import { TabList } from "@/components/lists/tab-list";
-import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
+import { supplierOf, supplierPayablesOf } from "@/lib/party-data";
 import { date, whole } from "@/lib/format";
 import { DataTable } from "@/components/common/data-table";
 import { supplierTitle } from "@/lib/titles";
@@ -12,10 +12,10 @@ export const generateMetadata = supplierTitle("Orders");
  * The supplier's Orders tab (in the board's table style): what it is making for us, with the day it should be
  * ready, and every order we still owe it money on, with what is left to pay.
  */
-export default async function FactoryOrders({ params }: { params: Promise<{ id: string }> }) {
+export default async function SupplierOrders({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requirePermission("sourcing.manage");
-  const [f, payables] = await Promise.all([factoryOf(id), factoryPayablesOf(id)]);
+  const [f, payables] = await Promise.all([supplierOf(id), supplierPayablesOf(id)]);
   const owed = new Map(
     payables.flatMap((p) => p.orders.filter((o) => Number(o.toPay) > 0.005).map((o) => [o.id, { ...o, currency: p.currency }] as const)),
   );

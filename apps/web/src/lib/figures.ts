@@ -198,7 +198,7 @@ export const how = {
   customersOwe:
     "Every order that still has money to come from its customer: its total and any charges, less what was paid, in the order's own currency. The most days late first, then by the day the next part is due.",
 
-  /** Reports › Overview: the factories' parts late or due within 7 days (billing/to-pay), and the bills that wait (money/bills). */
+  /** Reports › Overview: the suppliers' parts late or due within 7 days (billing/to-pay), and the bills that wait (money/bills). */
   toPaySoon:
     "What we owe suppliers with a part late or due in the next 7 days, and every bill and person to pay back that waits now, each in its own currency. The most days late first.",
 

@@ -86,7 +86,7 @@ export interface Funnel {
   lostReasons: { reason: string; label: string; count: number }[];
 }
 
-export interface FactoryGroupRow {
+export interface SupplierGroupRow {
   period: string;
   key: string;
   label: string;
@@ -105,12 +105,12 @@ export interface FactoryGroupRow {
   lastOrderedOn: string | null;
 }
 
-export interface FactoryGroups {
+export interface SupplierGroups {
   currency: string;
   seeMoney: boolean;
   period: string;
   by: string;
-  rows: FactoryGroupRow[];
+  rows: SupplierGroupRow[];
 }
 
 export interface Aging {
@@ -171,8 +171,8 @@ export interface FactOrders {
   rows: FactOrderRow[];
 }
 
-/** GET /insights/facts/factory-orders?factoryId: one factory's orders (the supplier's "Purchase orders"). */
-export interface FactoryOrders {
+/** GET /insights/facts/factory-orders?supplierId: one supplier's orders (the supplier's "Purchase orders"). */
+export interface SupplierOrders {
   currency: string;
   rows: {
     orderId: string;

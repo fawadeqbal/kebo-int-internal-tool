@@ -91,10 +91,10 @@ export async function editPaymentAction(
   return { ...r, detail: `Now ${money(body.receivedAmount ?? "0", body.receivedCurrency)} · your reason is kept in History` };
 }
 
-const factoryBody = (form: FormData) => {
+const supplierBody = (form: FormData) => {
   const v = formValues(form);
   return {
-    factoryId: v.factoryId,
+    supplierId: v.supplierId,
     kind: v.kind,
     amount: v.amount,
     currency: v.currency,
@@ -110,8 +110,8 @@ const factoryBody = (form: FormData) => {
   };
 };
 
-/** Money sent to a factory (paymentId null = new; a change always asks why). */
-export async function factoryPaymentAction(
+/** Money sent to a supplier (paymentId null = new; a change always asks why). */
+export async function supplierPaymentAction(
   orderId: string,
   paymentId: string | null,
   /** A change: the payment's updatedAt when the form was opened (someone else's change since is not overwritten). */
@@ -119,7 +119,7 @@ export async function factoryPaymentAction(
   _prev: ActionState,
   form: FormData,
 ): Promise<ActionState> {
-  const body = factoryBody(form);
+  const body = supplierBody(form);
   const r = await attempt(
     form,
     () =>
@@ -130,7 +130,7 @@ export async function factoryPaymentAction(
   );
   if (!r.ok) return r;
   refresh(orderId);
-  // Named: how much to which factory, and what is still to pay it.
+  // Named: how much to which supplier, and what is still to pay it.
   const d = r.data as
     | {
         createdId?: string;
@@ -160,7 +160,7 @@ export async function factoryPaymentAction(
   };
 }
 
-export async function voidFactoryPaymentAction(
+export async function voidSupplierPaymentAction(
   orderId: string,
   paymentId: string,
   _prev: ActionState,
@@ -193,7 +193,7 @@ export async function expenseAction(
     orderId: orderId ?? (v.orderId || null),
     inquiryId: orderId ? null : v.inquiryId || null,
     customerId: orderId ? null : v.customerId || null,
-    factoryId: v.factoryId || null,
+    supplierId: v.supplierId || null,
     category: v.category,
     // A form may name it after its kind when "What" is left empty.
     description: v.description?.trim() || v.descriptionDefault?.trim() || "",
@@ -236,7 +236,7 @@ export async function expenseAction(
   };
 }
 
-/** What a cost can be for (customers, inquiries, orders) and the factories one visits: the cost window loads it when it opens. Null when this person may not see them. */
+/** What a cost can be for (customers, inquiries, orders) and the suppliers one visits: the cost window loads it when it opens. Null when this person may not see them. */
 export async function costChoicesAction(): Promise<ExpenseTargets | null> {
   try {
     return await api.get<ExpenseTargets>("/expenses/targets");
@@ -245,7 +245,7 @@ export async function costChoicesAction(): Promise<ExpenseTargets | null> {
   }
 }
 
-/** Removes the proof kept with a payment: `in` from a customer, `out` to a factory. */
+/** Removes the proof kept with a payment: `in` from a customer, `out` to a supplier. */
 export async function removePaymentFileAction(side: "in" | "out", paymentId: string, orderId: string): Promise<ActionState> {
   const r = await attempt(null, () => api.delete(`/${side === "in" ? "payments" : "factory-payments"}/${paymentId}/file`), "File removed.");
   if (r.ok) refresh(orderId);
@@ -425,8 +425,8 @@ export async function saveTargetRowAction(
   return r;
 }
 
-/** The factory's payment plan on an order (people who see factory money): its parts as JSON `payload`. */
-export async function factoryPlanAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+/** The supplier's payment plan on an order (people who see supplier money): its parts as JSON `payload`. */
+export async function supplierPlanAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const r = await attempt(form, () => api.put(`/orders/${orderId}/factory-plan`, formBody(form)), "Plan saved.");
   if (r.ok) refresh(orderId);
   return r;

@@ -1,5 +1,5 @@
 // Finance › Ledger (approved page 34), in a real browser:
-//   - All entries, an entry in the side panel, By account, Customers, a customer's, a factory's and a person's
+//   - All entries, an entry in the side panel, By account, Customers, a customer's, a supplier's and a person's
 //     ledger: axe (WCAG 2.2 A/AA and best practice) at 1440 and 390, no sideways scroll at 390;
 //   - the keyboard: a row's reference opens the entry (Enter), Esc closes it; every focused control shows a ring;
 //   - one primary action per page (Share statement on a party, none on the ledger itself);
@@ -127,7 +127,7 @@ for (const [view, name] of [
   await axe(page, `view ${view}`);
 }
 
-// A customer's ledger, a factory's, a person's.
+// A customer's ledger, a supplier's, a person's.
 await page.goto(`${BASE}/finance/ledger?view=customers`);
 await settle(page);
 const customerHref = await page.locator("tbody tr td a").first().getAttribute("href");
@@ -141,8 +141,8 @@ tiles ? ok("Customer ledger: ageing tiles") : fail("Customer ledger", "no ageing
 
 await page.goto(`${BASE}/finance/ledger?view=factories`);
 await settle(page);
-const factoryHref = await page.locator("tbody tr td a").first().getAttribute("href");
-await page.goto(`${BASE}${factoryHref}`);
+const supplierHref = await page.locator("tbody tr td a").first().getAttribute("href");
+await page.goto(`${BASE}${supplierHref}`);
 await settle(page);
 await shot(page, "08-factory-ledger.png", { fullPage: true });
 await axe(page, "Factory ledger");
@@ -198,7 +198,7 @@ for (const what of ["ledger", `ledger-party?kind=customer&id=${customerHref.spli
     : fail("Excel", `${what} answered ${x.status()}`);
 }
 
-// To receive and To pay factories: ageing from the ledger, the lists as they were.
+// To receive and To pay suppliers: ageing from the ledger, the lists as they were.
 for (const [path, name] of [
   ["/finance/to-receive", "12-to-receive.png"],
   ["/purchasing/to-pay", "13-to-pay.png"],

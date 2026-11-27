@@ -58,7 +58,7 @@ const orderDocument =
     };
   };
 
-/** A paper the app makes: a version (?v=), which payment, plan item or factory (?ref=). */
+/** A paper the app makes: a version (?v=), which payment, plan item or supplier (?ref=). */
 const paper =
   (kind: PaperKind): Kind =>
   async (id, token, url) => {

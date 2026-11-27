@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { fromDbDate, fromDbDateOrNull, toDbDate, toDbDateOrNull, isSupplier } from "@kebo/database";
-import { can, FACTORY_REQUEST_STATUS_LABEL, type FactoryRequestsInput, type FactoryRequestUpdateInput, type RequestChannel } from "@kebo/shared";
+import { can, SUPPLIER_REQUEST_STATUS_LABEL, type SupplierRequestsInput, type SupplierRequestUpdateInput, type RequestChannel } from "@kebo/shared";
 import { daysBetween, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -10,13 +10,13 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 
 /**
- * Asking factories for a price: the inquiry's spec goes to several factories,
- * each one a request that is answered (an offer entered on Factory prices),
- * declined, or left without a reply. Factory names and prices are internal, so
+ * Asking suppliers for a price: the inquiry's spec goes to several suppliers,
+ * each one a request that is answered (an offer entered on Supplier prices),
+ * declined, or left without a reply. Supplier names and prices are internal, so
  * only people who manage sourcing see or change these.
  */
 @Injectable()
-export class FactoryRequestsService {
+export class SupplierRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -35,55 +35,55 @@ export class FactoryRequestsService {
     return i;
   }
 
-  /** The factories asked, with whether each answered; an offer entered for the factory counts as its answer. */
+  /** The suppliers asked, with whether each answered; an offer entered for the supplier counts as its answer. */
   async list(user: SessionUser, inquiryId: string) {
     await this.must(user);
     const inquiry = await this.inquiry(user, inquiryId);
-    const [rows, offers, factories, lastAsked, offerCounts, wins] = await Promise.all([
-      this.prisma.db.factoryRequest.findMany({
+    const [rows, offers, suppliers, lastAsked, offerCounts, wins] = await Promise.all([
+      this.prisma.db.supplierRequest.findMany({
         where: { inquiryId },
         orderBy: { createdAt: "asc" },
         include: { factory: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
       }),
-      this.prisma.db.factoryQuote.findMany({ where: { inquiryId, deletedAt: null }, select: { id: true, factoryId: true }, orderBy: { createdAt: "asc" } }),
+      this.prisma.db.supplierQuote.findMany({ where: { inquiryId, deletedAt: null }, select: { id: true, supplierId: true }, orderBy: { createdAt: "asc" } }),
       this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true, createdAt: true, contacts: { where: { deletedAt: null }, select: { name: true, isPrimary: true, wechat: true, email: true, phone: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] } }, orderBy: { name: "asc" }, take: 500 }),
-      this.prisma.db.factoryRequest.groupBy({ by: ["factoryId"], _max: { sentOn: true } }),
-      this.prisma.db.factoryQuote.groupBy({ by: ["factoryId"], where: { deletedAt: null }, _count: { _all: true } }),
-      // Orders each factory supplied, and how many of them were in this inquiry's category.
-      this.prisma.db.$queryRaw<{ factoryId: string; won: number; inCategory: number }[]>`
-        select f.factory_id as "factoryId", count(distinct f.order_id)::int as won,
+      this.prisma.db.supplierRequest.groupBy({ by: ["supplierId"], _max: { sentOn: true } }),
+      this.prisma.db.supplierQuote.groupBy({ by: ["supplierId"], where: { deletedAt: null }, _count: { _all: true } }),
+      // Orders each supplier supplied, and how many of them were in this inquiry's category.
+      this.prisma.db.$queryRaw<{ supplierId: string; won: number; inCategory: number }[]>`
+        select f.factory_id as "supplierId", count(distinct f.order_id)::int as won,
                count(distinct f.order_id) filter (where lower(i.category) = lower(${inquiry.category}))::int as "inCategory"
         from factory_order_facts f join orders o on o.id = f.order_id join inquiries i on i.id = o.inquiry_id
         where f.status <> 'cancelled' group by f.factory_id`,
     ]);
     const today = this.clock.today();
     const items = rows.map((r) => {
-      const offer = r.factoryQuoteId ?? offers.find((q) => q.factoryId === r.factoryId)?.id ?? null;
+      const offer = r.supplierQuoteId ?? offers.find((q) => q.supplierId === r.supplierId)?.id ?? null;
       const status = r.status === "sent" && offer ? "quoted" : r.status;
       const replyBy = fromDbDateOrNull(r.replyBy);
       return {
         id: r.id,
         factory: r.factory,
         status,
-        statusLabel: FACTORY_REQUEST_STATUS_LABEL[status],
+        statusLabel: SUPPLIER_REQUEST_STATUS_LABEL[status],
         sentOn: fromDbDate(r.sentOn),
         replyBy,
         late: status === "sent" && !!replyBy && replyBy < today,
         channel: r.channel as RequestChannel | null,
         /** Days since asked, while still waiting. */
         waitingDays: status === "sent" ? daysBetween(fromDbDate(r.sentOn), today) : null,
-        factoryQuoteId: offer,
+        supplierQuoteId: offer,
         note: r.note,
         by: r.createdBy,
       };
     });
-    // The factories to choose from: the ones asked most recently first, then the others by name.
-    const last = new Map(lastAsked.map((l) => [l.factoryId, l._max.sentOn ? fromDbDate(l._max.sentOn) : null]));
-    const offersBy = new Map(offerCounts.map((c) => [c.factoryId, c._count._all]));
-    const asked = new Set(rows.map((r) => r.factoryId));
-    const won = new Map(wins.map((w) => [w.factoryId, w]));
+    // The suppliers to choose from: the ones asked most recently first, then the others by name.
+    const last = new Map(lastAsked.map((l) => [l.supplierId, l._max.sentOn ? fromDbDate(l._max.sentOn) : null]));
+    const offersBy = new Map(offerCounts.map((c) => [c.supplierId, c._count._all]));
+    const asked = new Set(rows.map((r) => r.supplierId));
+    const won = new Map(wins.map((w) => [w.supplierId, w]));
     const recent = Date.now() - 14 * 86_400_000;
-    const suggestions = factories
+    const suggestions = suppliers
       .map((f) => ({
         id: f.id,
         name: f.name,
@@ -114,25 +114,25 @@ export class FactoryRequestsService {
     };
   }
 
-  async ask(user: SessionUser, inquiryId: string, input: FactoryRequestsInput) {
+  async ask(user: SessionUser, inquiryId: string, input: SupplierRequestsInput) {
     await this.must(user);
     const today = this.clock.today();
     if (input.sentOn && input.sentOn > today) throw new DomainError("The date sent cannot be in the future.");
     if (input.replyBy && input.replyBy < (input.sentOn ?? today)) throw new DomainError("The reply-by date cannot be before the date sent.");
-    const ids = [...new Set(input.factoryIds)];
+    const ids = [...new Set(input.supplierIds)];
     await this.prisma.tx(async (tx) => {
       const i = await tx.inquiry.findFirst({ where: { id: inquiryId, deletedAt: null, ...inquiryAccess(user) }, select: { id: true, refNo: true, stage: true } });
       if (!i) throw new NotFoundError("Inquiry");
       if (i.stage === "won" || i.stage === "lost") throw new DomainError("This deal is closed.");
-      const factories = await tx.party.findMany({ where: { ...isSupplier, id: { in: ids }, deletedAt: null }, select: { id: true, name: true } });
-      if (factories.length !== ids.length) throw new DomainError("One of the suppliers is not in your list any more.");
-      const already = new Set((await tx.factoryRequest.findMany({ where: { inquiryId, factoryId: { in: ids } }, select: { factoryId: true } })).map((r) => r.factoryId));
-      const fresh = factories.filter((f) => !already.has(f.id));
+      const suppliers = await tx.party.findMany({ where: { ...isSupplier, id: { in: ids }, deletedAt: null }, select: { id: true, name: true } });
+      if (suppliers.length !== ids.length) throw new DomainError("One of the suppliers is not in your list any more.");
+      const already = new Set((await tx.supplierRequest.findMany({ where: { inquiryId, supplierId: { in: ids } }, select: { supplierId: true } })).map((r) => r.supplierId));
+      const fresh = suppliers.filter((f) => !already.has(f.id));
       if (!fresh.length) return;
-      await tx.factoryRequest.createMany({
+      await tx.supplierRequest.createMany({
         data: fresh.map((f) => ({
           inquiryId,
-          factoryId: f.id,
+          supplierId: f.id,
           sentOn: toDbDate(input.sentOn ?? today),
           replyBy: toDbDateOrNull(input.replyBy),
           channel: input.channel,
@@ -152,23 +152,23 @@ export class FactoryRequestsService {
     return this.list(user, inquiryId);
   }
 
-  async update(user: SessionUser, id: string, input: FactoryRequestUpdateInput) {
+  async update(user: SessionUser, id: string, input: SupplierRequestUpdateInput) {
     await this.must(user);
-    const r = await this.prisma.db.factoryRequest.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
+    const r = await this.prisma.db.supplierRequest.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
     if (!r) throw new NotFoundError("Request");
     const i = await this.inquiry(user, r.inquiryId);
-    if (input.factoryQuoteId) {
-      const q = await this.prisma.db.factoryQuote.findFirst({ where: { id: input.factoryQuoteId, inquiryId: r.inquiryId, factoryId: r.factoryId, deletedAt: null } });
+    if (input.supplierQuoteId) {
+      const q = await this.prisma.db.supplierQuote.findFirst({ where: { id: input.supplierQuoteId, inquiryId: r.inquiryId, supplierId: r.supplierId, deletedAt: null } });
       if (!q) throw new DomainError("That offer is not this supplier's offer on this inquiry.");
     }
     await this.prisma.tx(async (tx) => {
-      await tx.factoryRequest.update({
+      await tx.supplierRequest.update({
         where: { id },
         data: {
           ...(input.status !== undefined && { status: input.status }),
           ...(input.replyBy !== undefined && { replyBy: toDbDateOrNull(input.replyBy) }),
           ...(input.channel !== undefined && { channel: input.channel }),
-          ...(input.factoryQuoteId !== undefined && { factoryQuoteId: input.factoryQuoteId }),
+          ...(input.supplierQuoteId !== undefined && { supplierQuoteId: input.supplierQuoteId }),
           ...(input.note !== undefined && { note: input.note }),
         },
       });
@@ -177,7 +177,7 @@ export class FactoryRequestsService {
         action: "update",
         entityType: "inquiry",
         entityId: r.inquiryId,
-        summary: `${i.refNo}: request to ${r.factory.name}${input.status ? ` marked ${FACTORY_REQUEST_STATUS_LABEL[input.status].toLowerCase()}` : " changed"}`,
+        summary: `${i.refNo}: request to ${r.factory.name}${input.status ? ` marked ${SUPPLIER_REQUEST_STATUS_LABEL[input.status].toLowerCase()}` : " changed"}`,
         oldValues: { status: r.status },
         newValues: input,
       });
@@ -187,11 +187,11 @@ export class FactoryRequestsService {
 
   async remove(user: SessionUser, id: string) {
     await this.must(user);
-    const r = await this.prisma.db.factoryRequest.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
+    const r = await this.prisma.db.supplierRequest.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
     if (!r) throw new NotFoundError("Request");
     const i = await this.inquiry(user, r.inquiryId);
     await this.prisma.tx(async (tx) => {
-      await tx.factoryRequest.delete({ where: { id } });
+      await tx.supplierRequest.delete({ where: { id } });
       await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "inquiry", entityId: r.inquiryId, summary: `${i.refNo}: request to ${r.factory.name} removed` });
     });
     return this.list(user, r.inquiryId);

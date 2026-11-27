@@ -19,10 +19,10 @@ import { z } from "zod";
 import {
   EXPENSE_CATEGORIES,
   expenseInput,
-  factoryPaymentInput,
-  type FactoryPaymentInput,
-  factoryPlanInput,
-  type FactoryPlanInput,
+  supplierPaymentInput,
+  type SupplierPaymentInput,
+  supplierPlanInput,
+  type SupplierPlanInput,
   paymentPlanInput,
   repayInput,
   voidInput,
@@ -50,7 +50,7 @@ const expenseQuery = z.object({
   to: date,
   orderId: z.uuid().optional(),
   inquiryId: z.uuid().optional(),
-  factoryId: z.uuid().optional(),
+  supplierId: z.uuid().optional(),
   customerId: z.uuid().optional(),
   category: z.enum(EXPENSE_CATEGORIES).optional(),
   kind: z.enum(["order", "customer", "general", "company"]).optional(),
@@ -110,7 +110,7 @@ export class MoneyController {
     return this.money.repeatingChange(user, key, body.what);
   }
 
-  /** Managers only: what an expense can be for (customers, deals, orders, factories). */
+  /** Managers only: what an expense can be for (customers, deals, orders, suppliers). */
   @RequireFeature("expenses")
   @SignedIn("checked inside: expenses.manage")
   @Get("expenses/targets")
@@ -145,7 +145,7 @@ export class MoneyController {
     return this.accounts.customerAccount(user, id);
   }
 
-  /** An order's money: payment plan, what we owe and paid factories, expenses and profit (each for the people who may see it). */
+  /** An order's money: payment plan, what we owe and paid suppliers, expenses and profit (each for the people who may see it). */
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Get("orders/:id/money")
   forOrder(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -165,8 +165,8 @@ export class MoneyController {
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post("orders/:id/factory-payments")
   @Once()
-  async payFactory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
-    const { createdId } = await this.supplierPayments.recordFactoryPayment(user, id, body);
+  async paySupplier(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierPaymentInput)) body: SupplierPaymentInput) {
+    const { createdId } = await this.supplierPayments.recordSupplierPayment(user, id, body);
     return { ...(await this.money.forOrder(user, id)), createdId };
   }
 
@@ -174,16 +174,16 @@ export class MoneyController {
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Patch("factory-payments/:id")
   @Versioned("payments")
-  async editFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPaymentInput)) body: FactoryPaymentInput) {
-    const { orderId } = await this.supplierPayments.editFactoryPayment(user, id, body);
+  async editSupplierPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierPaymentInput)) body: SupplierPaymentInput) {
+    const { orderId } = await this.supplierPayments.editSupplierPayment(user, id, body);
     return this.money.forOrder(user, orderId);
   }
 
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
   @Post("factory-payments/:id/void")
   @HttpCode(200)
-  async voidFactoryPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
-    const { orderId } = await this.supplierPayments.voidFactoryPayment(user, id, body.reason);
+  async voidSupplierPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
+    const { orderId } = await this.supplierPayments.voidSupplierPayment(user, id, body.reason);
     return this.money.forOrder(user, orderId);
   }
 
@@ -195,11 +195,11 @@ export class MoneyController {
     return this.money.forOrder(user, id);
   }
 
-  /** { factoryId, items: [{ label, percent?, amount, dueRule: on_order | on_ready | fixed, dueOn? }] } — they add up to what we owe it. */
+  /** { supplierId, items: [{ label, percent?, amount, dueRule: on_order | on_ready | fixed, dueOn? }] } — they add up to what we owe it. */
   @Put("orders/:id/factory-plan")
   @RequirePermissions("sourcing.manage")
-  async factoryPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryPlanInput)) body: FactoryPlanInput) {
-    await this.billing.setFactoryPlan(user, id, body);
+  async supplierPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierPlanInput)) body: SupplierPlanInput) {
+    await this.billing.setSupplierPlan(user, id, body);
     return this.money.forOrder(user, id);
   }
 

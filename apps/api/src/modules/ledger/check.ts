@@ -1,13 +1,13 @@
 import { decimalToMinor, isCustomer } from "@kebo/database";
 import { fromMinor, type Minor } from "@kebo/money";
-import { factoryPositionsSql, positionsSql } from "../billing/api";
+import { supplierPositionsSql, positionsSql } from "../billing/api";
 import type { MoneyCtx } from "../billing/api";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 
 type Db = PrismaService["db"] | Tx;
 
 export interface LedgerDifference {
-  /** order: what the customer still owes on it; factory: what we still owe a factory on an order (one currency);
+  /** order: what the customer still owes on it; supplier: what we still owe a supplier on an order (one currency);
    *  account: a money account's balance; staff: what we owe a person back; credit: a customer's credit; group: a posting
    *  whose debits and credits differ in the main currency. */
   kind: "order" | "factory" | "account" | "staff" | "credit" | "group";
@@ -15,21 +15,21 @@ export interface LedgerDifference {
   currency: string;
   /** As the ledger has it. */
   ledger: string;
-  /** As today's figures have it (the order's money, the factory's to pay, the cash book, to repay, the credit). */
+  /** As today's figures have it (the order's money, the supplier's to pay, the cash book, to repay, the credit). */
   expected: string;
 }
 
 export interface LedgerCheck {
-  checked: { orders: number; factoryParts: number; accounts: number; staff: number; credits: number; groups: number };
+  checked: { orders: number; supplierParts: number; accounts: number; staff: number; credits: number; groups: number };
   differences: LedgerDifference[];
 }
 
 const m = (v: unknown) => decimalToMinor((v ?? 0) as never);
 
 /**
- * The ledger's balances against today's figures, worked out the usual way (positionsSql / factoryPositionsSql =
- * orderPosition / factoryPosition, the cash book's balance, "to repay", the customer's credit): every order's
- * balance with its customer (total + charged − settled), every factory part's (owed − paid − taken off), every
+ * The ledger's balances against today's figures, worked out the usual way (positionsSql / supplierPositionsSql =
+ * orderPosition / supplierPosition, the cash book's balance, "to repay", the customer's credit): every order's
+ * balance with its customer (total + charged − settled), every supplier part's (owed − paid − taken off), every
  * money account's balance, what we owe each person back, each customer's credit; and every posting balanced in
  * the main currency. Lists each difference.
  */
@@ -59,26 +59,27 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
     );
   }
 
-  // Factory parts of orders not cancelled: what we owe each factory in each currency (paid-only parts too).
-  const parts = await factoryPositionsSql(db, fx);
+  // Supplier parts of orders not cancelled: what we owe each supplier in each currency (paid-only parts too).
+  const parts = await supplierPositionsSql(db, fx);
   const expected = new Map<string, Minor>();
-  for (const r of parts) expected.set(`${r.orderId}:${r.factoryId}:${r.currency}`, Math.round(r.owedMinor - r.paidMinor - r.takenOffMinor));
-  const paidOnly = await db.$queryRaw<{ orderId: string; factoryId: string; currency: string; paid: string }[]>`
-    select a.purchase_order_id as "orderId", m.party_id as "factoryId", m.currency::text, sum(a.share)::text as paid
+  for (const r of parts)
+    expected.set(`${r.orderId}:${r.supplierId}:${r.currency}`, Math.round(r.owedMinor - r.paidMinor - r.takenOffMinor));
+  const paidOnly = await db.$queryRaw<{ orderId: string; supplierId: string; currency: string; paid: string }[]>`
+    select a.purchase_order_id as "orderId", m.party_id as "supplierId", m.currency::text, sum(a.share)::text as paid
       from allocations a join money_movements m on m.id = a.movement_id
       join orders o on o.id = a.purchase_order_id and o.status <> 'cancelled'
      where a.target = 'purchase' and a.voided_at is null
      group by 1, 2, 3`;
   for (const r of paidOnly) {
-    const k = `${r.orderId}:${r.factoryId}:${r.currency}`;
+    const k = `${r.orderId}:${r.supplierId}:${r.currency}`;
     if (!expected.has(k)) expected.set(k, -m(r.paid));
   }
-  const factoryLedger = await db.$queryRaw<{ orderId: string; factoryId: string; currency: string; minor: string }[]>`
-    select l.order_id as "orderId", substr(l.account, 9) as "factoryId", l.currency::text, sum(l.credit - l.debit)::text as minor
+  const supplierLedger = await db.$queryRaw<{ orderId: string; supplierId: string; currency: string; minor: string }[]>`
+    select l.order_id as "orderId", substr(l.account, 9) as "supplierId", l.currency::text, sum(l.credit - l.debit)::text as minor
       from ledger_entries l join orders o on o.id = l.order_id and o.status <> 'cancelled'
      where l.account like 'factory:%'
      group by 1, 2, 3`;
-  const ledgerParts = new Map(factoryLedger.map((r) => [`${r.orderId}:${r.factoryId}:${r.currency}`, m(r.minor)]));
+  const ledgerParts = new Map(supplierLedger.map((r) => [`${r.orderId}:${r.supplierId}:${r.currency}`, m(r.minor)]));
   const keys = new Set([...expected.keys(), ...ledgerParts.keys()]);
   for (const k of keys) {
     const [orderId, , currency] = k.split(":");
@@ -144,7 +145,7 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
   return {
     checked: {
       orders: positions.length,
-      factoryParts: keys.size,
+      supplierParts: keys.size,
       accounts: accounts.length,
       staff: staff.length,
       credits: credits.length,

@@ -32,7 +32,7 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     await app?.close();
   });
 
-  /** A deal with one factory offer, quoted with these terms and accepted: the order. */
+  /** A deal with one supplier offer, quoted with these terms and accepted: the order. */
   async function accepted(terms: Record<string, unknown>, lead: { leadDays: number; leadFrom: string }) {
     const me = (await api(app, sana).get("/auth/me")).body.id;
     const customer = (
@@ -48,7 +48,7 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0].id;
     await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Jinan Agreed ${tag}`,
+        newSupplierName: `Jinan Agreed ${tag}`,
         receivedOn: addDays(today, -3),
         currency: "USD",
         leadDays: 30,
@@ -131,8 +131,8 @@ describe("agreed with the customer: the quotation's terms in the order", () => {
     const o = await order(threeId);
     expect(o.agreed).toMatchObject({ copied: true, leadDays: 45, leadFrom: "after_payment", leadTime: "45 days after the deposit", warrantyMonths: 12, warrantyFrom: "sat", deliveryConditions: "Export wooden cases." });
     expect(o.agreed.warrantyLine).toBe("12 months from the site acceptance test (SAT), parts and service.");
-    expect(o.factoryTerms).toHaveLength(1);
-    expect(o.factoryTerms[0]).toMatchObject({ terms: { leadDays: 30, leadFrom: "after_payment" }, costMinor: 2_000_000 });
+    expect(o.supplierTerms).toHaveLength(1);
+    expect(o.supplierTerms[0]).toMatchObject({ terms: { leadDays: 30, leadFrom: "after_payment" }, costMinor: 2_000_000 });
     // A new port of discharge differs from the quotation: why?
     const asked = await api(app, sana).patch(`/orders/${threeId}/agreed`, { portOfDischarge: "Port Qasim" }).expect(409);
     expect(JSON.stringify(asked.body)).toMatch(/reason/i);

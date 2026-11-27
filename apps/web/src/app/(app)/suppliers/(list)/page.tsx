@@ -8,12 +8,12 @@ import { PartyExcel } from "@/components/sheets/party-excel";
 import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { OpenPanelButton } from "@/components/common/panel";
-import { importFactoriesAction, saveFactoryAction } from "../actions";
-import { FactoryPanel } from "../factory-form";
+import { importSuppliersAction, saveSupplierAction } from "../actions";
+import { SupplierPanel } from "../supplier-form";
 import { hasFeature, requirePermission } from "@/lib/session";
 import type { Paged } from "@/lib/types";
-import type { FactoryGroups } from "@/lib/types-facts";
-import type { FactoryDetail, FactoryRow, Owed } from "@/lib/types-people";
+import type { SupplierGroups } from "@/lib/types-facts";
+import type { SupplierDetail, SupplierRow, Owed } from "@/lib/types-people";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { plural, short, whole, countOf } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
@@ -21,10 +21,10 @@ import { getPeople } from "@/lib/loaders";
 export const metadata = { title: "Suppliers" };
 
 type Params = Record<string, string | undefined>;
-type List = Paged<FactoryRow & { city: string | null }> & { cities: string[]; waiting: number; counts?: { all: number; offers: number; none: number; mine: number } };
+type List = Paged<SupplierRow & { city: string | null }> & { cities: string[]; waiting: number; counts?: { all: number; offers: number; none: number; mine: number } };
 
 /** How to reach them, in a few words: "Mr. Zhang · WeChat zhang_jpm". */
-const reach = (f: FactoryRow) => [f.contactPerson, f.wechat ? `WeChat ${f.wechat}` : (f.email ?? f.phone)].filter(Boolean).join(" · ");
+const reach = (f: SupplierRow) => [f.contactPerson, f.wechat ? `WeChat ${f.wechat}` : (f.email ?? f.phone)].filter(Boolean).join(" · ");
 
 const STATUSES = [
   { value: "offers", label: "Offers in" },
@@ -33,10 +33,10 @@ const STATUSES = [
 
 /**
  * Suppliers (board "Suppliers — list"): Export CSV and Add supplier; Suppliers, We owe, Bought this year and
- * Offers waiting; search with City, Owner and Status; each factory with its city, who looks after it, orders,
+ * Offers waiting; search with City, Owner and Status; each supplier with its city, who looks after it, orders,
  * offers, what we bought from it, what we owe it and where things stand. Never shown to customers.
  */
-export default async function FactoriesPage({ searchParams }: { searchParams: Promise<Params> }) {
+export default async function SuppliersPage({ searchParams }: { searchParams: Promise<Params> }) {
   const me = await requirePermission("sourcing.manage");
   const sp = await searchParams;
   const status = STATUSES.find((x) => x.value === sp.status)?.value;
@@ -51,13 +51,13 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
     api.get<List>("/factories", { pageSize: 1 }),
     api.get<List>("/factories", { pageSize: 1, mine: "true" }),
     getPeople().catch(() => []),
-    panel === "edit-factory" ? api.get<FactoryDetail>(`/factories/${sp.id}`).catch(() => null) : null,
-    // What we owe each factory and what we bought from it (people who see money, with Insights).
+    panel === "edit-factory" ? api.get<SupplierDetail>(`/factories/${sp.id}`).catch(() => null) : null,
+    // What we owe each supplier and what we bought from it (people who see money, with Insights).
     money ? api.get<Owed>("/insights/facts/owed", { side: "payable" }).catch(() => null) : null,
-    money ? api.get<FactoryGroups>("/insights/facts/factories/groups", { period: "all", by: "factory" }).catch(() => null) : null,
+    money ? api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory" }).catch(() => null) : null,
     money
       ? api
-          .get<FactoryGroups>("/insights/facts/factories/groups", {
+          .get<SupplierGroups>("/insights/facts/factories/groups", {
             period: "all",
             by: "factory",
             from: `${year}-01-01`,
@@ -67,7 +67,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
       : null,
     money
       ? api
-          .get<FactoryGroups>("/insights/facts/factories/groups", {
+          .get<SupplierGroups>("/insights/facts/factories/groups", {
             period: "all",
             by: "factory",
             from: `${year - 1}-01-01`,
@@ -80,14 +80,14 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
   const bought = new Map((groups?.rows ?? []).map((r) => [r.key, r]));
   const owedTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.total), 0);
   const overdueTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.overdue), 0);
-  const spend = (g: FactoryGroups | null) => (g?.rows ?? []).reduce((t, r) => t + Number(r.spend ?? 0), 0);
+  const spend = (g: SupplierGroups | null) => (g?.rows ?? []).reduce((t, r) => t + Number(r.spend ?? 0), 0);
   const boughtYear = spend(thisYear);
   const boughtLast = spend(lastYear);
   const filtered = !!(sp.q || keep.city || keep.owner || status || mineTab);
   const people_ = people.map((p) => ({ value: p.id, label: p.id === me.id ? "Me" : p.name }));
 
-  /** Where things stand with the factory, in a word. */
-  const stateOf = (f: FactoryRow) => {
+  /** Where things stand with the supplier, in a word. */
+  const stateOf = (f: SupplierRow) => {
     const o = owes.get(f.id);
     if (o && Number(o.overdue) > 0.005) return <StatusBadge meaning="bad">Payment late</StatusBadge>;
     if (o) return <StatusBadge meaning="warn">To pay</StatusBadge>;
@@ -103,7 +103,7 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
         title={labelFor("/suppliers")}
         papers={
           <>
-            <PartyExcel kind="factories" importAction={importFactoriesAction} />
+            <PartyExcel kind="factories" importAction={importSuppliersAction} />
           </>
         }
         more={<ExportCsv what="factories" query={query} />}
@@ -266,9 +266,9 @@ export default async function FactoriesPage({ searchParams }: { searchParams: Pr
       <Pager base="/suppliers" params={keep} page={data.page} pageSize={data.pageSize} total={data.total} bare />
 
       {panel && (panel === "new-factory" || editing) && (
-        <FactoryPanel
+        <SupplierPanel
           key={editing?.id ?? "new"}
-          action={saveFactoryAction.bind(null, editing?.id ?? null, editing?.updatedAt ?? null)}
+          action={saveSupplierAction.bind(null, editing?.id ?? null, editing?.updatedAt ?? null)}
           factory={editing}
           people={people}
           meId={me.id}

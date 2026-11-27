@@ -7,7 +7,7 @@
  *   pnpm db:load-data --years 3 --deals 10000  the load-test set
  *   options: --years N  --deals N  --people N (sales people, default 6)
  *
- * Deals go through the same shape the app makes: items, a factory offer,
+ * Deals go through the same shape the app makes: items, a supplier offer,
  * quotation revisions, and for won deals an order with its payment plan,
  * payments in and out, expenses and stage history. Business grows over the
  * period, so the charts have a shape. Nothing is dated after today. Also:
@@ -110,7 +110,7 @@ const BUYERS = [
   "Sara Al-Amri",
   "Rustam Aliyev",
 ];
-const FACTORY_CITIES = [
+const SUPPLIER_CITIES = [
   "Jining",
   "Wenzhou",
   "Qingdao",
@@ -124,7 +124,7 @@ const FACTORY_CITIES = [
   "Hangzhou",
   "Dongguan",
 ];
-const FACTORY_TRADES = [
+const SUPPLIER_TRADES = [
   "Pharma Machinery",
   "Valve Works",
   "Packaging",
@@ -178,7 +178,7 @@ async function main() {
   }
   const rate = 7.1;
 
-  // Customers with a contact each, and factories, with real-looking names.
+  // Customers with a contact each, and suppliers, with real-looking names.
   const nCustomers = Math.max(30, Math.round(DEALS / 6));
   const used = new Set<string>();
   const customers = Array.from({ length: nCustomers }, () => {
@@ -204,18 +204,18 @@ async function main() {
   }));
   for (let i = 0; i < contacts.length; i += 1000) await db.contact.createMany({ data: contacts.slice(i, i + 1000) });
   const fnames = new Set<string>();
-  const factories = Array.from({ length: Math.max(15, Math.round(DEALS / 40)) }, () => {
+  const suppliers = Array.from({ length: Math.max(15, Math.round(DEALS / 40)) }, () => {
     let name = "";
     for (let tries = 0; tries < 20 && (!name || fnames.has(name)); tries++)
-      name = `${pick(FACTORY_CITIES)} ${pick(FACTORY_TRADES)} Co., Ltd.`;
+      name = `${pick(SUPPLIER_CITIES)} ${pick(SUPPLIER_TRADES)} Co., Ltd.`;
     if (fnames.has(name)) name = `${name.replace(" Co., Ltd.", "")} ${fnames.size} Co., Ltd.`;
     fnames.add(name);
     return { id: randomUUID(), name, createdById: lead.id, ownerId: pick(team) };
   });
-  await db.party.createMany({ data: factories });
-  await db.partyRole.createMany({ data: roleRows("supplier", factories) });
+  await db.party.createMany({ data: suppliers });
+  await db.partyRole.createMany({ data: roleRows("supplier", suppliers) });
   console.log(
-    `[load] ${YEARS} year${YEARS === 1 ? "" : "s"}: ${customers.length} customers, ${factories.length} factories, ${team.length} people`,
+    `[load] ${YEARS} year${YEARS === 1 ? "" : "s"}: ${customers.length} customers, ${suppliers.length} factories, ${team.length} people`,
   );
 
   let made = 0;
@@ -238,7 +238,7 @@ async function main() {
       return {
         description,
         unit,
-        factoryPrice: Math.round(price * (0.8 + rnd() * 0.4) * 100) / 100,
+        supplierPrice: Math.round(price * (0.8 + rnd() * 0.4) * 100) / 100,
         quantity: Math.max(1, Math.round(qty * (0.3 + rnd()))),
       };
     });
@@ -279,15 +279,15 @@ async function main() {
     });
     made++;
     if (stage === "new") return;
-    const factory = pick(factories);
-    const fq = await db.factoryQuote.create({
+    const supplier = pick(suppliers);
+    const fq = await db.supplierQuote.create({
       data: {
         inquiryId: inquiry.id,
-        factoryId: factory.id,
+        supplierId: supplier.id,
         receivedOn: toDbDate(upTo(addDays(created, 2))),
         validUntil: toDbDate(addDays(created, 32)),
         currency: "CNY",
-        // The demo factories charge 13% VAT on top of their prices.
+        // The demo suppliers charge 13% VAT on top of their prices.
         taxRate: 13,
         leadTime: "35 days after deposit",
         createdById: assignee ?? lead.id,
@@ -297,7 +297,7 @@ async function main() {
             description: l.description,
             quantity: l.quantity,
             unit: l.unit,
-            unitPrice: l.factoryPrice,
+            unitPrice: l.supplierPrice,
             taxRate: 13,
             sortOrder: k,
           })),
@@ -307,7 +307,7 @@ async function main() {
     });
     if (stage === "sourcing") return;
     const costs = lines.map((l, k) => {
-      const costCny = withTaxMinor(toMinor(l.factoryPrice), 13);
+      const costCny = withTaxMinor(toMinor(l.supplierPrice), 13);
       return { lineId: fq.lines[k]!.id, costCny, costMinor: Math.round(costCny / rate) };
     });
     const quotation = await db.quotation.create({ data: { refNo: await nextReference(db, "quotation", year), inquiryId: inquiry.id } });
@@ -362,7 +362,7 @@ async function main() {
         data: {
           revisionId: rev.id,
           letter: "A",
-          factoryQuoteId: fq.id,
+          supplierQuoteId: fq.id,
           status: status === "accepted" ? "accepted" : "open",
           leadTime: "35 days after deposit",
           ...header,
@@ -377,7 +377,7 @@ async function main() {
               unitPrice: fromMinor(x.unitPrice),
               lineTotal: fromMinor(totals.lines[k]!.lineTotal),
               unitCost: fromMinor(x.cost.costMinor),
-              factoryQuoteLineId: x.cost.lineId,
+              supplierQuoteLineId: x.cost.lineId,
               fxRate: rate,
               sortOrder: k,
             })),
@@ -483,8 +483,8 @@ async function main() {
           at: new Date(`${stageDay(st)}T09:00:00Z`),
         })),
     });
-    // The factory's ready date (one per factory; this order has one).
-    if (oStage !== "confirmed") await db.orderFactory.create({ data: { orderId: order.id, factoryId: factory.id, readyOn: toDbDate(addDays(orderedOn, int(15, 40))) } });
+    // The supplier's ready date (one per supplier; this order has one).
+    if (oStage !== "confirmed") await db.orderSupplier.create({ data: { orderId: order.id, supplierId: supplier.id, readyOn: toDbDate(addDays(orderedOn, int(15, 40))) } });
     // The deposit on its date, the balance 14 days after the goods leave (worked out from the ship date).
     await db.invoice.createMany({
       data: defaultPlan(accepted.total, 30, orderedOn, 7).map((p, k) => ({
@@ -505,7 +505,7 @@ async function main() {
       await createSupplierPayment(db, {
         orderId: order.id,
         orderCurrency: order.currency,
-        supplierId: factory.id,
+        supplierId: supplier.id,
         kind: "deposit",
         amount: fromMinor(Math.round(cny * 0.3)),
         currency: "CNY",
@@ -519,7 +519,7 @@ async function main() {
       await createSupplierPayment(db, {
         orderId: order.id,
         orderCurrency: order.currency,
-        supplierId: factory.id,
+        supplierId: supplier.id,
         kind: "balance",
         amount: fromMinor(cny - Math.round(cny * 0.3)),
         currency: "CNY",

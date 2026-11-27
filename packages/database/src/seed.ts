@@ -137,7 +137,7 @@ type Line = {
   model?: string;
   quantity: number;
   unit?: string;
-  factoryPrice: number;
+  supplierPrice: number;
   factory: number;
   type?: "goods" | "charge";
 };
@@ -180,7 +180,7 @@ export async function seedDemoData(
       }),
     ),
   );
-  const factories = await Promise.all(
+  const suppliers = await Promise.all(
     ["Jinan Pharma Machinery", "Wenzhou Valve Works", "Qingdao Packaging Co."].map((name) =>
       db.party.create({ data: newSupplier({ name, createdById: people.manager.id }) }),
     ),
@@ -188,7 +188,7 @@ export async function seedDemoData(
   const settings = readSettings({});
   const rate = settings.sales.exchangeRates.CNY ?? 7.1;
 
-  /** A deal with items and (optionally) factory prices, quotation revisions and an order. */
+  /** A deal with items and (optionally) supplier prices, quotation revisions and an order. */
   async function deal(o: {
     customer: number;
     assignee?: string | null;
@@ -240,18 +240,18 @@ export async function seedDemoData(
     }
     if (o.stage === "new") return;
 
-    // Factory prices (CNY, without tax; each item's 13% tax is added on top): one offer per factory with its lines.
+    // Supplier prices (CNY, without tax; each item's 13% tax is added on top): one offer per supplier with its lines.
     const costByLine = new Map<number, { lineId: string; costMinor: number; costCny: number; factory: number }>();
     const offerOf = new Map<number, string>();
     for (const f of [...new Set(o.lines.filter((l) => l.type !== "charge").map((l) => l.factory))]) {
       const mine = [...o.lines.entries()].filter(([, l]) => l.type !== "charge" && l.factory === f);
-      const fq = await db.factoryQuote.create({
+      const fq = await db.supplierQuote.create({
         data: {
           inquiryId: inquiry.id,
-          factoryId: factories[f].id,
+          supplierId: suppliers[f].id,
           receivedOn: toDbDate(addDays(created, 2)),
           currency: "CNY",
-          // The demo factories charge 13% VAT on top of their prices.
+          // The demo suppliers charge 13% VAT on top of their prices.
           taxRate: 13,
           leadTime: "35 days after deposit",
           createdById: o.assignee ?? people.staff.id,
@@ -262,7 +262,7 @@ export async function seedDemoData(
               model: l.model,
               quantity: l.quantity,
               unit: l.unit ?? "pcs",
-              unitPrice: l.factoryPrice,
+              unitPrice: l.supplierPrice,
               taxRate: 13,
               sortOrder: k,
             })),
@@ -272,7 +272,7 @@ export async function seedDemoData(
       });
       offerOf.set(f, fq.id);
       for (const [k, [i, l]] of mine.entries()) {
-        const costCny = withTaxMinor(toMinor(l.factoryPrice), Number(fq.lines[k].taxRate));
+        const costCny = withTaxMinor(toMinor(l.supplierPrice), Number(fq.lines[k].taxRate));
         costByLine.set(i, { lineId: fq.lines[k].id, costMinor: Math.round(costCny / rate), costCny, factory: f });
       }
     }
@@ -284,7 +284,7 @@ export async function seedDemoData(
       const margin = 18 - n * 3; // each revision a little sharper
       const lines = o.lines.map((l, i) => {
         const cost = costByLine.get(i);
-        const unitPrice = cost ? priceForMargin(cost.costMinor, margin) : toMinor(l.factoryPrice);
+        const unitPrice = cost ? priceForMargin(cost.costMinor, margin) : toMinor(l.supplierPrice);
         return { l, i, unitPrice, cost };
       });
       const totals = documentTotals(
@@ -304,12 +304,12 @@ export async function seedDemoData(
           createdById: o.assignee ?? people.staff.id,
         },
       });
-      // One option: the offer the goods came from (demo deals use one factory each), plus our charges.
+      // One option: the offer the goods came from (demo deals use one supplier each), plus our charges.
       const option = await db.quotationOption.create({
         data: {
           revisionId: rev.id,
           letter: "A",
-          factoryQuoteId: offerOf.get(o.lines.find((l) => l.type !== "charge")!.factory) ?? null,
+          supplierQuoteId: offerOf.get(o.lines.find((l) => l.type !== "charge")!.factory) ?? null,
           status: status === "accepted" ? "accepted" : "open",
           leadTime: "35 days after deposit",
           ...header,
@@ -325,7 +325,7 @@ export async function seedDemoData(
               unitPrice: fromMinor(x.unitPrice),
               lineTotal: fromMinor(totals.lines[k].lineTotal),
               unitCost: x.cost ? fromMinor(x.cost.costMinor) : null,
-              factoryQuoteLineId: x.cost?.lineId,
+              supplierQuoteLineId: x.cost?.lineId,
               fxRate: x.cost ? rate : null,
               sortOrder: k,
             })),
@@ -379,7 +379,7 @@ export async function seedDemoData(
             lineTotal: l.lineTotal,
             unitCost: l.unitCost,
             sortOrder: l.sortOrder,
-            // Goods that already left came in from the factory and were packed.
+            // Goods that already left came in from the supplier and were packed.
             ...(shippedOn && l.type === "goods"
               ? {
                   receivedQty: l.quantity,
@@ -412,7 +412,7 @@ export async function seedDemoData(
           : {}),
       },
     });
-    // What the API freezes on acceptance: factory prices, costs to reach the basis, the rate.
+    // What the API freezes on acceptance: supplier prices, costs to reach the basis, the rate.
     await freezeOrderMoney(db, [order.id]);
     await freezeOrderBuyer(db, [order.id], orderedOn);
     // Its history: each stage it went through, in order.
@@ -430,12 +430,12 @@ export async function seedDemoData(
         },
       });
     }
-    // Each factory's ready date (one per factory; the order's is the latest of them).
+    // Each supplier's ready date (one per supplier; the order's is the latest of them).
     if (o.order.readyInDays !== undefined) {
       const readyOn = toDbDate(addDays(orderedOn, o.order.readyInDays));
-      const made = await db.orderLine.findMany({ where: { orderId: order.id }, select: { factoryId: true } });
-      const ids = [...new Set(made.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
-      await db.orderFactory.createMany({ data: (ids.length ? ids : [null]).map((factoryId) => ({ orderId: order.id, factoryId, readyOn })) });
+      const made = await db.orderLine.findMany({ where: { orderId: order.id }, select: { supplierId: true } });
+      const ids = [...new Set(made.flatMap((l) => (l.supplierId ? [l.supplierId] : [])))];
+      await db.orderSupplier.createMany({ data: (ids.length ? ids : [null]).map((supplierId) => ({ orderId: order.id, supplierId, readyOn })) });
     }
     // The customer's plan from the terms: the deposit on its date, the balance 14 days after the goods leave.
     for (const [k, p] of defaultPlan(accepted.total, 30, orderedOn, 7).entries()) {
@@ -452,7 +452,7 @@ export async function seedDemoData(
         },
       });
     }
-    // What we paid the factories: 30% once production started, the rest before shipping (CNY, with tax).
+    // What we paid the suppliers: 30% once production started, the rest before shipping (CNY, with tax).
     const owed = new Map<number, number>();
     for (const [i, l] of o.lines.entries()) {
       const c = costByLine.get(i);
@@ -463,7 +463,7 @@ export async function seedDemoData(
         createSupplierPayment(db, {
           orderId: order.id,
           orderCurrency: order.currency,
-          supplierId: factories[f].id,
+          supplierId: suppliers[f].id,
           kind,
           amount: fromMinor(minor),
           currency: "CNY",
@@ -541,14 +541,14 @@ export async function seedDemoData(
     stage: "new",
     category: "Machinery",
     daysAgo: 0,
-    lines: [{ description: "Rotary tablet press, 35 stations", quantity: 1, factoryPrice: 0, factory: 0 }],
+    lines: [{ description: "Rotary tablet press, 35 stations", quantity: 1, supplierPrice: 0, factory: 0 }],
   });
   await deal({
     customer: 3,
     stage: "new",
     category: "Chemicals",
     daysAgo: 3,
-    lines: [{ description: "Urea 46% granular", quantity: 50, unit: "ton", factoryPrice: 0, factory: 2 }],
+    lines: [{ description: "Urea 46% granular", quantity: 50, unit: "ton", supplierPrice: 0, factory: 2 }],
   });
   await deal({
     customer: 1,
@@ -556,7 +556,7 @@ export async function seedDemoData(
     stage: "sourcing",
     category: "Machinery",
     daysAgo: 2,
-    lines: [{ description: "Gate valve DN100 PN16", quantity: 120, factoryPrice: 410, factory: 1 }],
+    lines: [{ description: "Gate valve DN100 PN16", quantity: 120, supplierPrice: 410, factory: 1 }],
   });
   await deal({
     customer: 2,
@@ -565,7 +565,7 @@ export async function seedDemoData(
     category: "Building materials",
     daysAgo: 8,
     revisions: ["sent"],
-    lines: [{ description: "PVC pipe 110mm, 6m", quantity: 800, factoryPrice: 58, factory: 2 }],
+    lines: [{ description: "PVC pipe 110mm, 6m", quantity: 800, supplierPrice: 58, factory: 2 }],
   });
   await deal({
     customer: 0,
@@ -575,8 +575,8 @@ export async function seedDemoData(
     daysAgo: 12,
     revisions: ["superseded", "sent"],
     lines: [
-      { description: "Blister packing machine DPP-260", quantity: 1, factoryPrice: 98000, factory: 0 },
-      { description: "Sea freight to Lagos", quantity: 1, factoryPrice: 2400, factory: 0, type: "charge" },
+      { description: "Blister packing machine DPP-260", quantity: 1, supplierPrice: 98000, factory: 0 },
+      { description: "Sea freight to Lagos", quantity: 1, supplierPrice: 2400, factory: 0, type: "charge" },
     ],
   });
   await deal({
@@ -587,7 +587,7 @@ export async function seedDemoData(
     category: "Packaging",
     daysAgo: 20,
     revisions: ["rejected"],
-    lines: [{ description: "Shrink film 25 micron", quantity: 10, unit: "ton", factoryPrice: 11000, factory: 2 }],
+    lines: [{ description: "Shrink film 25 micron", quantity: 10, unit: "ton", supplierPrice: 11000, factory: 2 }],
   });
   await deal({
     customer: 0,
@@ -598,8 +598,8 @@ export async function seedDemoData(
     revisions: ["superseded", "accepted"],
     order: { stage: "in_production", paid: "deposit", readyInDays: 15 },
     lines: [
-      { description: "Capsule filling machine NJP-1200", quantity: 2, factoryPrice: 125000, factory: 0 },
-      { description: "Spare parts kit", quantity: 2, factoryPrice: 6000, factory: 0 },
+      { description: "Capsule filling machine NJP-1200", quantity: 2, supplierPrice: 125000, factory: 0 },
+      { description: "Spare parts kit", quantity: 2, supplierPrice: 6000, factory: 0 },
     ],
   });
   await deal({
@@ -610,7 +610,7 @@ export async function seedDemoData(
     daysAgo: 30,
     revisions: ["accepted"],
     order: { stage: "confirmed", paid: "none", terms: "against_bl_copy" },
-    lines: [{ description: "Butterfly valve DN200", quantity: 60, factoryPrice: 780, factory: 1 }],
+    lines: [{ description: "Butterfly valve DN200", quantity: 60, supplierPrice: 780, factory: 1 }],
   });
   await deal({
     customer: 3,
@@ -620,7 +620,7 @@ export async function seedDemoData(
     daysAgo: 90,
     revisions: ["accepted"],
     order: { stage: "done", paid: "full", shippedAfterDays: 35 },
-    lines: [{ description: "Woven PP bags 50kg", quantity: 100000, factoryPrice: 1.15, factory: 2 }],
+    lines: [{ description: "Woven PP bags 50kg", quantity: 100000, supplierPrice: 1.15, factory: 2 }],
   });
   await deal({
     customer: 1,
@@ -630,7 +630,7 @@ export async function seedDemoData(
     daysAgo: 60,
     revisions: ["accepted"],
     order: { stage: "shipped", paid: "deposit", terms: "against_bl_copy", shippedAfterDays: 38 },
-    lines: [{ description: "Ball valve DN50, stainless", quantity: 300, factoryPrice: 165, factory: 1 }],
+    lines: [{ description: "Ball valve DN50, stainless", quantity: 300, supplierPrice: 165, factory: 1 }],
   });
   // Company costs for the last two months.
   for (const back of [0, 1]) {
@@ -667,7 +667,7 @@ export async function seedDemoData(
     { customer: 2, category: "meals", description: "Lunch at the Canton Fair", amount: "680.00", currency: "CNY", back: 0 },
     { customer: 2, category: "gifts", description: "Tea gift set", amount: "420.00", currency: "CNY", back: 0 },
   ] as const;
-  // Spent on deals: a factory trip for a deal we then lost, and a visit before a deal we won.
+  // Spent on deals: a supplier trip for a deal we then lost, and a visit before a deal we won.
   const lostDeal = await db.inquiry.findFirst({ where: { stage: "lost" }, select: { id: true, customerId: true } });
   const wonDeal = await db.inquiry.findFirst({
     where: { stage: "won", orders: { some: { status: { not: "cancelled" } } } },
@@ -679,7 +679,7 @@ export async function seedDemoData(
       data: {
         inquiryId: lostDeal.id,
         customerId: lostDeal.customerId,
-        factoryId: factories[2].id,
+        supplierId: suppliers[2].id,
         category: "travel",
         description: "Train to the film factory to check samples",
         amount: "1650.00",
@@ -695,7 +695,7 @@ export async function seedDemoData(
       data: {
         inquiryId: wonDeal.id,
         customerId: wonDeal.customerId,
-        factoryId: factories[0].id,
+        supplierId: suppliers[0].id,
         category: "travel",
         description: "Visit to the factory with the customer's engineer",
         amount: "2400.00",
@@ -762,10 +762,10 @@ export async function seedDemoData(
     });
   }
   await db.note.create({
-    data: { factoryId: factories[1].id, kind: "visit", body: "Saw the valves on the test bench; packing starts next week.", at: at(3, "02:00"), authorId: people.manager.id },
+    data: { supplierId: suppliers[1].id, kind: "visit", body: "Saw the valves on the test bench; packing starts next week.", at: at(3, "02:00"), authorId: people.manager.id },
   });
   await db.followUp.create({
-    data: { title: "Factory visit: final check before packing", kind: "visit", dueOn: toDbDate(today), dueAt: "14:00", place: "Wenzhou", factoryId: factories[1].id, assigneeId: sana.id, createdById: people.manager.id },
+    data: { title: "Factory visit: final check before packing", kind: "visit", dueOn: toDbDate(today), dueAt: "14:00", place: "Wenzhou", supplierId: suppliers[1].id, assigneeId: sana.id, createdById: people.manager.id },
   });
   if (quoted)
     await db.followUp.create({

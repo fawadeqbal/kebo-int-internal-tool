@@ -70,7 +70,7 @@ export const LEDGER_FIXED_ACCOUNT_LABEL: Record<LedgerFixedAccount, string> = {
 /** The kinds of account, as the key starts ("money:…", "customer:…"); fixed ones are their own kind. */
 export type LedgerAccountKind = "money" | "customer" | "credit" | "factory" | "staff" | "expense" | LedgerFixedAccount;
 
-/** Account keys: one per money account (or "not on an account" per currency), customer, factory, person, expense kind. */
+/** Account keys: one per money account (or "not on an account" per currency), customer, supplier, person, expense kind. */
 export const ledgerAccount = {
   money: (id: string) => `money:${id}`,
   noAccount: (currency: string) => `money:none:${currency}`,

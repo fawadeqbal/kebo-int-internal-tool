@@ -24,7 +24,7 @@ export const PERMISSIONS = [
   "customers.delete",
   "customers.export",
   "quotations.manage",
-  /** Factories, their prices, our costs and margins (never shown to customers). */
+  /** Suppliers, their prices, our costs and margins (never shown to customers). */
   "sourcing.manage",
   /** Cancel orders. */
   "orders.manage",
@@ -42,9 +42,9 @@ export const PERMISSIONS = [
   "documents.manage",
   /** Arrival, customs, delivery, site acceptance and claims. */
   "delivery.manage",
-  /** Expenses, what factories were paid and profit & loss (managers and the super admin). */
+  /** Expenses, what suppliers were paid and profit & loss (managers and the super admin). */
   "expenses.manage",
-  /** Finance › Ledger: every money record as posted, each customer's, factory's and person's ledger, statements, ageing. */
+  /** Finance › Ledger: every money record as posted, each customer's, supplier's and person's ledger, statements, ageing. */
   "ledger.view",
   "users.manage",
   "settings.manage",

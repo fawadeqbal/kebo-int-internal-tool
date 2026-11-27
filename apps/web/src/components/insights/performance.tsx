@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { date, plural, companyToday } from "@/lib/format";
 import { bigMoney, percent } from "@/lib/insights-period";
 import { hasFeature } from "@/lib/session";
-import type { Aging, FactoryGroups, FactOrders, InquiryGroups, OrderGroups } from "@/lib/types-facts";
+import type { Aging, SupplierGroups, FactOrders, InquiryGroups, OrderGroups } from "@/lib/types-facts";
 import type { PersonSpending } from "@/lib/types-money";
 import { PerformanceView, type PerfFigure } from "./performance-view";
 
@@ -15,7 +15,7 @@ const n = (v: string | number | null | undefined) => (v === null || v === undefi
 type Kind = "customer" | "factory" | "user";
 
 /**
- * Performance (design system: Record frame): how a customer, a factory or a person has done, this year or
+ * Performance (design system: Record frame): how a customer, a supplier or a person has done, this year or
  * all time, from the Insights tables — the same figures Insights shows. For people who may see Insights.
  */
 export async function PerformanceCard({
@@ -107,8 +107,8 @@ async function figures(kind: Kind, id: string, span: { from?: string; to?: strin
   }
   if (kind === "factory") {
     const [f, last] = await Promise.all([
-      facts<FactoryGroups>("factories/groups", { ...span, period: "all", by: "factory", factoryId: id }),
-      facts<FactOrders>("orders", { ...span, factoryId: id, limit: 1 }),
+      facts<SupplierGroups>("factories/groups", { ...span, period: "all", by: "factory", supplierId: id }),
+      facts<FactOrders>("orders", { ...span, supplierId: id, limit: 1 }),
     ]);
     const r = f.rows[0];
     const c = f.currency;

@@ -1,16 +1,16 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { factoryImport, factoryInput, listQuery, type FactoryImport, type FactoryInput } from "@kebo/shared";
+import { supplierImport, supplierInput, listQuery, type SupplierImport, type SupplierInput } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
 import { CurrentUser, RequirePermissions, RequireFeature } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
-import { FactoriesService } from "./factories.service";
+import { SuppliersService } from "./suppliers.service";
 import { Versioned } from "../../common/http/version";
 
-/** ?mine=true: the factories I look after. */
+/** ?mine=true: the suppliers I look after. */
 const blank = (v: unknown) => (v === "" ? undefined : v);
-const factoryList = listQuery.extend({
+const supplierList = listQuery.extend({
   mine: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
   /** Who looks after it ("none": nobody yet). */
   owner: z.preprocess(blank, z.union([z.uuid(), z.literal("none")]).optional()),
@@ -22,12 +22,12 @@ const factoryList = listQuery.extend({
 
 @ApiTags("factories")
 @Controller("factories")
-export class FactoriesController {
-  constructor(private readonly factories: FactoriesService) {}
+export class SuppliersController {
+  constructor(private readonly factories: SuppliersService) {}
 
   @Get()
   @RequirePermissions("sourcing.manage")
-  list(@CurrentUser() user: SessionUser, @Query(Validate(factoryList)) q: z.infer<typeof factoryList>) {
+  list(@CurrentUser() user: SessionUser, @Query(Validate(supplierList)) q: z.infer<typeof supplierList>) {
     return this.factories.list(user, q);
   }
 
@@ -39,23 +39,23 @@ export class FactoriesController {
 
   @Post()
   @RequirePermissions("sourcing.manage")
-  create(@CurrentUser() user: SessionUser, @Body(Validate(factoryInput)) body: FactoryInput) {
+  create(@CurrentUser() user: SessionUser, @Body(Validate(supplierInput)) body: SupplierInput) {
     return this.factories.create(user, body);
   }
 
-  /** New factories from an uploaded file: { added, skipped: [{ name, reason }] }. */
+  /** New suppliers from an uploaded file: { added, skipped: [{ name, reason }] }. */
   @RequireFeature("excel")
   @Post("import")
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")
-  importMany(@CurrentUser() user: SessionUser, @Body(Validate(factoryImport)) body: FactoryImport) {
+  importMany(@CurrentUser() user: SessionUser, @Body(Validate(supplierImport)) body: SupplierImport) {
     return this.factories.importMany(user, body);
   }
 
   @Versioned("parties")
   @Put(":id")
   @RequirePermissions("sourcing.manage")
-  update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryInput)) body: FactoryInput) {
+  update(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierInput)) body: SupplierInput) {
     return this.factories.update(user, id, body);
   }
 

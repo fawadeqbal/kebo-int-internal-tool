@@ -18,8 +18,8 @@ export const orderCostsSetup = cache(async (id: string) => {
   const costs = await optional(() => orderCostsOf(id));
   if (!costs) return null;
   const [settings, people, m, o] = await Promise.all([getSettings(), optional(getPeople), optional(() => orderMoneyOf(id)), optional(() => orderOf(id))]);
-  const factories = new Map<string, string>();
-  for (const r of m?.factories?.rows ?? []) factories.set(r.factory.id, r.factory.name);
+  const suppliers = new Map<string, string>();
+  for (const r of m?.factories?.rows ?? []) suppliers.set(r.factory.id, r.factory.name);
   const setup: CostSetup = {
     mainCurrency: settings.sales.currency,
     fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates },
@@ -28,7 +28,7 @@ export const orderCostsSetup = cache(async (id: string) => {
     for: { place: "order", id, customerId: o?.customer.id ?? null, label: `Order ${costs.refNo}${o ? ` · ${o.customer.name}` : ""}` },
     order: {
       currency: costs.currency,
-      factories: [...factories].map(([fid, name]) => ({ id: fid, name })),
+      factories: [...suppliers].map(([fid, name]) => ({ id: fid, name })),
       // What a new cost does to the margin: the costed value, the profit now, and where it gets thin.
       margin:
         costs.sheet.costs !== null && costs.sheet.profit !== null

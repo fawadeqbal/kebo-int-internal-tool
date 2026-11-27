@@ -34,7 +34,7 @@ describe("papers in the customer's format", () => {
         })
         .expect(201)
     ).body.id;
-    const factoryId = (await api(app, sana).post("/factories", { name: `Capping Works ${tag}`, address: "Jining" }).expect(201)).body.id;
+    const supplierId = (await api(app, sana).post("/factories", { name: `Capping Works ${tag}`, address: "Jining" }).expect(201)).body.id;
     const inquiry = (
       await api(app, sana)
         .post("/inquiries", { customerId, category: "Machinery", assigneeId: me, items: [{ description: "Vial capping machine RHZ-8", quantity: 1 }] })
@@ -43,7 +43,7 @@ describe("papers in the customer's format", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "RHZ-8", quantity: 1, unitPrice: 200000 }],

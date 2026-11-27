@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
-import { factoryTaxMinor, formatMinor, toMinor } from "@kebo/money";
+import { supplierTaxMinor, formatMinor, toMinor } from "@kebo/money";
 import { ATTACHMENT_KIND_LABEL, lineNumbers, offerTaxText, PAPER, type AttachmentKind } from "@kebo/shared";
 import { Button, cn, Field, RULES, Select, Textarea, Badge, Notice, EmptyLine, linkClass, Dash } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
@@ -18,13 +18,13 @@ import { ConfirmDialog } from "@/components/common/dialog";
 import { changeLine } from "@/components/common/change-words";
 import type { ActionState } from "@/lib/actions";
 import { date as dateText, dateTime, money as amount } from "@/lib/format";
-import type { FactoryOption, FactoryQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
+import type { SupplierOption, SupplierQuoteView, OfferFile, SourcingView } from "@/lib/types-deals";
 import type { OfferLineResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 import { send, type Staged } from "@/components/files/upload";
 import { FileRow, FileZone } from "@/components/common/file-zone";
 import { fileSize } from "@/lib/format";
 import { convertText, type Fx } from "@/lib/fx";
-import { OFFER_PART_LABEL, OfferHeaderForm, type AskedFactory, type OfferPart, type OfferSaved, type OfferStep } from "./factory-quote-form";
+import { OFFER_PART_LABEL, OfferHeaderForm, type AskedSupplier, type OfferPart, type OfferSaved, type OfferStep } from "./supplier-quote-form";
 import { LinesExcel } from "./lines-view";
 import { ItemsBox } from "@/components/records/items-box";
 import { Totals } from "@/components/records/totals";
@@ -44,7 +44,7 @@ export interface OfferLineActions {
   removeFile: (fileId: string, prev: ActionState, form: FormData) => Promise<ActionState>;
 }
 
-/** A factory's file is its quotation unless it is clearly something else. */
+/** A supplier's file is its quotation unless it is clearly something else. */
 const guessOfferKind = (name: string, type: string): AttachmentKind => {
   const n = name.toLowerCase();
   if (/catalog|brochure|spec|datasheet|technical/.test(n)) return "specification";
@@ -76,12 +76,12 @@ export type OfferKit = {
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchFactories: (q: string) => Promise<FactoryOption[]>;
+  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
   saveAction: Action;
   removeAction: Action;
   removeFile: OfferLineActions["removeFile"];
   items: Items;
-  others: FactoryQuoteView[];
+  others: SupplierQuoteView[];
   lineActions: OfferLineActions;
   linesCard?: EditCard | null;
   /** The inquiry's number, under the window's title ("Shenjing Machinery · RFQ-2026-0007"). */
@@ -92,7 +92,7 @@ export type OfferKit = {
  * The offer's window (design rules 18 Nov): `only` opens just the part asked for — "Edit delivery & payment", 640 px
  * (the prices wide) — the rest "Edit offer", every part.
  */
-export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: OfferKit; q: FactoryQuoteView; step: OfferStep; only?: boolean; onClose: () => void }) {
+export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: OfferKit; q: SupplierQuoteView; step: OfferStep; only?: boolean; onClose: () => void }) {
   const one = only;
   const part = step === "review" || step === "changes" ? null : step;
   return (
@@ -109,7 +109,7 @@ export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: Offer
 }
 
 /**
- * Edit with its word (never a pencil alone): opens the offer's window on `step` (Factory · Prices · Delivery &
+ * Edit with its word (never a pencil alone): opens the offer's window on `step` (Supplier · Prices · Delivery &
  * payment · Warranty & conditions), only that part when `only`. `what` finishes its name for screen readers ("Edit prices").
  */
 export function OfferEdit({
@@ -123,7 +123,7 @@ export function OfferEdit({
   variant = "secondary",
 }: {
   kit: OfferKit;
-  q: FactoryQuoteView;
+  q: SupplierQuoteView;
   step: OfferStep;
   only?: boolean;
   what?: string;
@@ -148,7 +148,7 @@ export function OfferEdit({
 }
 
 /** Edit offer from the page's ⋯ (?panel=edit-offer): every part, in steps, as the Edit offer button opened it. */
-export function OfferUrlWindow({ kit, q }: { kit: OfferKit; q: FactoryQuoteView }) {
+export function OfferUrlWindow({ kit, q }: { kit: OfferKit; q: SupplierQuoteView }) {
   const panel = useSidePanel("edit-offer");
   if (!panel.open) return null;
   // ?panel=edit-offer: every step; …&id=prices: that part only (an item's sheet on a phone opens it so).
@@ -158,7 +158,7 @@ export function OfferUrlWindow({ kit, q }: { kit: OfferKit; q: FactoryQuoteView 
 
 /**
  * The offer's window, the same for a new offer and an edit (design 18 Nov, the inquiry's rules): the steps of
- * OfferHeaderForm, the factory's own files in the Factory step and the lines in Prices — all saved by the one Save.
+ * OfferHeaderForm, the supplier's own files in the Supplier step and the lines in Prices — all saved by the one Save.
  * A new offer saved opens its page (or the window starts again: Save and add another); an edit closes. Each part's
  * changes are kept with the reason, for its box's history. Removing the offer, or one of its files, asks first.
  */
@@ -168,7 +168,7 @@ function OfferWindow({
   today,
   mainCurrency,
   rates,
-  searchFactories,
+  searchSuppliers,
   saveAction,
   removeAction,
   removeFile,
@@ -187,21 +187,21 @@ function OfferWindow({
   /** The customer's items (a new offer's lines can be copied from them; a line keeps which it answers). */
   items: Items;
   /** The inquiry's other offers with lines (their lines can be copied). */
-  others: FactoryQuoteView[];
+  others: SupplierQuoteView[];
   lineActions: OfferLineActions;
   /** The lines' saved edits ("Edited n×"). */
   linesCard?: EditCard | null;
-  /** The factories asked for this inquiry, first in the picker. */
-  asked?: AskedFactory[];
+  /** The suppliers asked for this inquiry, first in the picker. */
+  asked?: AskedSupplier[];
   /** The step it opens on. */
   startStep?: OfferStep;
   dealId: string;
   /** The offer being edited; null: a new one. */
-  q: FactoryQuoteView | null;
+  q: SupplierQuoteView | null;
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchFactories: (q: string) => Promise<FactoryOption[]>;
+  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
   saveAction: Action;
   removeAction?: Action;
   removeFile?: OfferLineActions["removeFile"];
@@ -233,12 +233,12 @@ function OfferWindow({
   }, 0);
   const [copyFrom, setCopyFrom] = useState("");
 
-  // The factory's files, sent once the offer is saved; what did not go up, said.
+  // The supplier's files, sent once the offer is saved; what did not go up, said.
   const upload = async (id: string) => {
     const problems: string[] = [];
     for (const file of files) {
       const staged: Staged = { key: file.name, file, kind: guessOfferKind(file.name, file.type), note: "", progress: 0, error: null };
-      const e = await send(dealId, staged, () => {}, { factoryQuoteId: id });
+      const e = await send(dealId, staged, () => {}, { supplierQuoteId: id });
       if (e) problems.push(`${file.name} did not upload: ${e}`);
     }
     return problems;
@@ -336,7 +336,7 @@ function OfferWindow({
       }
     });
 
-  // Their quotation (design 18 Nov): with who sent it and when, in the Factory step.
+  // Their quotation (design 18 Nov): with who sent it and when, in the Supplier step.
   const fileRows = (
     <div className="flex flex-col gap-2">
       {(q?.files ?? []).map((f) => (
@@ -538,7 +538,7 @@ function OfferWindow({
         today={today}
         mainCurrency={mainCurrency}
         rates={rates}
-        searchFactories={searchFactories}
+        searchSuppliers={searchSuppliers}
         onDone={(st, saved) => void done(st, saved)}
         defaults={taxDefault ? { taxIncluded: taxDefault.included, taxRate: taxDefault.rate, advancePercent: taxDefault.advance } : undefined}
         files={fileRows}
@@ -628,7 +628,7 @@ function LinesReview({ rows, currency, tax }: { rows: LineRow[]; currency: strin
 }
 
 /** The offer's saved lines as rows of the line table. */
-export function offerRows(lines: FactoryQuoteView["lines"]): LineRow[] {
+export function offerRows(lines: SupplierQuoteView["lines"]): LineRow[] {
   return lines.map((l) => ({
     key: l.id,
     parentKey: l.parentId,
@@ -646,7 +646,7 @@ export function offerRows(lines: FactoryQuoteView["lines"]): LineRow[] {
 }
 
 /** The offer's line calls (one change, one call), for the offer `id` (a new offer's, once it is saved). */
-function offerLineHandlers(id: string, q: FactoryQuoteView | null, lines: OfferLineActions): LineHandlers {
+function offerLineHandlers(id: string, q: SupplierQuoteView | null, lines: OfferLineActions): LineHandlers {
   const had = new Set((q?.lines ?? []).map((l) => l.id));
   const result = (r: OfferLineResult): LineResult => {
     if (!r.ok) return { ok: false, message: r.message, reasonChoices: r.reasonChoices };
@@ -713,7 +713,7 @@ export function offerSums(rows: LineRow[], taxRate: number, savedRate: number, i
     byRate.set(rate, { amount: g.amount + m, lines: g.lines + 1 });
     sum += m;
   }
-  const tax = [...byRate].reduce((t, [r, g]) => t + factoryTaxMinor(g.amount, r, included), 0);
+  const tax = [...byRate].reduce((t, [r, g]) => t + supplierTaxMinor(g.amount, r, included), 0);
   const rates = [...byRate.keys()].sort((a, b) => b - a);
   const noTax = rates.every((r) => r === 0) && taxRate === 0;
   return { byRate, sum, tax, rates, noTax, total: included ? sum : sum + tax };
@@ -780,7 +780,7 @@ export function OfferTotals({
  * The offer's line columns (the view and the steps window's sheet): its currency in the price, its tax % for new lines.
  * Which item a line answers is kept on the line, not shown (design 18 Nov): copied lines keep it.
  */
-export function offerColumns(lines: FactoryQuoteView["lines"], currency: string, taxRate: number, savedRate = taxRate): LineColumn[] {
+export function offerColumns(lines: SupplierQuoteView["lines"], currency: string, taxRate: number, savedRate = taxRate): LineColumn[] {
   // Lines another spec can point at: the offer's main lines (not parts, not specs themselves).
   const mains = lines.filter((l) => !l.parentId && !l.alternativeOfId);
   const numberOf = (id: string) => lines.find((l) => l.id === id)?.no ?? "";
@@ -878,7 +878,7 @@ export function offerColumns(lines: FactoryQuoteView["lines"], currency: string,
 /* ---------------------------------------------------------------- the offer's page: a box per part */
 
 /**
- * The offer's page (design 18 Nov, the inquiry's rules): the same boxes as its steps — Factory and Delivery &
+ * The offer's page (design 18 Nov, the inquiry's rules): the same boxes as its steps — Supplier and Delivery &
  * payment side by side, then Prices, then Warranty & conditions — each with its own history clock and Edit (that part only),
  * each fact once.
  */
@@ -890,7 +890,7 @@ export function OfferBoxes({
   mainCurrency,
   historyHref,
 }: {
-  q: FactoryQuoteView;
+  q: SupplierQuoteView;
   kit: OfferKit;
   canEdit: boolean;
   /** This offer's saved edits, by card. */
@@ -1043,15 +1043,15 @@ export function OfferBoxes({
 /* ---------------------------------------------------------------- add an offer */
 
 /**
- * "Enter an offer": the New factory offer window (design 18 Nov): Factory · Prices · Delivery & payment · Warranty & conditions,
- * then Review and Add the offer. The factories asked for this inquiry come first in its picker.
+ * "Enter an offer": the New supplier offer window (design 18 Nov): Supplier · Prices · Delivery & payment · Warranty & conditions,
+ * then Review and Add the offer. The suppliers asked for this inquiry come first in its picker.
  */
 export function AddOfferButton({
   dealId,
   today,
   mainCurrency,
   rates,
-  searchFactories,
+  searchSuppliers,
   createAction,
   taxDefault,
   label = "Add an offer",
@@ -1065,13 +1065,13 @@ export function AddOfferButton({
   asked,
   inquiryTitle,
 }: {
-  /** The factories asked for this inquiry (first in the picker). */
-  asked?: AskedFactory[];
+  /** The suppliers asked for this inquiry (first in the picker). */
+  asked?: AskedSupplier[];
   /** The inquiry's title, under the window's title ("For RFQ-2026-0007 · Tablet press machine"). */
   inquiryTitle?: string;
   /** The customer's items and the other offers (a new offer's lines can start from them), and the line calls. */
   items: Items;
-  others: FactoryQuoteView[];
+  others: SupplierQuoteView[];
   lineActions: OfferLineActions;
   /** The inquiry's number, in the window's line under the title. */
   refNo?: string;
@@ -1079,8 +1079,8 @@ export function AddOfferButton({
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchFactories: (q: string) => Promise<FactoryOption[]>;
-  /** saveFactoryQuoteAction bound to the deal and null (a new offer). */
+  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
+  /** saveSupplierQuoteAction bound to the deal and null (a new offer). */
   createAction: Action;
   /** A new offer's tax and advance: the company's defaults (Settings). */
   taxDefault: { included: boolean; rate: number; advance?: number };
@@ -1111,7 +1111,7 @@ export function AddOfferButton({
             today={today}
             mainCurrency={mainCurrency}
             rates={rates}
-            searchFactories={searchFactories}
+            searchSuppliers={searchSuppliers}
             saveAction={createAction}
             taxDefault={taxDefault}
             onAnother={() => setRound((n) => n + 1)}

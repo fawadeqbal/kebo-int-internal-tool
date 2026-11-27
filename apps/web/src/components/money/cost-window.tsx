@@ -40,7 +40,7 @@ import { COMPANY, costKind } from "./cost-kinds";
  * The one cost window (design "spending", board CostWindow): every place that adds or changes a cost opens it,
  * with the same fields in the same order and the same words. Opened from a record it already knows what the
  * cost is for (shown, with Change); from Record payment or Home it is chosen first. The kinds offered fit the
- * place; Repeats only for the company, Who bears it only on an order, Factory visited for trips and checks.
+ * place; Repeats only for the company, Who bears it only on an order, Supplier visited for trips and checks.
  */
 
 /** Who a cost is for: the company's own, spent on a customer, on one of their inquiries (won or lost), or on one order. */
@@ -76,7 +76,7 @@ export interface CostSetup {
   /** What it is for; null: chosen in the window. */
   for: CostFor | null;
   /**
-   * Opened from an order: its currency, the factories on it (one of them can bear a cost), and its margin now
+   * Opened from an order: its currency, the suppliers on it (one of them can bear a cost), and its margin now
    * (the costed value and the profit, in its currency; the floor from Settings) to say when a cost makes it thin.
    */
   order?: { currency: string; factories: { id: string; name: string }[]; margin?: { value: string; profit: string; floor: number } | null };
@@ -112,7 +112,7 @@ const PLACE_KINDS: Record<CostPlace, readonly ExpenseCategory[]> = {
   company: ["rent", "salaries", "office", "utilities", "travel", "meals", "bank_charges", "other"],
 };
 const DEFAULT_KIND: Record<CostPlace, ExpenseCategory> = { company: "rent", customer: "meals", deal: "travel", order: "freight" };
-/** Kinds that are a visit: the window asks which factory. */
+/** Kinds that are a visit: the window asks which supplier. */
 const VISITS: readonly ExpenseCategory[] = ["travel", "hotel", "meals", "inspection"];
 
 
@@ -235,10 +235,10 @@ export function CostForm({
   const [paidBy, setPaidBy] = useState(expense ? (expense.paidBy?.id ?? "") : (template?.paidBy?.id ?? meId));
   const settled = expense?.repaid ?? null;
 
-  // On an order: who bears it, and the factory (visited, or the one that bears it).
+  // On an order: who bears it, and the supplier (visited, or the one that bears it).
   const onSetupOrder = place === "order" && !!s0.order && orderId === (s0.for?.place === "order" ? s0.for.id : null);
   const [bearer, setBearer] = useState<ExpenseBearer>(from?.borneBy ?? "us");
-  const [factoryId, setFactoryId] = useState(from?.factory?.id ?? "");
+  const [supplierId, setSupplierId] = useState(from?.factory?.id ?? "");
   const [repeats, setRepeats] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -280,12 +280,12 @@ export function CostForm({
     return then < m.floor ? { now, then, floor: m.floor } : null;
   })();
 
-  const factories = (() => {
+  const suppliers = (() => {
     if (bearer === "factory" && onSetupOrder) return s0.order!.factories;
     const all = choices?.factories ?? s0.order?.factories ?? [];
     return from?.factory && !all.some((f) => f.id === from.factory!.id) ? [from.factory, ...all] : all;
   })();
-  const asksFactory = !send && (bearer === "factory" || VISITS.includes(category) || !!from?.factory) && (factories.length > 0 || bearer === "factory");
+  const asksSupplier = !send && (bearer === "factory" || VISITS.includes(category) || !!from?.factory) && (suppliers.length > 0 || bearer === "factory");
 
   const base = send ? submitCostAction : expenseAction.bind(null, null, expense?.id ?? null, expense?.updatedAt ?? null);
   const save = useSaveThenSend(
@@ -353,7 +353,7 @@ export function CostForm({
               <input type="hidden" name="descriptionDefault" value={EXPENSE_CATEGORY_LABEL[category]} />
               <input type="hidden" name="payLater" value={paid === "later" ? "on" : "off"} />
               <input type="hidden" name="borneBy" value={place === "order" ? bearer : "us"} />
-              {!asksFactory && <input type="hidden" name="factoryId" value="" />}
+              {!asksSupplier && <input type="hidden" name="supplierId" value="" />}
               {place === "company" && !expense && !month && <input type="hidden" name="repeats" value={repeats ? "on" : "off"} />}
               {month && (
                 <>
@@ -604,20 +604,20 @@ export function CostForm({
             {send && st.errors?.paidById && <p className="text-xs text-bad">{st.errors.paidById[0]}</p>}
           </div>
 
-          {/* The factory, and who bears it (orders only) */}
-          {(asksFactory || place === "order") && !send && (
+          {/* The supplier, and who bears it (orders only) */}
+          {(asksSupplier || place === "order") && !send && (
             <div className="grid gap-3 sm:grid-cols-2">
-              {asksFactory ? (
+              {asksSupplier ? (
                 <Field
                   label={bearer === "factory" ? "Which supplier" : "Supplier visited"}
                   htmlFor="cost-factory"
                   optional={bearer !== "factory"}
-                  error={st.errors?.factoryId}
+                  error={st.errors?.supplierId}
                   
                 >
-                  <Select id="cost-factory" name="factoryId" value={factoryId} onChange={(e) => setFactoryId(e.target.value)}>
+                  <Select id="cost-factory" name="supplierId" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
                     <option value="">{bearer === "factory" ? "Choose the supplier…" : "None"}</option>
-                    {factories.map((f) => (
+                    {suppliers.map((f) => (
                       <option key={f.id} value={f.id}>
                         {f.name}
                       </option>
@@ -634,7 +634,7 @@ export function CostForm({
                     items={EXPENSE_BEARERS.filter((b) => b !== "factory" || (onSetupOrder && s0.order!.factories.length > 0) || bearer === "factory").map((b) => ({ value: b, label: EXPENSE_BEARER_LABEL[b] }))}
                     onChange={(b) => {
                       setBearer(b);
-                      if (b === "factory" && onSetupOrder && s0.order!.factories.length === 1) setFactoryId(s0.order!.factories[0]!.id);
+                      if (b === "factory" && onSetupOrder && s0.order!.factories.length === 1) setSupplierId(s0.order!.factories[0]!.id);
                     }}
                   />
                   <p className="text-xs text-text-2">

@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 
-/** Expenses on deals and factories, profit after what was spent before the sale, and a customer's account. */
+/** Expenses on deals and suppliers, profit after what was spent before the sale, and a customer's account. */
 describe("customer account", () => {
   let app: INestApplication;
   let sana: string;
@@ -10,7 +10,7 @@ describe("customer account", () => {
   let customerId: string;
   let lostDeal: string;
   let openDeal: string;
-  let factoryId: string;
+  let supplierId: string;
   const tag = Date.now().toString(36);
   const today = new Date().toISOString().slice(0, 10);
   const spend = (body: Record<string, unknown>) =>
@@ -31,7 +31,7 @@ describe("customer account", () => {
     lostDeal = await deal("Flour mill 50 t/day");
     openDeal = await deal("Bran finisher");
     await api(app, sana).post(`/inquiries/${lostDeal}/stage`, { to: "lost", lostReason: "price_too_high", note: "Turkish mill was cheaper" }).expect(200);
-    factoryId = (await api(app, manager).get("/factories?pageSize=1").expect(200)).body.rows[0].id;
+    supplierId = (await api(app, manager).get("/factories?pageSize=1").expect(200)).body.rows[0].id;
   });
 
   afterAll(async () => {
@@ -39,19 +39,19 @@ describe("customer account", () => {
   });
 
   it("puts an expense on a deal (its customer is filled in) and on the supplier visited", async () => {
-    const trip = (await spend({ inquiryId: lostDeal, factoryId, description: `Trip to check the mill ${tag}`, amount: 400 }).expect(201)).body;
-    expect(trip).toMatchObject({ deal: { id: lostDeal, stage: "lost" }, customer: { id: customerId }, factory: { id: factoryId }, order: null });
+    const trip = (await spend({ inquiryId: lostDeal, supplierId, description: `Trip to check the mill ${tag}`, amount: 400 }).expect(201)).body;
+    expect(trip).toMatchObject({ deal: { id: lostDeal, stage: "lost" }, customer: { id: customerId }, factory: { id: supplierId }, order: null });
     await spend({ inquiryId: openDeal, category: "samples", description: "Bran samples", amount: 60 }).expect(201);
     await spend({ customerId, category: "meals", description: "Dinner in Peshawar", amount: 40 }).expect(201);
     // A deal of another customer is refused.
     const other = (await api(app, manager).get("/customers/names").expect(200)).body.find((c: { id: string }) => c.id !== customerId);
     const bad = await spend({ inquiryId: lostDeal, customerId: other.id, description: "x", amount: 1 }).expect(400);
     expect(bad.body.error).toMatch(/is for another customer/);
-    // Filters by deal and by factory.
+    // Filters by deal and by supplier.
     const onDeal = (await api(app, manager).get(`/expenses?inquiryId=${lostDeal}`).expect(200)).body;
     expect(onDeal.rows.map((r: { description: string }) => r.description)).toEqual([`Trip to check the mill ${tag}`]);
-    const atFactory = (await api(app, manager).get(`/expenses?factoryId=${factoryId}`).expect(200)).body;
-    expect(atFactory.rows.some((r: { description: string }) => r.description === `Trip to check the mill ${tag}`)).toBe(true);
+    const atSupplier = (await api(app, manager).get(`/expenses?supplierId=${supplierId}`).expect(200)).body;
+    expect(atSupplier.rows.some((r: { description: string }) => r.description === `Trip to check the mill ${tag}`)).toBe(true);
   });
 
   it("shows the customer's account: lost inquiries' cost by reason, open deals, and the net", async () => {

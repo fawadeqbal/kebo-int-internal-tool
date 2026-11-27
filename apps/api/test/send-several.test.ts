@@ -44,7 +44,7 @@ describe("sending several quotations at once", () => {
       (
         await api(app, sana)
           .post(`/inquiries/${inquiryId}/factory-quotes`, {
-            newFactoryName: `${name} ${tag}`,
+            newSupplierName: `${name} ${tag}`,
             receivedOn: "2026-11-12",
             currency: "USD",
             lines: [{ requestedItemId: item, description: "Cartoner CT-80", quantity: 1, unitPrice: price, taxRate: 0 }],

@@ -8,7 +8,7 @@ import {
   can,
   DOCUMENT_PAPER,
   documentDone,
-  FACTORY_PRICE_PAPERS,
+  SUPPLIER_PRICE_PAPERS,
   inSentence,
   LIVE_PAPERS,
   ORDER_DOCUMENT_LABEL,
@@ -28,7 +28,7 @@ import {
   PAPER_STATE_LABEL,
   PAPER_STEP,
   PAPER_TITLE,
-  PER_FACTORY_PAPERS,
+  PER_SUPPLIER_PAPERS,
   paperNumber,
   placeholdersIn,
   paperOptionsOf,
@@ -77,7 +77,7 @@ import { OrdersService } from "../orders/orders.service";
 import { FlowService } from "../flow/flow.service";
 import {
   BUILDERS,
-  factoriesOf,
+  suppliersOf,
   hsMissing,
   livePlanOfPaper,
   paperOrderInclude,
@@ -94,7 +94,7 @@ type PaperRow = PaperOrder["papers"][number];
 
 /** One paper of the order on its step page and the Documents page. */
 export interface PaperListRow {
-  /** Unique in the list: the kind, with the factory / payment / plan item, or the document row. */
+  /** Unique in the list: the kind, with the supplier / payment / plan item, or the document row. */
   key: string;
   /** A paper the app makes (PaperKind), the order's own "proforma" / "packing-list", or a document-set kind someone else issues. */
   kind: string;
@@ -156,7 +156,7 @@ const asOptions = (v: Prisma.JsonValue): PaperOptions =>
  * same services (and rules) as everywhere else.
  *
  * Seeing papers follows the order; making them needs documents.manage; the bank
- * papers need the bank_documents module; the purchase order shows factory
+ * papers need the bank_documents module; the purchase order shows supplier
  * prices, so only people who see them (sourcing.manage) get it.
  */
 @Injectable()
@@ -196,11 +196,11 @@ export class PapersService implements OnModuleInit {
     return !routes || (route !== null && (routes as readonly string[]).includes(route));
   }
 
-  /** The paper may be read: its module is on, it fits the route, and the purchase order only for people who see factory prices. */
+  /** The paper may be read: its module is on, it fits the route, and the purchase order only for people who see supplier prices. */
   private async mayRead(user: SessionUser, kind: PaperKind, o: WithTerms) {
     const f = PAPER_FEATURE[kind];
     if (f) await this.limits.require(f as PlanFeature);
-    if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier prices.");
+    if (SUPPLIER_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier prices.");
     if (!this.applies(kind, o, null))
       throw new DomainError(
         `The ${PAPER_LABEL[kind].toLowerCase()} is only for orders paid ${PAPER_ROUTES[kind]!.includes("bank_contract") ? "through the banks" : "by LC"}.`,
@@ -328,12 +328,12 @@ export class PapersService implements OnModuleInit {
     return { checks, fields, doc };
   }
 
-  /** The default ref: the first factory of a purchase order; "" otherwise. */
+  /** The default ref: the first supplier of a purchase order; "" otherwise. */
   private refOf(kind: PaperKind, o: PaperOrder, ref: string | null | undefined) {
-    if (PER_FACTORY_PAPERS.includes(kind)) {
-      const factories = factoriesOf(o);
-      if (ref && !factories.some((f) => f.id === ref)) throw new NotFoundError("Supplier on this order");
-      return ref || factories[0]?.id || "";
+    if (PER_SUPPLIER_PAPERS.includes(kind)) {
+      const suppliers = suppliersOf(o);
+      if (ref && !suppliers.some((f) => f.id === ref)) throw new NotFoundError("Supplier on this order");
+      return ref || suppliers[0]?.id || "";
     }
     // A receipt without a ref is the last payment's.
     if (kind === "payment-receipt") return ref || o.allocations.at(-1)?.id || "";
@@ -453,7 +453,7 @@ export class PapersService implements OnModuleInit {
       madeFrom: PAPER_MADE_FROM[kind],
       number: latest?.number ?? doc.number,
       ref: ref || null,
-      factories: PER_FACTORY_PAPERS.includes(kind) ? factoriesOf(o).map((f) => ({ id: f.id, name: f.name })) : null,
+      factories: PER_SUPPLIER_PAPERS.includes(kind) ? suppliersOf(o).map((f) => ({ id: f.id, name: f.name })) : null,
       live: LIVE_PAPERS.includes(kind),
       canMake: can(user, "documents.manage") && o.status !== "cancelled" && !LIVE_PAPERS.includes(kind) && !SENT_PAPERS.includes(kind),
       state: this.stateOf(latest, ready),
@@ -594,7 +594,7 @@ export class PapersService implements OnModuleInit {
 
     for (const kind of PAPER_KINDS) {
       if (!this.applies(kind, o, features)) continue;
-      if (FACTORY_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) continue;
+      if (SUPPLIER_PRICE_PAPERS.includes(kind) && !can(user, "sourcing.manage")) continue;
       // Switched off: printed-from-the-data papers go; made ones stay (below).
       if (!used(kind) && LIVE_PAPERS.includes(kind)) continue;
       const base = { kind, source: "app" as const, step: PAPER_STEP[kind], printable: true, live: LIVE_PAPERS.includes(kind), kept: SENT_PAPERS.includes(kind) };
@@ -706,8 +706,8 @@ export class PapersService implements OnModuleInit {
       // The FAT report shows once Production has a factory test.
       if (kind === "fat-report" && !fatOf(c)) continue;
       const docKind = PAPER_DOCUMENT[kind] ?? null;
-      const refs = PER_FACTORY_PAPERS.includes(kind) ? factoriesOf(o).map((f) => ({ ref: f.id, name: f.name })) : [{ ref: "", name: "" }];
-      if (PER_FACTORY_PAPERS.includes(kind) && !refs.length) continue;
+      const refs = PER_SUPPLIER_PAPERS.includes(kind) ? suppliersOf(o).map((f) => ({ ref: f.id, name: f.name })) : [{ ref: "", name: "" }];
+      if (PER_SUPPLIER_PAPERS.includes(kind) && !refs.length) continue;
       // A purchase order prints its own number (PO-2026-0044), one per supplier.
       const pos =
         kind === "purchase-order"
@@ -1123,12 +1123,12 @@ export class PapersService implements OnModuleInit {
         break;
       }
       case "readyOn": {
-        // A purchase order's ready date is its factory's own (one per factory); elsewhere, every factory's.
-        const factoryId = kind === "purchase-order" ? (refIn ?? o.lines.find((l) => l.factoryId)?.factoryId ?? null) : null;
+        // A purchase order's ready date is its supplier's own (one per supplier); elsewhere, every supplier's.
+        const supplierId = kind === "purchase-order" ? (refIn ?? o.lines.find((l) => l.supplierId)?.supplierId ?? null) : null;
         await this.orders.setDetails(
           user,
           orderId,
-          orderDetailsInput.parse(factoryId ? { readyBy: [{ factoryId, readyOn: v }] } : { readyOn: v }),
+          orderDetailsInput.parse(supplierId ? { readyBy: [{ supplierId, readyOn: v }] } : { readyOn: v }),
         );
         break;
       }

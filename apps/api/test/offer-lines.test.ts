@@ -8,8 +8,8 @@ type Offer = { id: string; lines: Line[]; files: { id: string; fileName: string;
 
 /**
  * Step 2c: the customer often sends only a requirement; the lines are made at
- * factory prices, one change at a time (added, edited, moved, removed), and
- * another factory's offer can start from the same lines. Each offer keeps its
+ * supplier prices, one change at a time (added, edited, moved, removed), and
+ * another supplier's offer can start from the same lines. Each offer keeps its
  * own files as evidence.
  */
 describe("supplier offer items, one change at a time", () => {
@@ -56,7 +56,7 @@ describe("supplier offer items, one change at a time", () => {
   it("starts an offer without items, then adds, edits, moves and removes items one by one", async () => {
     offerA = (
       await api(app, sana)
-        .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Jiangsu Water ${tag}`, receivedOn: "2026-10-26", currency: "CNY" })
+        .post(`/inquiries/${inquiryId}/factory-quotes`, { newSupplierName: `Jiangsu Water ${tag}`, receivedOn: "2026-10-26", currency: "CNY" })
         .expect(201)
     ).body.id;
     // Enter, Enter, Enter
@@ -113,7 +113,7 @@ describe("supplier offer items, one change at a time", () => {
   it("starts another supplier's offer from the same items and compares them product by product", async () => {
     offerB = (
       await api(app, sana)
-        .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Zhangjiagang ${tag}`, receivedOn: "2026-10-27", currency: "CNY" })
+        .post(`/inquiries/${inquiryId}/factory-quotes`, { newSupplierName: `Zhangjiagang ${tag}`, receivedOn: "2026-10-27", currency: "CNY" })
         .expect(201)
     ).body.id;
     let b: Offer = (await api(app, sana).post(`/factory-quotes/${offerB}/copy-lines`, { fromQuoteId: offerA }).expect(201)).body;
@@ -121,7 +121,7 @@ describe("supplier offer items, one change at a time", () => {
     expect(shape(b)).toEqual(["1 Bottling line", "2 Filler [RFC-32]", "2.1 Blow moulder [CPET-6]", "2.2 Shrink wrapper"]);
     expect(b.lines.every((l) => l.unitPrice === "0.00")).toBe(true);
     expect(b.lines.map((l) => l.productKey)).toEqual(a.lines.map((l) => l.productKey));
-    // This factory's own model and price.
+    // This supplier's own model and price.
     const blow = b.lines.find((l) => l.description === "Blow moulder")!;
     b = (await api(app, sana).patch(`/factory-lines/${blow.id}`, { model: "ZJ-BM6", unitPrice: 495000 }).expect(200)).body;
     expect(b.lines.find((l) => l.id === blow.id)).toMatchObject({ model: "ZJ-BM6", unitPrice: "495000.00" });
@@ -138,7 +138,7 @@ describe("supplier offer items, one change at a time", () => {
         .post(`/api/inquiries/${inquiryId}/files`)
         .set("authorization", `Bearer ${sana}`)
         .field("kind", "factory_quote")
-        .field("factoryQuoteId", offerA)
+        .field("supplierQuoteId", offerA)
         .attach("file", Buffer.from("%PDF-1.4 supplier offer"), { filename: "Jiangsu quote.pdf", contentType: "application/pdf" })
         .expect(201)
     ).body;
@@ -153,7 +153,7 @@ describe("supplier offer items, one change at a time", () => {
     await request(app.getHttpServer())
       .post(`/api/inquiries/${inquiryId}/files`)
       .set("authorization", `Bearer ${sana}`)
-      .field("factoryQuoteId", "00000000-0000-4000-8000-000000000000")
+      .field("supplierQuoteId", "00000000-0000-4000-8000-000000000000")
       .attach("file", Buffer.from("%PDF-1.4"), { filename: "x.pdf", contentType: "application/pdf" })
       .expect(400);
   });
@@ -161,16 +161,16 @@ describe("supplier offer items, one change at a time", () => {
   it("asks why before changing the price of an item a quotation uses; an offer without items cannot be offered", async () => {
     const empty = (
       await api(app, sana)
-        .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Empty ${tag}`, receivedOn: "2026-10-27", currency: "CNY" })
+        .post(`/inquiries/${inquiryId}/factory-quotes`, { newSupplierName: `Empty ${tag}`, receivedOn: "2026-10-27", currency: "CNY" })
         .expect(201)
     ).body.id;
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body;
-    expect(offers.offers.map((o: { factoryQuoteId: string }) => o.factoryQuoteId)).not.toContain(empty);
+    expect(offers.offers.map((o: { supplierQuoteId: string }) => o.supplierQuoteId)).not.toContain(empty);
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     // Put a price on every line of the chosen offer, then save R1.
     const options = draft.options.map((o: { prices: { lineId: string; unitPrice: number }[] }) => ({ ...o, prices: o.prices.map((p) => ({ ...p, unitPrice: p.unitPrice || 100 })) }));
     await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, options }).expect(201);
-    const used = (await api(app, sana).get(`/factory-quotes/${draft.options[0].factoryQuoteId}`)).body.lines.find((l: Line) => l.description === "Blow moulder") as Line;
+    const used = (await api(app, sana).get(`/factory-quotes/${draft.options[0].supplierQuoteId}`)).body.lines.find((l: Line) => l.description === "Blow moulder") as Line;
     const r = await api(app, sana).patch(`/factory-lines/${used.id}`, { unitPrice: 1 }).expect(409);
     expect(r.body.code).toBe("reason_needed");
     await api(app, sana).patch(`/factory-lines/${used.id}`, { model: "renamed" }).expect(200); // wording: quotations keep their own copy

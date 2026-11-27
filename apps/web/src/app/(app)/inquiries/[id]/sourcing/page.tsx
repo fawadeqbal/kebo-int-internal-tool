@@ -6,7 +6,7 @@ import { THead, Th, Tr, Badge, cn, EmptyLine, Notice, RULES, subTitleClass, Dash
 import { requirePermission } from "@/lib/session";
 import { dayMonth, money, qty, companyToday } from "@/lib/format";
 import { dealOf, quotationOf, sourcingOf } from "@/lib/deal-data";
-import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
+import type { SupplierQuoteView, SourcingView } from "@/lib/types-deals";
 import { TabList } from "@/components/lists/tab-list";
 import { offerFigures, OfferCompare, offerLine } from "@/components/deals/offer-list";
 import { optional } from "@/components/print/data";
@@ -15,8 +15,8 @@ import { AddOfferButton } from "@/components/deals/offer-work";
 import { requestsOf } from "../facts";
 import { WithSide } from "../side";
 import { RequestMore } from "@/components/deals/ask-window";
-import { factoryRequestStatusAction, removeFactoryRequestAction } from "../../factory-request-actions";
-import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, removeOfferLineAction, saveFactoryQuoteAction, searchFactoriesAction } from "./actions";
+import { supplierRequestStatusAction, removeSupplierRequestAction } from "../../supplier-request-actions";
+import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOfferLineAction, removeOfferLineAction, saveSupplierQuoteAction, searchSuppliersAction } from "./actions";
 import { removeFileAction } from "../../actions";
 import { getSettings } from "@/lib/loaders";
 import { inquiryTitle } from "@/lib/titles";
@@ -59,13 +59,13 @@ export default async function SourcingPage({
   const usedIn = new Map<string, string[]>();
   for (const y of q?.quotations ?? []) {
     const c = y.revisions.find((r) => r.status === "draft") ?? y.revisions[0];
-    for (const o of c?.options ?? []) if (o.factoryQuoteId) usedIn.set(o.factoryQuoteId, [...(usedIn.get(o.factoryQuoteId) ?? []), y.letter]);
+    for (const o of c?.options ?? []) if (o.supplierQuoteId) usedIn.set(o.supplierQuoteId, [...(usedIn.get(o.supplierQuoteId) ?? []), y.letter]);
   }
-  // The factories asked for this inquiry come first in the new offer's picker (design 18 Nov).
+  // The suppliers asked for this inquiry come first in the new offer's picker (design 18 Nov).
   const requests = await requestsOf(d.id);
-  const askedFactories = (requests?.items ?? []).flatMap((r) =>
+  const askedSuppliers = (requests?.items ?? []).flatMap((r) =>
     r.factory
-      ? [{ id: r.factory.id, name: r.factory.name, contactPerson: null, note: [r.sentOn ? `asked ${dayMonth(r.sentOn)}` : "asked", r.factoryQuoteId ? "offer in" : "no offer yet"].join(" · ") }]
+      ? [{ id: r.factory.id, name: r.factory.name, contactPerson: null, note: [r.sentOn ? `asked ${dayMonth(r.sentOn)}` : "asked", r.supplierQuoteId ? "offer in" : "no offer yet"].join(" · ") }]
       : [],
   );
   const addOffer = (props: { variant?: "primary" | "secondary" | "ghost"; size?: "xs" | "sm" | "md"; label?: string; open?: boolean }) =>
@@ -74,12 +74,12 @@ export default async function SourcingPage({
         dealId={d.id}
         refNo={d.refNo}
         inquiryTitle={d.title}
-        asked={askedFactories}
+        asked={askedSuppliers}
         today={today}
         mainCurrency={s.currency}
         rates={settings.sales.exchangeRates}
-        searchFactories={searchFactoriesAction}
-        createAction={saveFactoryQuoteAction.bind(null, d.id, null)}
+        searchSuppliers={searchSuppliersAction}
+        createAction={saveSupplierQuoteAction.bind(null, d.id, null)}
         items={s.items}
         others={s.quotes.filter((o) => o.lines.length)}
         lineActions={{
@@ -90,7 +90,7 @@ export default async function SourcingPage({
           copy: copyOfferLinesAction.bind(null, d.id),
           removeFile: removeFileAction.bind(null, d.id),
         }}
-        taxDefault={{ included: settings.sales.factoryTaxIncluded ?? false, rate: settings.sales.factoryTaxRate ?? 0, advance: settings.sales.factoryAdvancePercent ?? 30 }}
+        taxDefault={{ included: settings.sales.supplierTaxIncluded ?? false, rate: settings.sales.supplierTaxRate ?? 0, advance: settings.sales.supplierAdvancePercent ?? 30 }}
         variant={props.variant}
         size={props.size}
         label={props.label}
@@ -98,7 +98,7 @@ export default async function SourcingPage({
       />
     ) : null;
 
-  const waiting = (requests?.items ?? []).filter((r) => !r.factoryQuoteId && r.status === "sent");
+  const waiting = (requests?.items ?? []).filter((r) => !r.supplierQuoteId && r.status === "sent");
 
   const notice = !canEdit && (
     <Notice tone="info">
@@ -109,7 +109,7 @@ export default async function SourcingPage({
   );
 
   // One row per supplier: its offer once it is in, else that it was asked (still waiting, declined, no reply), last.
-  const others = (requests?.items ?? []).filter((r) => !r.factoryQuoteId);
+  const others = (requests?.items ?? []).filter((r) => !r.supplierQuoteId);
   const answered = s.quotes.length;
   const asked = answered + others.length;
 
@@ -127,7 +127,7 @@ export default async function SourcingPage({
           .filter(Boolean)
           .join(" · ")
       : "No offer yet";
-  const status = (x: FactoryQuoteView) => {
+  const status = (x: SupplierQuoteView) => {
     const letters = usedIn.get(x.id) ?? [];
     return letters.length ? <Badge tone="ok">In quotation {letters.join(", ")}</Badge> : <Badge tone="info">Offer in</Badge>;
   };
@@ -145,12 +145,12 @@ export default async function SourcingPage({
       .filter(Boolean)
       .join(" · ");
   // An offer with its items but not one price yet says so (not "USD 0.00").
-  const unpriced = (x: FactoryQuoteView) => x.lines.length > 0 && x.unpriced >= x.lines.length;
-  const covers = (x: FactoryQuoteView) => {
+  const unpriced = (x: SupplierQuoteView) => x.lines.length > 0 && x.unpriced >= x.lines.length;
+  const covers = (x: SupplierQuoteView) => {
     return coverText(x, s.items, "cell");
   };
   const more = (r: (typeof others)[number]) =>
-    canEdit && <RequestMore name={r.factory.name} status={r.status} setStatus={factoryRequestStatusAction.bind(null, d.id, r.id)} remove={removeFactoryRequestAction.bind(null, d.id, r.id)} />;
+    canEdit && <RequestMore name={r.factory.name} status={r.status} setStatus={supplierRequestStatusAction.bind(null, d.id, r.id)} remove={removeSupplierRequestAction.bind(null, d.id, r.id)} />;
   const dash = <Dash />;
   const two = (v: { main: string; sub: string | null } | null) =>
     v ? (

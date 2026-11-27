@@ -30,8 +30,8 @@ import { safeFileName, StorageService } from "../../common/storage/storage.servi
 import { checkAccount } from "../treasury/api";
 import { convert, costingsOf, MainMoney, orderRate, paysBasis } from "./order-money";
 import { fileView } from "../treasury/api";
-import { factoryPlansOf } from "../billing/api";
-import { chargedOf, factoryPositionOf, fxOf, positionOf } from "../billing/api";
+import { supplierPlansOf } from "../billing/api";
+import { chargedOf, supplierPositionOf, fxOf, positionOf } from "../billing/api";
 import { termsOf } from "../billing/api";
 import { AuditService } from "../../common/audit/audit.service";
 import { requireReason } from "../../common/audit/reason";
@@ -44,13 +44,13 @@ import { LedgerPosting } from "../ledger/posting.service";
 
 const person = { select: { id: true, name: true } } as const;
 
-/** Lines of an order with the factory price frozen on them when it was made (for what we owe each factory). */
-const linesWithFactory = {
+/** Lines of an order with the supplier price frozen on them when it was made (for what we owe each supplier). */
+const linesWithSupplier = {
   orderBy: { sortOrder: "asc" },
   include: { factory: { select: { id: true, name: true, owner: person } } },
 } satisfies Prisma.Order$linesArgs;
 
-type FactoryRow = { id: string; name: string; owner: { id: string; name: string } | null };
+type SupplierRow = { id: string; name: string; owner: { id: string; name: string } | null };
 
 const expenseInclude = {
   paidBy: person,
@@ -70,7 +70,7 @@ const RECEIPT_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "webp", "gif", 
 /**
  * Money around orders and the company (Step 2):
  * - the customer's payment plan on each order (instalments, ticked off as money comes in);
- * - what we owe each factory for an order, and what we paid it;
+ * - what we owe each supplier for an order, and what we paid it;
  * - expenses, for an order, spent on a customer or for the company, with receipts (managers and the super admin only);
  * - profit & loss per order and per month, earned and cash.
  */
@@ -126,7 +126,7 @@ export class MoneyService {
 
   /**
    * Everything about an order's money: the plan (all who see the order), what
-   * we owe and paid the factories (people who see costs), its expenses and
+   * we owe and paid the suppliers (people who see costs), its expenses and
    * profit (managers).
    */
   async forOrder(user: SessionUser, orderId: string) {
@@ -134,7 +134,7 @@ export class MoneyService {
     const o = await this.prisma.db.order.findUniqueOrThrow({
       where: { id: orderId },
       include: {
-        lines: linesWithFactory,
+        lines: linesWithSupplier,
         costs: true,
         receivables: { orderBy: { sortOrder: "asc" } },
         allocations: { where: livePart },
@@ -152,7 +152,7 @@ export class MoneyService {
     const s = await this.settings.get();
     const today = this.clock.today();
     const totalMinor = decimalToMinor(o.total);
-    // Spent on the deal before it became this order (trips, samples, visits to factories): managers only.
+    // Spent on the deal before it became this order (trips, samples, visits to suppliers): managers only.
     const dealExpenses = can(user, "expenses.manage")
       ? await this.prisma.db.expense.findMany({
           where: { inquiryId: o.inquiryId, orderId: null },
@@ -186,42 +186,42 @@ export class MoneyService {
     const chargedMinor = position.chargedMinor;
     const dueMinor = position.dueMinor;
 
-    // Factories: owed from the order's lines (with tax), less what we paid them and the expenses they bear: factoryPosition.
+    // Suppliers: owed from the order's lines (with tax), less what we paid them and the expenses they bear: supplierPosition.
     // Each supplier payment as the order shows it (its part; the money facts from its entry).
-    const factoryPaid = o.supplierPaid.map((a) => ({ ...asSupplierPayment(a), factory: a.movement.party!, paidBy: a.movement.paidBy, account: a.movement.account }));
-    const livePaid = factoryPaid.filter((p) => !p.voidedAt);
-    const factoryRows = factoryPositionOf(o, fx);
-    const factoryOf = new Map<string, FactoryRow>(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
-    for (const r of factoryRows)
-      if (!factoryOf.has(r.factoryId))
-        factoryOf.set(r.factoryId, await this.prisma.db.party.findUniqueOrThrow({ where: { ...isSupplier, id: r.factoryId }, select: { id: true, name: true, owner: person } }));
-    const owed = new Map(factoryRows.map((r) => [r.key, r]));
-    // For each counted factory payment: paid so far to that factory (same currency) and what is left after it.
-    const factoryAfter = new Map<string, { paid: string; toPay: string }>();
+    const supplierPaid = o.supplierPaid.map((a) => ({ ...asSupplierPayment(a), factory: a.movement.party!, paidBy: a.movement.paidBy, account: a.movement.account }));
+    const livePaid = supplierPaid.filter((p) => !p.voidedAt);
+    const supplierRows = supplierPositionOf(o, fx);
+    const supplierOf = new Map<string, SupplierRow>(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+    for (const r of supplierRows)
+      if (!supplierOf.has(r.supplierId))
+        supplierOf.set(r.supplierId, await this.prisma.db.party.findUniqueOrThrow({ where: { ...isSupplier, id: r.supplierId }, select: { id: true, name: true, owner: person } }));
+    const owed = new Map(supplierRows.map((r) => [r.key, r]));
+    // For each counted supplier payment: paid so far to that supplier (same currency) and what is left after it.
+    const supplierAfter = new Map<string, { paid: string; toPay: string }>();
     const running = new Map<string, number>();
     for (const p of livePaid) {
-      const key = `${p.factoryId}:${p.currency}`;
+      const key = `${p.supplierId}:${p.currency}`;
       const sum = (running.get(key) ?? 0) + decimalToMinor(p.amount);
       running.set(key, sum);
-      factoryAfter.set(p.id, { paid: fromMinor(sum), toPay: fromMinor(Math.max((owed.get(key)?.owedMinor ?? 0) - sum, 0)) });
+      supplierAfter.set(p.id, { paid: fromMinor(sum), toPay: fromMinor(Math.max((owed.get(key)?.owedMinor ?? 0) - sum, 0)) });
     }
     const recorders = new Map(
       (
         await this.prisma.db.user.findMany({
-          where: { id: { in: [...new Set(factoryPaid.map((p) => p.recordedById))] } },
+          where: { id: { in: [...new Set(supplierPaid.map((p) => p.recordedById))] } },
           select: { id: true, name: true },
         })
       ).map((u) => [u.id, u]),
     );
-    const factories = factoryRows.map((r) => {
-      const f = factoryOf.get(r.factoryId)!;
+    const suppliers = supplierRows.map((r) => {
+      const f = supplierOf.get(r.supplierId)!;
       return {
         factory: { id: f.id, name: f.name },
         lookedAfterBy: f.owner,
         currency: r.currency,
         lines: r.lines,
         owed: fromMinor(r.owedMinor),
-        /** Paid, with the expenses the factory bears (taken off what we owe it). */
+        /** Paid, with the expenses the supplier bears (taken off what we owe it). */
         paid: fromMinor(r.settledMinor),
         takenOff: fromMinor(r.takenOffMinor),
         toPay: fromMinor(r.toPayMinor),
@@ -231,7 +231,7 @@ export class MoneyService {
     });
 
     // Profit, in the order's currency: expenses (kept in the main currency) come back at the order's own rate.
-    // Only those borne by us cut it: the customer pays the others back, or they come off what we owe a factory.
+    // Only those borne by us cut it: the customer pays the others back, or they come off what we owe a supplier.
     const liveExpenses = liveAll.filter((e) => e.borneBy === "us");
     const expensesMinor = orderPerMain === null ? null : liveExpenses.reduce((t, e) => t + inOrder(e), 0);
     // Freight and the like pay for their own planned cost first (per planned step, as on the Costs page).
@@ -243,7 +243,7 @@ export class MoneyService {
             liveExpenses.map((e) => ({ category: e.category as ExpenseCategory, minor: inOrder(e) })),
           ).coveredMinor;
     const beforeSaleMinor = orderPerMain === null ? null : dealExpenses.filter((e) => !e.voidedAt).reduce((t, e) => t + inOrder(e), 0);
-    const factoryPaidMinor = livePaid.reduce((t, p) => t + convert(decimalToMinor(p.amount), Number(p.rate)), 0);
+    const supplierPaidMinor = livePaid.reduce((t, p) => t + convert(decimalToMinor(p.amount), Number(p.rate)), 0);
     const costing = orderCosting(
       o.lines.map((l) => ({
         lineTotalMinor: decimalToMinor(l.lineTotal),
@@ -259,7 +259,7 @@ export class MoneyService {
         : orderMoney({
             ...costing,
             receivedMinor: position.receivedMinor,
-            factoryPaidMinor,
+            supplierPaidMinor,
             expensesMinor,
             expensesUnpaidMinor: liveExpenses.filter((e) => e.payLater && !e.repaidOn).reduce((t, e) => t + inOrder(e), 0),
             basisPaidMinor,
@@ -314,7 +314,7 @@ export class MoneyService {
         cancelled: requests.gone.map((g) => ({ paperId: g.paperId, ref: g.ref, number: g.number, revision: g.revision, sentOn: g.sentOn, amount: g.amount, label: g.label })),
         /** May send a request to the customer (kept as sent). */
         canSend: (can(user, "orders.update") || can(user, "documents.manage")) && o.status !== "cancelled",
-        /** The order's dates the rules read (the ready date: the latest factory's). */
+        /** The order's dates the rules read (the ready date: the latest supplier's). */
         dates: live.dates,
         /** The instalments must add up to the order total; a different sum is shown as a problem to fix. */
         matchesTotal: planSum === totalMinor,
@@ -324,10 +324,10 @@ export class MoneyService {
       },
       factories: seeCosts
         ? {
-            rows: factories,
+            rows: suppliers,
             /** Where the customer's money for this order stands, for the person paying its suppliers (by the route). */
             customer: customerMoney({ totalMinor: position.owedMinor, receivedMinor: position.settledMinor, depositMinor: position.depositMinor, route: terms.route }),
-            payments: factoryPaid.map((p) => ({
+            payments: supplierPaid.map((p) => ({
               id: p.id,
               factory: p.factory,
               recordedBy: recorders.get(p.recordedById) ?? null,
@@ -336,8 +336,8 @@ export class MoneyService {
               changedAt: p.updatedAt.getTime() - p.createdAt.getTime() > 2000 ? p.updatedAt : null,
               /** When its entry last changed: a change sends it back (If-Match), so it never overwrites someone else's. */
               updatedAt: p.updatedAt,
-              /** Paid to this factory so far and still to pay (in this currency) once this payment counted. */
-              after: factoryAfter.get(p.id) ?? null,
+              /** Paid to this supplier so far and still to pay (in this currency) once this payment counted. */
+              after: supplierAfter.get(p.id) ?? null,
               kind: p.kind,
               amount: p.amount.toFixed(2),
               currency: p.currency,
@@ -351,12 +351,12 @@ export class MoneyService {
               note: p.note,
               account: p.account,
               voided: p.voidedAt ? { at: p.voidedAt, reason: p.voidReason } : null,
-              /** A photo or PDF proving it (bank slip, the factory's receipt). */
+              /** A photo or PDF proving it (bank slip, the supplier's receipt). */
               file: fileView(p),
             })),
             canRecord: can(user, "payments.record") && o.status !== "cancelled",
-            /** Each factory's payment plan (advance on order, balance on the ready date) with what is paid on each part. */
-            plans: await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx),
+            /** Each supplier's payment plan (advance on order, balance on the ready date) with what is paid on each part. */
+            plans: await supplierPlansOf(this.prisma.db, o.id, s.sales.supplierAdvancePercent, today, s.reminders.dueSoonDays, fx),
             canPlan: can(user, "sourcing.manage") && o.status !== "cancelled",
           }
         : null,
@@ -400,7 +400,7 @@ export class MoneyService {
               marginPercent: profit.marginPercent,
               coveragePercent: profit.coveragePercent,
               received: fromMinor(position.receivedMinor),
-              factoryPaid: fromMinor(factoryPaidMinor),
+              supplierPaid: fromMinor(supplierPaidMinor),
               cash: fromMinor(profit.cashMinor),
             }
           : null,
@@ -475,7 +475,7 @@ export class MoneyService {
       to?: ISODate;
       orderId?: string;
       inquiryId?: string;
-      factoryId?: string;
+      supplierId?: string;
       customerId?: string;
       category?: string;
       /** company: everything that is not a cost of one order (the company's own, and what is spent on customers and deals). */
@@ -501,7 +501,7 @@ export class MoneyService {
     const rows = await this.prisma.db.expense.findMany({
       where: {
         ...(q.inquiryId ? { inquiryId: q.inquiryId } : {}),
-        ...(q.factoryId ? { factoryId: q.factoryId } : {}),
+        ...(q.supplierId ? { supplierId: q.supplierId } : {}),
         ...(q.orderId
           ? { orderId: q.orderId }
           : q.kind === "order"
@@ -635,8 +635,8 @@ export class MoneyService {
       const c = await this.prisma.db.party.findFirst({ where: { ...isCustomer, id: customerId, deletedAt: null }, select: { id: true } });
       if (!c) throw new DomainError("That customer is not in the system any more.");
     }
-    if (input.factoryId) {
-      const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.factoryId, deletedAt: null }, select: { id: true } });
+    if (input.supplierId) {
+      const f = await this.prisma.db.party.findFirst({ where: { ...isSupplier, id: input.supplierId, deletedAt: null }, select: { id: true } });
       if (!f) throw new DomainError("That supplier is not in the system any more.");
     }
     // On an order: its step (left out on a change: kept; on a new one: the usual step of its kind) and who bears it.
@@ -644,8 +644,8 @@ export class MoneyService {
     const borneBy = input.borneBy ?? (before?.borneBy as ExpenseBearer | undefined) ?? "us";
     if (borneBy !== "us" && !order) throw new DomainError("Only an order's expense can be charged to the customer or the supplier.");
     if (borneBy === "factory") {
-      if (!input.factoryId) throw new DomainError("Choose the supplier that bears it.");
-      const onOrder = await this.prisma.db.orderLine.count({ where: { orderId: order!.id, factoryId: input.factoryId } });
+      if (!input.supplierId) throw new DomainError("Choose the supplier that bears it.");
+      const onOrder = await this.prisma.db.orderLine.count({ where: { orderId: order!.id, supplierId: input.supplierId } });
       if (!onOrder) throw new DomainError("That supplier has nothing on this order, so nothing can be taken off what we owe it.");
     }
     const ownMoney = input.ownMoney ?? before?.ownMoney ?? false;
@@ -677,7 +677,7 @@ export class MoneyService {
         orderId: order?.id ?? null,
         customerId,
         inquiryId,
-        factoryId: input.factoryId ?? null,
+        supplierId: input.supplierId ?? null,
         category: input.category,
         description: input.description,
         amount: input.amount,
@@ -696,7 +696,7 @@ export class MoneyService {
 
   /**
    * The checks adding an expense runs, without adding it (an expense sent for approval): the date, the order
-   * (seen by this person, not cancelled), the inquiry, customer, factory, person and account named, the rate.
+   * (seen by this person, not cancelled), the inquiry, customer, supplier, person and account named, the rate.
    * Returns the order it is on. Approving runs createExpense() itself.
    */
   async checkExpense(user: SessionUser, input: ExpenseInput) {
@@ -920,7 +920,7 @@ export class MoneyService {
   }
 
   /**
-   * What we owe outside the factories' goods, across the company (money, step 3, "Suppliers and bills"): every
+   * What we owe outside the suppliers' goods, across the company (money, step 3, "Suppliers and bills"): every
    * bill known and not paid yet, and every expense someone paid from their own money and was not paid back.
    * Oldest first. Managers with the expenses feature.
    */
@@ -1026,13 +1026,13 @@ export class MoneyService {
   /**
    * The company's profit & loss for a year, month by month, in the main currency.
    * - Earned: an order counts in the month it shipped — the part of its value
-   *   whose lines have a cost, less the factory cost of its goods, the costs to
+   *   whose lines have a cost, less the supplier cost of its goods, the costs to
    *   reach the basis it was sold on, its expenses and the bank charges on its
    *   payments; less the general expenses of the month. Value on lines without a
    *   cost is shown apart, never as profit. Expenses on a cancelled order are
    *   general expenses of the month they were spent.
    * - Cash: what came in from customers that month (what arrived, without the
-   *   bank charges), less what was paid to factories and all expenses paid that month.
+   *   bank charges), less what was paid to suppliers and all expenses paid that month.
    * Orders are turned into the main currency at the rate stored on them.
    */
   async profitAndLoss(user: SessionUser, year: number) {
@@ -1046,7 +1046,7 @@ export class MoneyService {
     const fx = new MainMoney(main, sales.exchangeRates);
     const rated = { currency: true, mainCurrency: true, mainRate: true } as const;
 
-    const [shipped, payments, factoryPaid, expenses] = await Promise.all([
+    const [shipped, payments, supplierPaid, expenses] = await Promise.all([
       this.prisma.db.order.findMany({
         // Shipped this year: the earliest day one of its shipments left (narrowed below).
         where: { status: { not: "cancelled" }, shipments: { some: { departedOn: { gte: from, lte: to } } } },
@@ -1057,7 +1057,7 @@ export class MoneyService {
           total: true,
           shipments: { select: { departedOn: true } },
           customer: { select: { name: true } },
-          // Only those borne by us: the customer pays the others back, or they come off what we owe a factory.
+          // Only those borne by us: the customer pays the others back, or they come off what we owe a supplier.
           expenses: { where: { voidedAt: null, borneBy: "us" }, select: { amount: true, rate: true, category: true } },
           allocations: { where: livePart, select: { bankCharges: true } },
         },
@@ -1143,7 +1143,7 @@ export class MoneyService {
         goodsCostMinor: goodsCost,
         basisCostMinor: basisCost,
         receivedMinor: 0,
-        factoryPaidMinor: 0,
+        supplierPaidMinor: 0,
         expensesMinor: exp,
         basisPaidMinor: basisPaid,
         bankChargesMinor: bank,
@@ -1183,7 +1183,7 @@ export class MoneyService {
       if (p.order.status === "cancelled")
         rowOf(p.paidOn).earned.bankCharges += fx.order(decimalToMinor(p.bankCharges), p.order);
     }
-    for (const p of factoryPaid) rowOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
+    for (const p of supplierPaid) rowOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
 
     const money = (n: number) => fromMinor(n);
     const earnedView = (e: (typeof months)[number]["earned"]) => ({

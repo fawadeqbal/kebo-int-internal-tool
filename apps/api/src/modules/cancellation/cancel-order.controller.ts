@@ -12,9 +12,9 @@ export class CancelOrderController {
   constructor(private readonly cancelling: CancelOrderService) {}
 
   /**
-   * { reason, customerMoney?: credit | refund | fee, refundNow?, refundAccountId?, refundOn?, factoryMoney?: refund_due | loss }
+   * { reason, customerMoney?: credit | refund | fee, refundNow?, refundAccountId?, refundOn?, supplierMoney?: refund_due | loss }
    * — managers only; the deal becomes lost (customer cancelled) and can be reopened. Money received is kept as
-   * credit unless told otherwise; money paid to the factory must be said (refund expected or a loss).
+   * credit unless told otherwise; money paid to the supplier must be said (refund expected or a loss).
    */
   @Post(":id/cancel")
   @HttpCode(200)

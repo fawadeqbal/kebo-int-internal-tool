@@ -2,14 +2,14 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, ParseUUIDPipe, P
 import { ApiTags } from "@nestjs/swagger";
 import {
   copyLinesInput,
-  factoryLinePatch,
-  factoryLinesInput,
-  factoryQuoteInput,
+  supplierLinePatch,
+  supplierLinesInput,
+  supplierQuoteInput,
   lineMoveInput,
   type CopyLinesInput,
-  type FactoryLinePatch,
-  type FactoryLinesInput,
-  type FactoryQuoteInput,
+  type SupplierLinePatch,
+  type SupplierLinesInput,
+  type SupplierQuoteInput,
   type LineMoveInput,
 } from "@kebo/shared";
 import { Validate } from "../../common/http/zod.pipe";
@@ -22,7 +22,7 @@ import { SourcingService } from "./sourcing.service";
 export class SourcingController {
   constructor(private readonly sourcing: SourcingService) {}
 
-  /** All factory prices on a deal, costed in the selling currency, with options per item. */
+  /** All supplier prices on a deal, costed in the selling currency, with options per item. */
   @Get("inquiries/:id/sourcing")
   @RequirePermissions("sourcing.manage")
   list(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
@@ -34,7 +34,7 @@ export class SourcingController {
   create(
     @CurrentUser() user: SessionUser,
     @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(factoryQuoteInput)) body: FactoryQuoteInput,
+    @Body(Validate(supplierQuoteInput)) body: SupplierQuoteInput,
   ) {
     return this.sourcing.create(user, id, body);
   }
@@ -44,7 +44,7 @@ export class SourcingController {
   update(
     @CurrentUser() user: SessionUser,
     @Param("id", ParseUUIDPipe) id: string,
-    @Body(Validate(factoryQuoteInput)) body: FactoryQuoteInput,
+    @Body(Validate(supplierQuoteInput)) body: SupplierQuoteInput,
   ) {
     return this.sourcing.update(user, id, body);
   }
@@ -59,7 +59,7 @@ export class SourcingController {
 
   @Post("factory-quotes/:id/lines")
   @RequirePermissions("sourcing.manage")
-  addLines(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryLinesInput)) body: FactoryLinesInput) {
+  addLines(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierLinesInput)) body: SupplierLinesInput) {
     return this.sourcing.addLines(user, id, body);
   }
 
@@ -71,7 +71,7 @@ export class SourcingController {
 
   @Patch("factory-lines/:id")
   @RequirePermissions("sourcing.manage")
-  editLine(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(factoryLinePatch)) body: FactoryLinePatch) {
+  editLine(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierLinePatch)) body: SupplierLinePatch) {
     return this.sourcing.editLine(user, id, body);
   }
 

@@ -37,7 +37,7 @@ const KINDS: readonly OrderDocumentKind[] = ["proforma", "packing-list"];
 const TITLE: Record<OrderDocumentKind, string> = { proforma: "PROFORMA  INVOICE", "packing-list": "PACKING  LIST" };
 const NUMBER_LABEL: Record<OrderDocumentKind, string> = { proforma: "Invoice.NO.", "packing-list": "Packing List NO." };
 
-/** A paper the app makes: ?v= a version, ?opts= options to preview, ?ref= which payment, plan item or factory. */
+/** A paper the app makes: ?v= a version, ?opts= options to preview, ?ref= which payment, plan item or supplier. */
 type PaperQuery = { v?: string; opts?: string; ref?: string; now?: string; embed?: string; back?: string; lang?: string; shipment?: string };
 const paperQuery = (sp: PaperQuery) =>
   Object.fromEntries(

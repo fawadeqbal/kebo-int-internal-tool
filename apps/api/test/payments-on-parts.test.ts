@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { paymentsOnParts } from "../src/modules/billing/factory-plan";
+import { paymentsOnParts } from "../src/modules/billing/supplier-plan";
 
-/** Which payments paid each part of a factory's plan: payments pay the parts in order. */
+/** Which payments paid each part of a supplier's plan: payments pay the parts in order. */
 describe("paymentsOnParts", () => {
   const parts = [{ amountMinor: 3000 }, { amountMinor: 7000 }];
 

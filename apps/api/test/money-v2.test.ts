@@ -9,7 +9,7 @@ import { Clock } from "../src/common/time/clock.service";
  * rate kept with it; one transfer over several orders with the rest as credit;
  * credit used and refunded; the route builds the plan; an LC's deferred
  * balance dated from the papers; "Money reached us" is the payment; the LC
- * checked against the order; the factory payment plan; cancelling with money in.
+ * checked against the order; the supplier payment plan; cancelling with money in.
  */
 describe("money v2", () => {
   let app: INestApplication;
@@ -22,7 +22,7 @@ describe("money v2", () => {
   let office: string;
   let me: string;
   let customerId: string;
-  let factoryId: string;
+  let supplierId: string;
   const tag = Date.now().toString(36);
   /** Days as the API counts them (the company's time zone). */
   let today = "";
@@ -39,7 +39,7 @@ describe("money v2", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "ZH-120", quantity: 1, unitPrice: price, taxRate: 0 }],
@@ -74,8 +74,8 @@ describe("money v2", () => {
         .post("/customers", { name: `Moneytwo Pharma ${tag}`, country: "PK", contacts: [{ name: "Rauf", email: `rauf-${tag}@shifa.test` }] })
         .expect(201)
     ).body.id;
-    factoryId = (await api(app, sana).post("/factories", { name: `Moneytwo Works ${tag}` }).expect(201)).body.id;
-    // A role that changes orders but neither records money nor sees factory money.
+    supplierId = (await api(app, sana).post("/factories", { name: `Moneytwo Works ${tag}` }).expect(201)).body.id;
+    // A role that changes orders but neither records money nor sees supplier money.
     const role = (
       await api(app, admin).post("/roles", { name: `Desk ${tag}`, permissions: ["dashboard.view", "inquiries.viewAll", "orders.update"] }).expect(201)
     ).body;
@@ -283,7 +283,7 @@ describe("money v2", () => {
     await api(app, sana).patch(`/orders/${id}/details`, { readyOn: day(60) }).expect(200);
     const m = await money(id);
     const balance = m.plan.items.find((i: { part: string }) => i.part === "balance").amount;
-    // Short of the balance, and the ship-by date before the factory's ready date.
+    // Short of the balance, and the ship-by date before the supplier's ready date.
     let f = (
       await api(app, sana)
         .put(`/orders/${id}/bank-contract`, { number: `LC/${tag}`, status: "opened", amount: Number(balance) - 1, currency: "USD", openedOn: today, latestShipOn: day(55), expiresOn: day(120) })
@@ -313,7 +313,7 @@ describe("money v2", () => {
     // Before ordering: the company's default, not saved.
     let m = await money(id);
     expect(m.factories.plans[0]).toMatchObject({ saved: false, currency: "CNY", owed: "100000.00" });
-    await api(app, sana).patch(`/orders/${id}/factory-order`, { factoryOrderedOn: today }).expect(200);
+    await api(app, sana).patch(`/orders/${id}/factory-order`, { supplierOrderedOn: today }).expect(200);
     m = await money(id);
     const plan = m.factories.plans[0];
     expect(plan).toMatchObject({ saved: true });
@@ -329,29 +329,29 @@ describe("money v2", () => {
     await api(app, sana).patch(`/orders/${id}/details`, { readyOn: day(-1) }).expect(200);
     expect((await money(id)).factories.plans[0].rows[1]).toMatchObject({ due: day(-1), status: "late" });
     // Paying the advance marks its part of the plan paid.
-    await api(app, manager).post(`/orders/${id}/factory-payments`, { factoryId, kind: "deposit", amount: 30000, currency: "CNY", rate: 7.12, paidOn: today }).expect(201);
+    await api(app, manager).post(`/orders/${id}/factory-payments`, { supplierId, kind: "deposit", amount: 30000, currency: "CNY", rate: 7.12, paidOn: today }).expect(201);
     m = await money(id);
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "paid", paid: "30000.00" });
     // Each part says which payment paid it (its Receipt; the payment's "For").
     const advance = m.factories.payments.find((x: { voided: unknown }) => !x.voided).id;
     expect(m.factories.plans[0].rows[0].payments).toEqual([{ id: advance, amount: "30000.00" }]);
     expect(m.factories.plans[0].rows[1].payments).toEqual([]);
-    // Money › We owe factories shows the next part and its date.
+    // Money › We owe suppliers shows the next part and its date.
     const payables = (await api(app, manager).get("/money/payables").expect(200)).body;
-    const row = payables.find((r: { factory: { id: string } }) => r.factory.id === factoryId);
+    const row = payables.find((r: { factory: { id: string } }) => r.factory.id === supplierId);
     expect(row.orders.find((o: { id: string }) => o.id === id).next).toMatchObject({ label: "Balance 70%", due: day(-1), status: "late" });
     // My to-do (Home) has it.
     const todo = (await api(app, sana).get("/me/todo").expect(200)).body;
     expect(todo.find((t: { id: string }) => t.id === id)?.needs).toMatchObject({ late: true });
-    // Changing the plan: the parts must add up to what we owe; only people who see factory money.
+    // Changing the plan: the parts must add up to what we owe; only people who see supplier money.
     const items = [
       { label: "Deposit 50%", percent: 50, amount: 50000, dueRule: "on_order" },
       { label: "Balance 50%", percent: 50, amount: 50000, dueRule: "fixed", dueOn: day(10) },
     ];
-    await api(app, office).put(`/orders/${id}/factory-plan`, { factoryId, items }).expect(403);
-    await api(app, sana).put(`/orders/${id}/factory-plan`, { factoryId, items: [items[0]] }).expect(400);
-    await api(app, sana).put(`/orders/${id}/factory-plan`, { factoryId, items: [items[0], { ...items[1], dueOn: null }] }).expect(400);
-    m = (await api(app, sana).put(`/orders/${id}/factory-plan`, { factoryId, items }).expect(200)).body;
+    await api(app, office).put(`/orders/${id}/factory-plan`, { supplierId, items }).expect(403);
+    await api(app, sana).put(`/orders/${id}/factory-plan`, { supplierId, items: [items[0]] }).expect(400);
+    await api(app, sana).put(`/orders/${id}/factory-plan`, { supplierId, items: [items[0], { ...items[1], dueOn: null }] }).expect(400);
+    m = (await api(app, sana).put(`/orders/${id}/factory-plan`, { supplierId, items }).expect(200)).body;
     expect(m.factories.plans[0].rows[1]).toMatchObject({ label: "Balance 50%", due: day(10), dueRule: "fixed" });
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "due", paid: "30000.00", open: "20000.00" });
     expect(m.factories.plans[0].rows[0].payments).toEqual([{ id: advance, amount: "30000.00" }]);
@@ -361,7 +361,7 @@ describe("money v2", () => {
       { label: "Before shipping 40%", percent: 40, amount: 40000, dueRule: "on_ready" },
       { label: "After arrival 30%", percent: 30, amount: 30000, dueRule: "on_ship_plus_days", dueDays: 45, supplierRef: "INV-77" },
     ];
-    m = (await api(app, sana).put(`/orders/${id}/factory-plan`, { factoryId, items: three }).expect(200)).body;
+    m = (await api(app, sana).put(`/orders/${id}/factory-plan`, { supplierId, items: three }).expect(200)).body;
     expect(m.factories.plans[0].rows[2]).toMatchObject({ dueRule: "on_ship_plus_days", dueDays: 45, due: null, status: "later", supplierRef: "INV-77" });
     expect(m.factories.plans[0].rows[0]).toMatchObject({ status: "paid", dueDays: null });
   });
@@ -379,7 +379,7 @@ describe("money v2", () => {
     const before = Number(await creditIn());
     await api(app, sana).post(`/orders/${a}/cancel`, { reason: "Postponed" }).expect(403);
     const cancelled = (await api(app, manager).post(`/orders/${a}/cancel`, { reason: "Project postponed to next year", customerMoney: "credit" }).expect(200)).body;
-    expect(cancelled.cancelled).toMatchObject({ customerMoney: "credit", factoryMoney: null });
+    expect(cancelled.cancelled).toMatchObject({ customerMoney: "credit", supplierMoney: null });
     expect(Number(await creditIn())).toBeCloseTo(before + inA, 2);
 
     // Refund now: credit in and out, from the account.
@@ -396,18 +396,18 @@ describe("money v2", () => {
     expect(Number(await creditIn())).toBeCloseTo(before + inA, 2);
     expect((await credit()).entries.find((e: { kind: string; order: { id: string } | null }) => e.kind === "fee" && e.order?.id === c)).toMatchObject({ amount: inC.toFixed(2) });
 
-    // Money paid to the factory: a loss on the order becomes its expense (borne by us).
+    // Money paid to the supplier: a loss on the order becomes its expense (borne by us).
     const d = await newOrder(12000);
-    await api(app, manager).post(`/orders/${d}/factory-payments`, { factoryId, kind: "deposit", amount: 3600, currency: "CNY", rate: 7.1, paidOn: today }).expect(201);
-    await api(app, manager).post(`/orders/${d}/cancel`, { reason: "Supplier failed", factoryMoney: "loss" }).expect(200);
+    await api(app, manager).post(`/orders/${d}/factory-payments`, { supplierId, kind: "deposit", amount: 3600, currency: "CNY", rate: 7.1, paidOn: today }).expect(201);
+    await api(app, manager).post(`/orders/${d}/cancel`, { reason: "Supplier failed", supplierMoney: "loss" }).expect(200);
     const loss = await prisma.platform.expense.findFirst({ where: { orderId: d } });
     expect(loss).toMatchObject({ category: "other", currency: "CNY", borneBy: "us", step: "factory" });
     expect(loss!.amount.toFixed(2)).toBe("3600.00");
-    // …or a refund expected from the factory (the default).
+    // …or a refund expected from the supplier (the default).
     const e = await newOrder(12000);
-    await api(app, manager).post(`/orders/${e}/factory-payments`, { factoryId, kind: "deposit", amount: 3600, currency: "CNY", rate: 7.1, paidOn: today }).expect(201);
+    await api(app, manager).post(`/orders/${e}/factory-payments`, { supplierId, kind: "deposit", amount: 3600, currency: "CNY", rate: 7.1, paidOn: today }).expect(201);
     const ce = (await api(app, manager).post(`/orders/${e}/cancel`, { reason: "Customer withdrew" }).expect(200)).body;
-    expect(ce.cancelled).toMatchObject({ factoryMoney: "refund_due", customerMoney: null });
+    expect(ce.cancelled).toMatchObject({ supplierMoney: "refund_due", customerMoney: null });
     const history = (await api(app, manager).get(`/history?type=order&id=${e}`).expect(200)).body;
     expect(JSON.stringify(history)).toContain("refund expected");
   });
@@ -417,7 +417,7 @@ describe("money v2", () => {
     const id = await newOrder();
     await api(app, bilal).get(`/orders/${id}/payments`).expect(404);
     await api(app, bilal).post(`/orders/${id}/use-credit`, { amount: 1 }).expect(403);
-    await api(app, bilal).put(`/orders/${id}/factory-plan`, { factoryId, items: [{ label: "All", amount: 1, dueRule: "on_order" }] }).expect(404);
+    await api(app, bilal).put(`/orders/${id}/factory-plan`, { supplierId, items: [{ label: "All", amount: 1, dueRule: "on_order" }] }).expect(404);
     for (const t of ["money_movements", "allocations", "invoices"]) {
       const [row] = await prisma.platform.$queryRawUnsafe<{ rls: boolean }[]>(`select relrowsecurity as rls from pg_class where relname = $1`, t);
       expect(row, t).toMatchObject({ rls: true });

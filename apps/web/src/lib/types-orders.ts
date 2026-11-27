@@ -84,10 +84,10 @@ export interface OrderView {
   shipBy: string | null;
   /** While ship-by is empty: when the customer wanted it (the deal's "wanted by"). */
   shipBySuggested?: string | null;
-  /** The latest of the factories' ready dates (known once each has given one). */
+  /** The latest of the suppliers' ready dates (known once each has given one). */
   readyOn: string | null;
-  /** Each factory's own ready date. */
-  readyBy?: { factoryId: string | null; name: string | null; readyOn: string | null }[];
+  /** Each supplier's own ready date. */
+  readyBy?: { supplierId: string | null; name: string | null; readyOn: string | null }[];
   /** The shipments', never the order's: the earliest day one left, and Shipment 1's B/L. */
   shippedOn: string | null;
   blNo: string | null;
@@ -150,19 +150,19 @@ export interface OrderView {
   cancelled: {
     at: string | null;
     reason: string | null;
-    /** What happened to the money: credit | refund | fee; to the factory's: refund_due | loss. */
+    /** What happened to the money: credit | refund | fee; to the supplier's: refund_due | loss. */
     customerMoney?: string | null;
-    factoryMoney?: string | null;
+    supplierMoney?: string | null;
   } | null;
   lines: OrderLineView[];
   goods: OrderGoodsView;
   documents: ({ kind: "quotation"; label: string; revisionId: string } | { kind: OrderDocumentKind; label: string })[];
   /** The proforma's number once issued (KEB260916TN07); null while it is a draft. */
   proforma: { number: string; issuedOn: string | null } | null;
-  /** The chosen factory's own quotation, catalogue and screenshots (people who see factory prices). */
-  factoryFiles: (OfferFile & { factory: string })[];
-  /** What each factory gives, beside what was agreed with the customer (people who see factory prices). */
-  factoryTerms?: {
+  /** The chosen supplier's own quotation, catalogue and screenshots (people who see supplier prices). */
+  supplierFiles: (OfferFile & { factory: string })[];
+  /** What each supplier gives, beside what was agreed with the customer (people who see supplier prices). */
+  supplierTerms?: {
     factory: { id: string; name: string };
     offer: { id: string; reference: string | null; receivedOn: string };
     basis: Incoterm | null;
@@ -229,7 +229,7 @@ export interface LinePacking {
   cases?: LineCase[];
 }
 
-/** A line of GET /orders/:id: goods (received from the factory, packed) or a charge. */
+/** A line of GET /orders/:id: goods (received from the supplier, packed) or a charge. */
 export interface OrderLineView {
   id: string;
   /** "1", "2", "2.1" (a part of item 2). */
@@ -241,7 +241,7 @@ export interface OrderLineView {
   unit: string;
   unitPrice: string;
   lineTotal: string;
-  /** The factory it was quoted from, when known. */
+  /** The supplier it was quoted from, when known. */
   factory: { id: string; name: string } | null;
   /** The papers' customs side: the customer's and China's HS codes (China's empty: the same), the item in Chinese and who wrote it. */
   customs: { hsCode: string | null; hsCodeCn: string | null; descriptionZh: string | null; zhBy: "machine" | "staff" | null };
@@ -250,11 +250,11 @@ export interface OrderLineView {
   packing: LinePacking;
   /** What reached the customer; null when Delivery & SAT is off for the company. */
   delivered: { qty: string; condition: LineCondition | null; note: string | null } | null;
-  /** The factory's price it was bought at; null for people who do not see factory prices (or not known). */
-  factoryPrice: { unitPrice: string; taxRate: string; taxIncluded: boolean; currency: string | null } | null;
+  /** The supplier's price it was bought at; null for people who do not see supplier prices (or not known). */
+  supplierPrice: { unitPrice: string; taxRate: string; taxIncluded: boolean; currency: string | null } | null;
 }
 
-/** The goods side of GET /orders/:id: what came in from the factory and the packing list. */
+/** The goods side of GET /orders/:id: what came in from the supplier and the packing list. */
 export interface OrderGoodsView {
   /** Goods lines, and how many came in complete. */
   lines: number;
@@ -432,7 +432,7 @@ export interface OrderDocument {
     unit: string;
     unitPrice: string | null;
     lineTotal: string | null;
-    /** Internal copy, for people who may see factory costs: one unit's cost in the order currency. */
+    /** Internal copy, for people who may see supplier costs: one unit's cost in the order currency. */
     unitCost?: string | null;
     /** Packing list only. */
     packing: LinePacking | null;
@@ -476,7 +476,7 @@ export interface DocLine {
   unit: string;
   unitPrice: string;
   lineTotal: string;
-  /** For people who may see factory costs. */
+  /** For people who may see supplier costs. */
   unitCost?: string | null;
 }
 
@@ -524,7 +524,7 @@ export interface RevisionDoc {
     discount: string;
     total: string;
     lines: DocLine[];
-    /** For people who may see factory costs. */
+    /** For people who may see supplier costs. */
     costing?: {
       cost: string;
       sales: string;
@@ -536,8 +536,8 @@ export interface RevisionDoc {
       extraCostMinor: number;
       extraCost: string;
     } | null;
-    factoryBasis?: Incoterm | null;
-    factoryBasisPlace?: string | null;
+    supplierBasis?: Incoterm | null;
+    supplierBasisPlace?: string | null;
   }[];
 }
 

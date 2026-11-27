@@ -207,7 +207,7 @@ export function AcceptForm({
   const [optionId, setOptionId] = useState(options.length === 1 ? options[0]!.id : (options[0]?.id ?? ""));
   const chosen = options.find((o) => o.id === optionId);
   const rest = options.filter((o) => o.id !== optionId);
-  const factories = chosen?.factory ? [chosen.factory.name] : [];
+  const suppliers = chosen?.factory ? [chosen.factory.name] : [];
   return (
     <ActionForm
       action={action}
@@ -272,9 +272,9 @@ export function AcceptForm({
                 <span className="block">
                   · Sales order <strong className="text-text">SO-{today.slice(0, 4)}-…</strong> is made with Option {chosen.letter}&apos;s items, prices and terms.
                 </span>
-                {factories.length > 0 && (
+                {suppliers.length > 0 && (
                   <span className="block">
-                    · A purchase order is opened for {factories.join(", ")} (sent later, from the order).
+                    · A purchase order is opened for {suppliers.join(", ")} (sent later, from the order).
                   </span>
                 )}
                 {others.length > 0 && (

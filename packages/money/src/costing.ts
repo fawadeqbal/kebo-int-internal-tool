@@ -1,7 +1,7 @@
 import { allocate, divideHalfAway, exactDecimal, multiplyMinor, roundHalfAway, type Minor } from "./core";
 
 /**
- * Costing for a trading company: what a factory line costs us in the quotation
+ * Costing for a trading company: what a supplier line costs us in the quotation
  * currency, and the margin we add on top.
  */
 
@@ -49,14 +49,14 @@ export function restateRates(rates: Rates, oldMain: string, newMain: string): Ra
   return out;
 }
 
-/** An amount in the factory's currency → the document currency, given rate = factory units per document unit. */
+/** An amount in the supplier's currency → the document currency, given rate = supplier units per document unit. */
 export const convertMinor = (minor: Minor, rate: number): Minor => {
   if (!(rate > 0)) throw new Error("Exchange rate must be more than 0");
   return roundHalfAway(minor / rate);
 };
 
 /**
- * A factory price with its tax % added on top: 100.00 + 13% → 113.00 (what one
+ * A supplier price with its tax % added on top: 100.00 + 13% → 113.00 (what one
  * unit costs Kebo); 100.50 + 13% → 113.57. Exact integer arithmetic, rounded
  * half away from zero, the same as round(price × (100 + tax)) in the database.
  */
@@ -68,36 +68,36 @@ export function withTaxMinor(unitPriceMinor: Minor, taxRate: number | string): M
 }
 
 /**
- * What one unit of a factory line costs us, in the factory's currency. Each
- * factory offer says whether its prices are without tax (the tax % is added on
+ * What one unit of a supplier line costs us, in the supplier's currency. Each
+ * supplier offer says whether its prices are without tax (the tax % is added on
  * top: price + tax, as withTaxMinor) or have the tax included (the price as it
  * is: the tax inside is only shown, never added again). Every place that works
- * out a cost from a factory price uses this one function.
+ * out a cost from a supplier price uses this one function.
  */
-export function factoryUnitCostMinor(unitPriceMinor: Minor, taxRate: number | string, taxIncluded = false): Minor {
+export function supplierUnitCostMinor(unitPriceMinor: Minor, taxRate: number | string, taxIncluded = false): Minor {
   return taxIncluded ? roundHalfAway(unitPriceMinor) : withTaxMinor(unitPriceMinor, taxRate);
 }
 
 /**
  * What one unit of a supplier's price costs us when we quote on it (canvas "From the supplier offer to the
- * quotation", change 6): with its tax (factoryUnitCostMinor), less the export VAT refund — `refundPercent` of the
+ * quotation", change 6): with its tax (supplierUnitCostMinor), less the export VAT refund — `refundPercent` of the
  * price before tax, never more than the tax itself. 0% (the default): the cost with its tax, as before.
  */
 export function quoteUnitCostMinor(unitPriceMinor: Minor, taxRate: number | string, taxIncluded = false, refundPercent: number | string = 0): Minor {
-  const cost = factoryUnitCostMinor(unitPriceMinor, taxRate, taxIncluded);
+  const cost = supplierUnitCostMinor(unitPriceMinor, taxRate, taxIncluded);
   const refund = Math.min(Math.max(Number(refundPercent) || 0, 0), Math.max(Number(taxRate) || 0, 0));
   if (!refund) return cost;
-  const before = cost - factoryTaxMinor(unitPriceMinor, taxRate, taxIncluded);
+  const before = cost - supplierTaxMinor(unitPriceMinor, taxRate, taxIncluded);
   return cost - roundHalfAway((before * refund) / 100);
 }
 
 /**
- * The tax in an amount at a factory's prices: added on top when the prices are
+ * The tax in an amount at a supplier's prices: added on top when the prices are
  * without tax (amount × r/100), or the part already inside when tax is
  * included (amount − amount / (1 + r/100)). Exact, rounded half away from zero.
  * For one unit without tax it is withTaxMinor − price, to the cent.
  */
-export function factoryTaxMinor(amountMinor: Minor, taxRate: number | string, taxIncluded = false): Minor {
+export function supplierTaxMinor(amountMinor: Minor, taxRate: number | string, taxIncluded = false): Minor {
   const amount = roundHalfAway(amountMinor);
   const rate = exactDecimal(Math.max(Number(taxRate) || 0, 0));
   if (!rate || !rate.n) return 0;

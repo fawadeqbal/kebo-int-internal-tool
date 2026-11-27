@@ -25,7 +25,7 @@ import { PanelBody, SidePanel, WindowCancelIn, WindowFooter } from "@/components
 import { money } from "@/lib/format";
 import { useTime } from "@/lib/time-client";
 import type { ActionState } from "@/lib/actions";
-import type { FactoryPlanView, OrderMoney } from "@/lib/types-money";
+import type { SupplierPlanView, OrderMoney } from "@/lib/types-money";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -290,7 +290,7 @@ const SUPPLIER_RULES: PlanRule[] = [
   { value: "on_ship_plus_days", label: "Days after shipment", needs: "days", days: 30 },
 ];
 
-/** "Edit plan" (and "Change") on Factory order: what we pay one supplier, in parts, with their invoice numbers. */
+/** "Edit plan" (and "Change") on Supplier order: what we pay one supplier, in parts, with their invoice numbers. */
 export function SupplierPlanWindow({
   label,
   sub,
@@ -301,8 +301,8 @@ export function SupplierPlanWindow({
   label: string;
   sub: string;
   action: Action;
-  plan: FactoryPlanView;
-  /** The day we ordered from the factory ("when we order" parts fall due then). */
+  plan: SupplierPlanView;
+  /** The day we ordered from the supplier ("when we order" parts fall due then). */
   orderedOn: string | null;
 }) {
   const { dayMonth } = useTime();
@@ -382,7 +382,7 @@ export function SupplierPlanWindow({
                 : null,
         action,
         toPayload: (parts) => ({
-          factoryId: plan.factory.id,
+          supplierId: plan.factory.id,
           items: parts.map((p) => {
             const share = num(p.share);
             return {

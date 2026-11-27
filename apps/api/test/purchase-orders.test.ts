@@ -31,7 +31,7 @@ describe("purchase orders", () => {
         order: {
           status: "open",
           stage: { in: ["confirmed", "in_production"] },
-          factoryOrderedOn: null,
+          supplierOrderedOn: null,
           allocations: { none: {} },
           shipments: { none: { OR: [{ status: { in: ["departed", "arrived", "cleared"] } }, { departedOn: { not: null } }] } },
           OR: [{ delivery: { is: null } }, { delivery: { is: { deliveredOn: null } } }],
@@ -55,7 +55,7 @@ describe("purchase orders", () => {
     ).body;
     expect(sent.items.find((i: { id: string }) => i.id === po.id)).toMatchObject({ sentOn: today, supplierRef: "THEIR-1", sentEarlyReason: "The price holds only until Friday" });
     // The first one sent is the order's "ordered from the factory" day.
-    expect((await db.order.findUniqueOrThrow({ where: { id: po.order.id } })).factoryOrderedOn).not.toBeNull();
+    expect((await db.order.findUniqueOrThrow({ where: { id: po.order.id } })).supplierOrderedOn).not.toBeNull();
   });
 
   it("finds orders by number or PO and by customer, and shows the quotation an order came from", async () => {

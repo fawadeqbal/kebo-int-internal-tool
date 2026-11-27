@@ -23,7 +23,7 @@ type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
  * Money v2 (order flow v3, phase 5) on the web: a payment in any currency with
  * what it counts as and where it goes, one transfer over several orders with the
  * rest as credit, the customer's credit, the plan built from the route, the LC
- * checks, the factory payment plan. The rules live in @kebo/shared; the API
+ * checks, the supplier payment plan. The rules live in @kebo/shared; the API
  * works the same numbers out again and is the one that counts.
  */
 
@@ -577,5 +577,5 @@ export function LcChecks({ checks }: { checks: LcCheck[] }) {
   );
 }
 
-/* ---------------------------------------------------------------- the factory payment plan */
+/* ---------------------------------------------------------------- the supplier payment plan */
 

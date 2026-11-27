@@ -7,7 +7,7 @@ import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../../common/auth/order-access";
 import { customerAccess } from "../parties/customers.service";
 
-/** A record notes and follow-ups are on: an inquiry, an order, a customer or a factory. */
+/** A record notes and follow-ups are on: an inquiry, an order, a customer or a supplier. */
 export type RecordType = NoteTarget;
 
 /** The record as notes and follow-ups show it: "SO-2026-0447 · Lahore Pharma", and where it opens. */
@@ -17,7 +17,7 @@ export interface RecordRef {
   label: string;
   /** Its page in the web app (the phone maps the same paths). */
   link: string;
-  /** The customer whose contacts a note can name (none for a factory). */
+  /** The customer whose contacts a note can name (none for a supplier). */
   customerId: string | null;
 }
 
@@ -30,7 +30,7 @@ type Db = PrismaService["db"];
 
 /**
  * The record when this person may see it, with its label; otherwise 404 (as every page of a record they
- * do not see answers), or 403 for factories without sourcing.manage (as GET /factories/:id answers).
+ * do not see answers), or 403 for suppliers without sourcing.manage (as GET /factories/:id answers).
  */
 export async function seeRecord(db: Db, user: SessionUser, type: RecordType, id: string): Promise<RecordRef> {
   const ref = (label: string, customerId: string | null): RecordRef => ({ type, id, label, link: recordLink(type, id), customerId });
@@ -72,7 +72,7 @@ export function canAddTo(user: SessionUser, type: RecordType): boolean {
 /**
  * Whether a person may remove anyone's note on the record: the managers of that kind of record (the
  * permission that already removes or overrides it: cancelling orders, deleting customers, removing
- * factories, changing anyone's inquiries).
+ * suppliers, changing anyone's inquiries).
  */
 export function managesNotesOf(user: SessionUser, type: RecordType): boolean {
   if (type === "order") return can(user, "orders.manage");
@@ -87,7 +87,7 @@ export async function recordLabels(db: Db, refs: { type: RecordType; id: string 
   const out = new Map<string, RecordRef>();
   const put = (type: RecordType, id: string, label: string, customerId: string | null) =>
     out.set(`${type}:${id}`, { type, id, label, link: recordLink(type, id), customerId });
-  const [inquiries, orders, customers, factories] = await Promise.all([
+  const [inquiries, orders, customers, suppliers] = await Promise.all([
     ids("inquiry").length
       ? db.inquiry.findMany({
           where: { id: { in: ids("inquiry") } },
@@ -106,6 +106,6 @@ export async function recordLabels(db: Db, refs: { type: RecordType; id: string 
   for (const i of inquiries) put("inquiry", i.id, `${i.refNo} · ${i.customer.name}`, i.customerId);
   for (const o of orders) put("order", o.id, `${o.refNo} · ${o.customer.name}`, o.customerId);
   for (const c of customers) put("customer", c.id, c.name, c.id);
-  for (const f of factories) put("factory", f.id, f.name, null);
+  for (const f of suppliers) put("factory", f.id, f.name, null);
   return out;
 }

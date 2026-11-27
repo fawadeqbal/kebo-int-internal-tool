@@ -51,7 +51,7 @@ for (const size of SIZES) {
   });
 }
 
-// Factories are called suppliers (Words, 18 Nov 2026): the old addresses still open the new pages.
+// Suppliers are called suppliers (Words, 18 Nov 2026): the old addresses still open the new pages.
 test("/factories still lands on /suppliers", async ({ page }) => {
   const res = await page.goto("/factories");
   expect(res?.status() ?? 0).toBeLessThan(400);

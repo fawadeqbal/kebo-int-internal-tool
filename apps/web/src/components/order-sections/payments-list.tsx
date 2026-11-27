@@ -25,7 +25,7 @@ export interface PaymentLine {
 
 /**
  * An order's payments, the same list on both sides (design "payment plans that match"): Payments received
- * on the Payment tab and Payments made on Factory order. A table on a laptop; on a phone each payment is a
+ * on the Payment tab and Payments made on Supplier order. A table on a laptop; on a phone each payment is a
  * card with what it was for, its amount, when and how, and its Receipt and Change.
  */
 export function PaymentsList({ name, account, total, rows }: { name: string; account: "Into" | "From"; total: { label: string; amount: ReactNode }; rows: PaymentLine[] }) {

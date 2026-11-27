@@ -3,8 +3,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 
 // Design "RFQ Desk — terms that travel" (16 Nov 2026), step 1: the quotation's form in the groups every offer and
-// order uses (Delivery · Payment · Warranty · Conditions); each option's lead time beside what its factory gives;
-// the payment as parts, the order's plan; where we promise more than the factory gives, it says so.
+// order uses (Delivery · Payment · Warranty · Conditions); each option's lead time beside what its supplier gives;
+// the payment as parts, the order's plan; where we promise more than the supplier gives, it says so.
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 
@@ -17,7 +17,7 @@ const offers: QuoteOffers = {
   rates: { USD: 1, CNY: 7.1 },
   offers: [
     {
-      factoryQuoteId: "J",
+      supplierQuoteId: "J",
       factory: { id: "fj", name: "Jinan Pharma Machinery" },
       currency: "CNY",
       basis: "FOB",
@@ -60,7 +60,7 @@ const draft = (extra: Partial<RevisionDraft> = {}): RevisionDraft => ({
   warrantyMonths: 12,
   warrantyFrom: "sat",
   notes: null,
-  options: [{ factoryQuoteId: "J", discount: 0, leadTime: null, leadDays: 45, leadFrom: "after_payment", charges: [], costs: [], prices: [{ lineId: "j1", unitPrice: 30125 }] }],
+  options: [{ supplierQuoteId: "J", discount: 0, leadTime: null, leadDays: 45, leadFrom: "after_payment", charges: [], costs: [], prices: [{ lineId: "j1", unitPrice: 30125 }] }],
   ...extra,
 });
 
@@ -83,7 +83,7 @@ describe("the quotation's form, in the four groups", () => {
     const leads = screen.getByRole("table", { name: "Lead time of each option" });
     expect(within(leads).getByLabelText("Option A lead time")).toHaveProperty("value", "45");
     expect(within(leads).getAllByText(/Jinan Pharma gives 30 days after the deposit · 15 days to spare/).length).toBeGreaterThan(0);
-    // 12 months from the site test against 12 from shipment: the last 2 are not the factory's.
+    // 12 months from the site test against 12 from shipment: the last 2 are not the supplier's.
     expect(screen.getByText(/the last 2 months of ours are not covered by the supplier: ask Jinan Pharma for 14 months/)).toBeTruthy();
     // The payment covers what Jinan asks before the goods leave.
     expect(screen.getByText(/^Covered: the customer pays USD 9,037.50 with the order/)).toBeTruthy();
@@ -119,7 +119,7 @@ describe("an older quotation opened in the form", () => {
       warranty: "Warranty: 12 months from the site acceptance test (SAT), parts and service.",
       warrantyMonths: null,
       warrantyFrom: null,
-      options: [{ factoryQuoteId: "J", discount: 0, leadTime: "60 days", charges: [], costs: [], prices: [{ lineId: "j1", unitPrice: 30125 }] }],
+      options: [{ supplierQuoteId: "J", discount: 0, leadTime: "60 days", charges: [], costs: [], prices: [{ lineId: "j1", unitPrice: 30125 }] }],
     });
     const opened = withFacts(fromDraft(d));
     expect(opened.state.options[0]).toMatchObject({ leadDays: "60", leadFrom: "after_payment", leadTime: "" });
@@ -132,7 +132,7 @@ describe("an older quotation opened in the form", () => {
   });
 
   it("the price editor sends its terms back as they were (nothing read into them)", () => {
-    const d = draft({ options: [{ factoryQuoteId: "J", discount: 0, leadTime: "60 days", charges: [], costs: [], prices: [{ lineId: "j1", unitPrice: 30125 }] }] });
+    const d = draft({ options: [{ supplierQuoteId: "J", discount: 0, leadTime: "60 days", charges: [], costs: [], prices: [{ lineId: "j1", unitPrice: 30125 }] }] });
     const p = payload(fromDraft(d), offers);
     expect(p.options[0]).toMatchObject({ leadDays: null, leadTime: "60 days" });
     expect(p.paymentParts.map((x) => `${x.percent} ${x.rule}`)).toEqual(["30 on_order", "70 before_shipment"]);

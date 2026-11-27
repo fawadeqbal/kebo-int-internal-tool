@@ -5,13 +5,13 @@ import type { OrderMoney } from "@/lib/types-money";
 
 // Design "RFQ Desk — terms that travel" (16 Nov 2026), step 2: the order's Overview has what was agreed with the
 // customer (copied from the quotation when it was accepted, changed in one window that asks why), and the customer
-// beside the factory: what we promised against what the factory gives, green or amber with what to do.
+// beside the supplier: what we promised against what the supplier gives, green or amber with what to do.
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 
 const { sideBySide, shipByNote } = await import("@/components/order-sections/agreed");
 const { AgreedWindow } = await import("@/components/order-sections/overview-windows");
-const { FactoryAgreedWindow } = await import("@/components/order-sections/factory-windows");
+const { SupplierAgreedWindow } = await import("@/components/order-sections/supplier-windows");
 
 const agreed = (a: Partial<NonNullable<OrderView["agreed"]>> = {}): NonNullable<OrderView["agreed"]> => ({
   copied: true,
@@ -45,7 +45,7 @@ const agreed = (a: Partial<NonNullable<OrderView["agreed"]>> = {}): NonNullable<
   ...a,
 });
 
-const factoryTerms = (t: Partial<NonNullable<OrderView["factoryTerms"]>[number]> = {}): NonNullable<OrderView["factoryTerms"]>[number] => ({
+const supplierTerms = (t: Partial<NonNullable<OrderView["supplierTerms"]>[number]> = {}): NonNullable<OrderView["supplierTerms"]>[number] => ({
   factory: { id: "fj", name: "Jinan Pharma Machinery" },
   offer: { id: "q1", reference: "JP-2611-08", receivedOn: "2026-11-12" },
   basis: "FOB",
@@ -75,7 +75,7 @@ const order = (o: Partial<OrderView> = {}) =>
     incotermPlace: "Qingdao",
     shipBy: "2026-12-31",
     agreed: agreed(),
-    factoryTerms: [factoryTerms()],
+    supplierTerms: [supplierTerms()],
     ...o,
   }) as OrderView;
 
@@ -112,14 +112,14 @@ describe("the customer and the supplier, side by side", () => {
   it("another basis is worth knowing, not a problem; rows neither side says are left out", () => {
     const [t] = sideBySide(order({ incoterm: "CIF", incotermPlace: "Karachi" } as Partial<OrderView>), null);
     expect(t!.rows.find((r) => r.key === "basis")!.check).toMatchObject({ ok: null, word: "Different", text: "From FOB Qingdao to CIF Karachi is ours to arrange and pay." });
-    // Without the plan (no money to see) the payment is the factory's only, and not checked.
+    // Without the plan (no money to see) the payment is the supplier's only, and not checked.
     expect(t!.rows.find((r) => r.key === "payment")).toMatchObject({ ours: null, check: null });
-    const none = sideBySide(order({ agreed: agreed({ warrantyMonths: null, warranty: null }), factoryTerms: [factoryTerms({ terms: { ...factoryTerms().terms, warrantyMonths: null } })] }), THREE);
+    const none = sideBySide(order({ agreed: agreed({ warrantyMonths: null, warranty: null }), supplierTerms: [supplierTerms({ terms: { ...supplierTerms().terms, warrantyMonths: null } })] }), THREE);
     expect(none[0]!.rows.map((r) => r.key)).not.toContain("warranty");
   });
 
   it("nothing for people who do not see the supplier's terms", () => {
-    expect(sideBySide(order({ factoryTerms: [] }), THREE)).toEqual([]);
+    expect(sideBySide(order({ supplierTerms: [] }), THREE)).toEqual([]);
   });
 });
 
@@ -195,7 +195,7 @@ describe("Change what we agreed with the customer", () => {
 describe("Change what we agreed with the supplier", () => {
   const open = (sent: boolean) => {
     render(
-      <FactoryAgreedWindow
+      <SupplierAgreedWindow
         title="What we agreed with Jinan Pharma Machinery"
         sub="PO-2026-0617 · from their offer JP-2611-08"
         action={async () => ({ ok: true })}

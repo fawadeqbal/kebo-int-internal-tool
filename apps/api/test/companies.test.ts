@@ -129,7 +129,7 @@ describe("companies: isolation and the platform", () => {
     // Kebo's records by id: not found for B, whatever the route.
     const kOrders = (await kebo.get("/orders").expect(200)).body as { id: string }[];
     const kCustomers = (await kebo.get("/customers?pageSize=5").expect(200)).body.rows as { id: string }[];
-    const kFactories = (await kebo.get("/factories?pageSize=5").expect(200)).body.rows as { id: string }[];
+    const kSuppliers = (await kebo.get("/factories?pageSize=5").expect(200)).body.rows as { id: string }[];
     const kQuote = (await kebo.get(`/inquiries/${kInquiries[0].id}/quotation`).expect(200)).body;
     const reads = [
       `/inquiries/${kInquiries[0].id}`,
@@ -138,11 +138,11 @@ describe("companies: isolation and the platform", () => {
       `/orders/${kOrders[0].id}/money`,
       `/customers/${kCustomers[0].id}`,
       `/customers/${kCustomers[0].id}/account`,
-      `/factories/${kFactories[0].id}`,
+      `/factories/${kSuppliers[0].id}`,
       `/inquiries/${kInquiries[0].id}/notes`,
       `/orders/${kOrders[0].id}/notes`,
       `/customers/${kCustomers[0].id}/notes`,
-      `/factories/${kFactories[0].id}/notes`,
+      `/factories/${kSuppliers[0].id}/notes`,
       `/follow-ups?orderId=${kOrders[0].id}`,
       ...(kQuote?.revisions?.[0] ? [`/revisions/${kQuote.revisions[0].id}`] : []),
     ];
@@ -160,7 +160,7 @@ describe("companies: isolation and the platform", () => {
       ["post", "/submissions", { kind: "payment", orderId: kOrders[0].id, body: { amount: "10", currency: "USD", paidOn: "2026-01-01" } }],
       ["post", `/orders/${kOrders[0].id}/notes`, { body: "from B" }],
       ["post", `/customers/${kCustomers[0].id}/notes`, { body: "from B" }],
-      ["post", `/factories/${kFactories[0].id}/notes`, { body: "from B" }],
+      ["post", `/factories/${kSuppliers[0].id}/notes`, { body: "from B" }],
       ["post", "/follow-ups", { title: "from B", dueOn: "2026-01-01", orderId: kOrders[0].id }],
       ["post", "/follow-ups", { title: "from B", dueOn: "2026-01-01", customerId: kCustomers[0].id }],
       ["delete", `/inquiries/${kInquiries[0].id}`, undefined],

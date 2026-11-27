@@ -11,7 +11,7 @@ import { plainQuoteParts, planSentence, quotePartsOf } from "./terms";
  * - one transfer pays several orders, oldest due first; the rest is credit;
  * - the payment route builds the plan (deposit + balance per route);
  * - an LC is checked against the order;
- * - the factory is paid on a plan (advance on order, balance on the ready date).
+ * - the supplier is paid on a plan (advance on order, balance on the ready date).
  * Nothing here touches the database.
  */
 
@@ -55,9 +55,9 @@ export interface RouteTerms {
 }
 
 /**
- * When an instalment falls due (owner, 3 Nov 2026: the customer's plan follows the dates like the factory's):
+ * When an instalment falls due (owner, 3 Nov 2026: the customer's plan follows the dates like the supplier's):
  * - fixed: on its own date (typed by hand, or the deposit's: some days after the order);
- * - on_ready: the order's ready date (the latest factory's; the ship date when none is known);
+ * - on_ready: the order's ready date (the latest supplier's; the ship date when none is known);
  * - on_ship_plus_days: `dueDays` after the goods left (the earliest shipment's departure);
  * - after_papers: `dueDays` after the papers reached the customer's bank (an LC);
  * - after_sat: `dueDays` after the site acceptance test was done (Delivery & SAT; design "terms that travel").
@@ -78,7 +78,7 @@ export const PLAN_RULE_DAYS: Partial<Record<PlanDueRule, number>> = { on_ship_pl
 
 /** The order's dates an instalment's rule reads. */
 export interface PlanDates {
-  /** The order's ready date: the latest of its factories' (orderReadyOn). */
+  /** The order's ready date: the latest of its suppliers' (orderReadyOn). */
   readyOn: ISODate | null;
   /** Shipped on: the earliest day one of its shipments left. */
   shippedOn: ISODate | null;
@@ -429,7 +429,7 @@ export interface LcCheck {
 
 /**
  * The LC against the order: the amount covers the balance, it is in the
- * order's currency, the latest ship date is not before the factory's ready
+ * order's currency, the latest ship date is not before the supplier's ready
  * date, and the papers can reach the bank before it expires (ETA, else the
  * latest ship date, plus the courier days). With our own ship-by date (the
  * promise to the customer): it is not later than the LC's latest shipment date
@@ -563,37 +563,37 @@ export const CANCEL_CUSTOMER_MONEY_LABEL: Record<CancelCustomerMoney, string> = 
   refund: "Refunded",
   fee: "Kept as a cancellation fee",
 };
-export const CANCEL_FACTORY_MONEY = ["refund_due", "loss"] as const;
-export type CancelFactoryMoney = (typeof CANCEL_FACTORY_MONEY)[number];
-export const CANCEL_FACTORY_MONEY_LABEL: Record<CancelFactoryMoney, string> = {
+export const CANCEL_SUPPLIER_MONEY = ["refund_due", "loss"] as const;
+export type CancelSupplierMoney = (typeof CANCEL_SUPPLIER_MONEY)[number];
+export const CANCEL_SUPPLIER_MONEY_LABEL: Record<CancelSupplierMoney, string> = {
   refund_due: "Refund expected from the supplier",
   loss: "A loss on this order",
 };
 
-/* ---------------------------------------------------------------- factory payment plan */
+/* ---------------------------------------------------------------- supplier payment plan */
 
 /** When a part of a supplier's plan falls due: when we order, their ready date, a fixed date, or days after the goods leave. */
-export const FACTORY_DUE_RULES = ["on_order", "on_ready", "fixed", "on_ship_plus_days"] as const;
-export type FactoryDueRule = (typeof FACTORY_DUE_RULES)[number];
-export const FACTORY_DUE_RULE_LABEL: Record<FactoryDueRule, string> = {
+export const SUPPLIER_DUE_RULES = ["on_order", "on_ready", "fixed", "on_ship_plus_days"] as const;
+export type SupplierDueRule = (typeof SUPPLIER_DUE_RULES)[number];
+export const SUPPLIER_DUE_RULE_LABEL: Record<SupplierDueRule, string> = {
   on_order: "when ordered",
   on_ready: "ready date",
   fixed: "fixed date",
   on_ship_plus_days: "days after shipping",
 };
 
-export interface FactoryPlanRow {
+export interface SupplierPlanRow {
   label: string;
   percent: number | null;
   amountMinor: Minor;
-  dueRule: FactoryDueRule;
+  dueRule: SupplierDueRule;
   dueOn: ISODate | null;
   /** on_ship_plus_days: how many days after the goods leave. */
   dueDays?: number | null;
 }
 
 /**
- * Where the customer's money for an order stands, in the words the person paying its factory needs:
+ * Where the customer's money for an order stands, in the words the person paying its supplier needs:
  * the route decides who pays the balance (the customer, or the bank on a contract or an LC), the
  * payments say what is in. `warn`: money we would expect by now is not in (the deposit, or anything
  * at all on a route where the customer pays us directly).
@@ -617,25 +617,25 @@ export function customerMoney(f: { totalMinor: Minor; receivedMinor: Minor; depo
   return { state: "part", words: `Customer part paid${bank ? ` · the rest ${bank}` : ""}`, warn: false };
 }
 
-/** The plan a factory starts with: an advance (percent) when we order, the balance on the ready date. */
-export function defaultFactoryPlan(owedMinor: Minor, advancePercent: number): FactoryPlanRow[] {
+/** The plan a supplier starts with: an advance (percent) when we order, the balance on the ready date. */
+export function defaultSupplierPlan(owedMinor: Minor, advancePercent: number): SupplierPlanRow[] {
   const p = Math.min(Math.max(advancePercent, 0), 100);
   const advance = percentOfMinor(owedMinor, p);
-  const rows: FactoryPlanRow[] = [];
+  const rows: SupplierPlanRow[] = [];
   if (advance > 0) rows.push({ label: `Deposit ${p}%`, percent: p, amountMinor: advance, dueRule: "on_order", dueOn: null });
   if (owedMinor - advance > 0 || !rows.length)
     rows.push({ label: advance > 0 ? `Balance ${Math.round((100 - p) * 100) / 100}%` : "Payment", percent: advance > 0 ? 100 - p : 100, amountMinor: owedMinor - advance, dueRule: "on_ready", dueOn: null });
   return rows;
 }
 
-export type FactoryPlanStatus = "paid" | "part" | "due" | "late" | "later";
-export const FACTORY_PLAN_STATUS_LABEL: Record<FactoryPlanStatus, string> = { paid: "Paid", part: "Part paid", due: "Due", late: "Late", later: "Not due yet" };
+export type SupplierPlanStatus = "paid" | "part" | "due" | "late" | "later";
+export const SUPPLIER_PLAN_STATUS_LABEL: Record<SupplierPlanStatus, string> = { paid: "Paid", part: "Part paid", due: "Due", late: "Late", later: "Not due yet" };
 
 /**
- * A row's date: when ordered (the factory order date), the factory's ready date (moves with it), days after
+ * A row's date: when ordered (the supplier order date), the supplier's ready date (moves with it), days after
  * the goods left (moves with the shipment), or the fixed date.
  */
-export function factoryDueOn(
+export function supplierDueOn(
   row: { dueRule: string; dueOn: ISODate | null; dueDays?: number | null },
   orderedOn: ISODate | null,
   readyOn: ISODate | null,
@@ -648,11 +648,11 @@ export function factoryDueOn(
 }
 
 /**
- * Each plan row with what is paid on it (payments to the factory pay the rows
+ * Each plan row with what is paid on it (payments to the supplier pay the rows
  * in order) and where it stands today: paid, part paid, due (within the
  * due-soon window), late, or not due yet.
  */
-export function factoryPlanStatus<T extends FactoryPlanRow>(
+export function supplierPlanStatus<T extends SupplierPlanRow>(
   rows: T[],
   paidMinor: Minor,
   orderedOn: ISODate | null,
@@ -663,8 +663,8 @@ export function factoryPlanStatus<T extends FactoryPlanRow>(
   shippedOn: ISODate | null = null,
 ) {
   return payInstalments(rows, paidMinor).map(({ item, paidMinor: paid, openMinor }) => {
-    const due = factoryDueOn(item, orderedOn, readyOn, shippedOn);
-    const status: FactoryPlanStatus =
+    const due = supplierDueOn(item, orderedOn, readyOn, shippedOn);
+    const status: SupplierPlanStatus =
       openMinor <= 0 ? "paid" : due && due < today ? "late" : due && due <= addDays(today, soonDays) ? "due" : paid > 0 ? "part" : "later";
     return { ...item, due, paidMinor: paid, openMinor: Math.max(openMinor, 0), status, inDays: due ? daysBetween(today, due) : null };
   });

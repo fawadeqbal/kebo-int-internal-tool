@@ -5,7 +5,7 @@ import type { InquiryStage, LostReason } from "../enums";
  *
  * Staff only make two decisions by hand: "Mark as lost" (with a reason) and
  * putting a deal on hold. Every other move follows from the work itself
- * (assigning someone, recording a factory price, sending or accepting a
+ * (assigning someone, recording a supplier price, sending or accepting a
  * quotation), so the stage is always true without anyone remembering to click.
  */
 

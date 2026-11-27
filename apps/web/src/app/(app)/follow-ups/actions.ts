@@ -16,9 +16,9 @@ async function happenedAt(local: string | undefined): Promise<string | undefined
 }
 
 /** The record's notes endpoint. */
-const NOTES_PATH = { orderId: "orders", customerId: "customers", factoryId: "factories", inquiryId: "inquiries" } as const;
+const NOTES_PATH = { orderId: "orders", customerId: "customers", supplierId: "factories", inquiryId: "inquiries" } as const;
 
-/** A note or call log on an order, customer or factory: { body, kind, contactId, at }. */
+/** A note or call log on an order, customer or supplier: { body, kind, contactId, at }. */
 export async function addNoteAction(on: RecordKey, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const at = await happenedAt(v.at);
@@ -40,7 +40,7 @@ export async function removeNoteAction(noteId: string, _prev: ActionState, form:
   return r;
 }
 
-const RECORD_KEYS = ["inquiryId", "orderId", "customerId", "factoryId"] as const;
+const RECORD_KEYS = ["inquiryId", "orderId", "customerId", "supplierId"] as const;
 
 /** The About select's "orderId:…" → { orderId: "…" } (anything else: on nothing). */
 function chosenRecord(about: string | undefined): Partial<Record<RecordKey["key"], string>> {

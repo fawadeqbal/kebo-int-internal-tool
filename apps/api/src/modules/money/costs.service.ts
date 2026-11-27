@@ -17,7 +17,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { OrdersService } from "../orders/orders.service";
 import { convert, orderRate } from "./order-money";
-import { factoryPositionOf, fxOf, positionOf, supplierPaidRelation } from "../billing/api";
+import { supplierPositionOf, fxOf, positionOf, supplierPaidRelation } from "../billing/api";
 
 const person = { select: { id: true, name: true } } as const;
 
@@ -81,7 +81,7 @@ export class CostsService {
       ours.map((e) => ({ category: e.category as ExpenseCategory, minor: inOrder(e) })),
     );
 
-    // Profit as the quote saw it and as it stands: sale − factory − planned − not planned (− bank charges on payments).
+    // Profit as the quote saw it and as it stands: sale − supplier − planned − not planned (− bank charges on payments).
     const totalMinor = decimalToMinor(o.total);
     const costing = orderCosting(
       o.lines.map((l) => ({
@@ -100,7 +100,7 @@ export class CostsService {
     const m = orderMoney({
       ...costing,
       receivedMinor: position.receivedMinor,
-      factoryPaidMinor: goodsPaidMinor,
+      supplierPaidMinor: goodsPaidMinor,
       expensesMinor: plan.spentMinor,
       expensesUnpaidMinor: sum(ours.filter((e) => e.payLater && !e.repaidOn)),
       basisPaidMinor: plan.coveredMinor,
@@ -108,13 +108,13 @@ export class CostsService {
     });
     const onQuote = m.grossOnQuoteMinor;
     const expected = m.expectedMinor;
-    // What the factories charge for the goods, in their own currencies (prices frozen on the lines, with tax on top unless
-    // included), and what is still to pay them after our payments and the expenses they bear: factoryPosition.
-    const factoryOwed = new Map<string, { owed: Minor; toPay: Minor }>();
-    const factoryRows = factoryPositionOf(o, fx).filter((x) => x.lines > 0);
-    for (const r of factoryRows) {
-      const cur = factoryOwed.get(r.currency) ?? { owed: 0, toPay: 0 };
-      factoryOwed.set(r.currency, { owed: cur.owed + r.owedMinor, toPay: cur.toPay + r.toPayMinor });
+    // What the suppliers charge for the goods, in their own currencies (prices frozen on the lines, with tax on top unless
+    // included), and what is still to pay them after our payments and the expenses they bear: supplierPosition.
+    const supplierOwed = new Map<string, { owed: Minor; toPay: Minor }>();
+    const supplierRows = supplierPositionOf(o, fx).filter((x) => x.lines > 0);
+    for (const r of supplierRows) {
+      const cur = supplierOwed.get(r.currency) ?? { owed: 0, toPay: 0 };
+      supplierOwed.set(r.currency, { owed: cur.owed + r.owedMinor, toPay: cur.toPay + r.toPayMinor });
     }
 
     // Paid from someone's own money and not repaid yet: per person and currency.
@@ -142,20 +142,20 @@ export class CostsService {
     const bearer = (b: ExpenseBearer) => fromMinor(sum(live.filter((e) => e.borneBy === b)));
 
     /* ----- The cost sheet (money, step 2): every cost the order has, known or paid, in one list. */
-    const factoryNames = new Map(
-      (await this.prisma.db.party.findMany({ where: { id: { in: [...new Set(factoryRows.map((r) => r.factoryId))] } }, select: { id: true, name: true } })).map((f) => [f.id, f.name]),
+    const supplierNames = new Map(
+      (await this.prisma.db.party.findMany({ where: { id: { in: [...new Set(supplierRows.map((r) => r.supplierId))] } }, select: { id: true, name: true } })).map((f) => [f.id, f.name]),
     );
-    // What each factory's goods cost in the order's currency (the lines' cost, as profit counts it).
+    // What each supplier's goods cost in the order's currency (the lines' cost, as profit counts it).
     const goodsOf = new Map<string, Minor>();
     for (const l of o.lines)
-      if (l.unitCost !== null) goodsOf.set(l.factoryId ?? "", (goodsOf.get(l.factoryId ?? "") ?? 0) + multiplyMinor(decimalToMinor(l.unitCost), l.quantity.toString()));
+      if (l.unitCost !== null) goodsOf.set(l.supplierId ?? "", (goodsOf.get(l.supplierId ?? "") ?? 0) + multiplyMinor(decimalToMinor(l.unitCost), l.quantity.toString()));
     type Row = {
       key: string;
       kind: "goods" | "cost" | "bank" | "estimate";
       label: string;
       category: ExpenseCategory | null;
       owedTo: string | null;
-      /** Where it comes from: the factory order, a shipment, the customer's payments, the quotation, or typed here. */
+      /** Where it comes from: the supplier order, a shipment, the customer's payments, the quotation, or typed here. */
       from: "factory" | "shipment" | "payment" | "quotation" | "typed";
       amount: string;
       currency: string;
@@ -168,36 +168,36 @@ export class CostsService {
       paidInOrder: string | null;
       toPayInOrder: string | null;
       state: "paid" | "part_paid" | "to_pay" | "to_repay" | "estimate";
-      /** Counted in the order's profit: ours to bear. The others are charged to the customer or taken off a factory. */
+      /** Counted in the order's profit: ours to bear. The others are charged to the customer or taken off a supplier. */
       borneBy: ExpenseBearer;
       expenseId: string | null;
       on: string | null;
     };
     const rows: Row[] = [];
     const seen = new Set<string>();
-    // What was paid to each factory (per currency), in the order's currency at each payment's own rate.
+    // What was paid to each supplier (per currency), in the order's currency at each payment's own rate.
     const paidTo = new Map<string, Minor>();
     for (const p of o.supplierPaid.filter((x) => !x.voidedAt)) {
       const k = `${p.movement.partyId}:${p.movement.currency}`;
       paidTo.set(k, (paidTo.get(k) ?? 0) + convert(decimalToMinor(p.share), Number(p.movement.rate)));
     }
-    for (const r of factoryRows) {
-      // A factory owed in two currencies: its goods cost in the order's currency shows once, on its first row.
-      const first = !seen.has(r.factoryId);
-      seen.add(r.factoryId);
-      const cost = first ? (goodsOf.get(r.factoryId) ?? null) : null;
-      // Settled in the factory's currency is paid in full here too, whatever the rates did between the payments.
+    for (const r of supplierRows) {
+      // A supplier owed in two currencies: its goods cost in the order's currency shows once, on its first row.
+      const first = !seen.has(r.supplierId);
+      seen.add(r.supplierId);
+      const cost = first ? (goodsOf.get(r.supplierId) ?? null) : null;
+      // Settled in the supplier's currency is paid in full here too, whatever the rates did between the payments.
       const paidHere = cost === null ? null : r.toPayMinor <= 0 ? cost : Math.min(paidTo.get(r.key) ?? 0, cost);
       rows.push({
         key: `goods:${r.key}`,
         kind: "goods",
         label: "Goods",
         category: null,
-        owedTo: factoryNames.get(r.factoryId) ?? "The supplier",
+        owedTo: supplierNames.get(r.supplierId) ?? "The supplier",
         from: "factory",
         amount: fromMinor(r.owedMinor),
         currency: r.currency,
-        inOrder: first && goodsOf.has(r.factoryId) ? fromMinor(goodsOf.get(r.factoryId)!) : null,
+        inOrder: first && goodsOf.has(r.supplierId) ? fromMinor(goodsOf.get(r.supplierId)!) : null,
         paid: fromMinor(Math.min(r.settledMinor, r.owedMinor)),
         toPay: fromMinor(r.toPayMinor),
         paidInOrder: paidHere === null ? null : fromMinor(paidHere),
@@ -208,7 +208,7 @@ export class CostsService {
         on: null,
       });
     }
-    // Goods with a cost and no factory price to pay (a line costed by hand): counted, nothing to pay here.
+    // Goods with a cost and no supplier price to pay (a line costed by hand): counted, nothing to pay here.
     const goodsListed = [...seen].reduce((t, id) => t + (goodsOf.get(id) ?? 0), 0);
     if (costing.goodsCostMinor - goodsListed > 0)
       rows.push({
@@ -321,7 +321,7 @@ export class CostsService {
         receiptsMissingAmounts: [...missingByCurrency].map(([currency, minor]) => ({ currency, amount: fromMinor(minor) })),
         borneByUs: bearer("us"),
         chargedToCustomer: bearer("customer"),
-        takenOffFactory: bearer("factory"),
+        takenOffSupplier: bearer("factory"),
       },
       planned: plan.rows.map((r) => ({
         key: r.key,
@@ -372,7 +372,7 @@ export class CostsService {
               sale: fromMinor(costing.costedRevenueMinor),
               uncosted: fromMinor(costing.uncostedRevenueMinor),
               factory: fromMinor(costing.goodsCostMinor),
-              factoryOwed: [...factoryOwed].map(([currency, f]) => ({ currency, amount: fromMinor(f.owed), toPay: fromMinor(f.toPay) })),
+              supplierOwed: [...supplierOwed].map(([currency, f]) => ({ currency, amount: fromMinor(f.owed), toPay: fromMinor(f.toPay) })),
               planned: fromMinor(plan.plannedMinor),
               notPlanned: fromMinor(plan.notPlannedMinor),
               /** Taken by banks from the customer's payments. */

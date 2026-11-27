@@ -3,7 +3,7 @@ import { BALANCE_TERMS_LABEL } from "../labels";
 
 /**
  * A deal has any number of quotations, A, B, C… (QUO-2026-0531-B; see quotationLetter below), each from one
- * factory offer or own prices, each with revisions R1, R2… Within a quotation only the newest revision is live. A revision cannot change after it is sent; a price
+ * supplier offer or own prices, each with revisions R1, R2… Within a quotation only the newest revision is live. A revision cannot change after it is sent; a price
  * change is a new revision, so what the customer saw is never altered. When a
  * newer revision is sent, the previous sent one becomes "superseded", so it no
  * longer counts as waiting for a reply, in reminders or in quoted value.
@@ -86,21 +86,21 @@ export function paymentSentenceOf(depositPercent: number, balanceTerms: BalanceT
  * whose item is not on the document (or comes later) is numbered on its own.
  */
 /**
- * Numbers for quotation and order lines: "1", "2", "2.1". A line from a factory
- * part is numbered under the line of its factory line; a line for one of the
- * customer's item parts (options without factory prices) under that item's line.
+ * Numbers for quotation and order lines: "1", "2", "2.1". A line from a supplier
+ * part is numbered under the line of its supplier line; a line for one of the
+ * customer's item parts (options without supplier prices) under that item's line.
  * Charges (freight…) are numbered after the goods.
  */
 export function numberQuoteLines(
-  lines: { id: string; factoryQuoteLineId: string | null; factoryParentId: string | null; requestedItemId: string | null; itemParentId: string | null }[],
+  lines: { id: string; supplierQuoteLineId: string | null; supplierParentId: string | null; requestedItemId: string | null; itemParentId: string | null }[],
 ): string[] {
   return lineNumbers(
     lines.map((l) => ({
       key: l.id,
-      parentKey: l.factoryParentId
-        ? (lines.find((x) => x.factoryQuoteLineId === l.factoryParentId)?.id ?? null)
-        : !l.factoryQuoteLineId && l.itemParentId
-          ? (lines.find((x) => !x.factoryQuoteLineId && x.requestedItemId === l.itemParentId)?.id ?? null)
+      parentKey: l.supplierParentId
+        ? (lines.find((x) => x.supplierQuoteLineId === l.supplierParentId)?.id ?? null)
+        : !l.supplierQuoteLineId && l.itemParentId
+          ? (lines.find((x) => !x.supplierQuoteLineId && x.requestedItemId === l.itemParentId)?.id ?? null)
           : null,
     })),
   );
@@ -131,7 +131,7 @@ export const optionLetter = (index: number) => String.fromCharCode(65 + index);
 
 /**
  * Which of the customer's items (top level) an offer answers. An item counts as
- * covered when the offer answers it or any of its parts; extras the factory
+ * covered when the offer answers it or any of its parts; extras the supplier
  * added (no item) do not count.
  */
 export function coverage(items: { id: string; parentId: string | null; no: string }[], answered: Iterable<string | null | undefined>) {

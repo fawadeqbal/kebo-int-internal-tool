@@ -3,7 +3,7 @@ import type { Db } from "./client";
 /**
  * For orders made outside the API (the demo seed, data loads, the old app's
  * import): copy onto them what the API freezes when a quotation is accepted —
- * the factory price, tax (and whether the price had it in) and currency of each line, the costs to reach the
+ * the supplier price, tax (and whether the price had it in) and currency of each line, the costs to reach the
  * basis it was sold on (from its option), and its main currency and rate.
  * Only fills what is still empty; the same as the money migration does for
  * orders made before it.

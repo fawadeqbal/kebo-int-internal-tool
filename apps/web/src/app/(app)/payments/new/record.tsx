@@ -15,12 +15,12 @@ import { getPeople, getSettings } from "@/lib/loaders";
 import type { OrderRow } from "@/lib/types-orders";
 import { ReceiptForm, ReceivedForm } from "@/components/money/money-v2";
 import type { CustomerPayments } from "@/lib/types-money";
-import { NewFactoryPayment } from "@/components/money/forms";
+import { NewSupplierPayment } from "@/components/money/forms";
 import { CostForm, type ExpenseChoices } from "@/components/money/cost-window";
 import { MoveMoney, type AccountRow } from "@/components/money/cash-forms";
 import { RecordBody } from "@/components/records/record-frame";
 import { customerReceiptAction, paymentAction } from "../../orders/actions";
-import { factoryPaymentAction } from "../../money/actions";
+import { supplierPaymentAction } from "../../money/actions";
 import { opensPayments } from "../shared";
 
 
@@ -57,7 +57,7 @@ export async function RecordPayment({ sp, inWindow = false }: { sp: Search; inWi
   const href = (k: Kind) => buildHref("/payments/new", {}, { kind: k, order: k === "in" || k === "out" ? orderId : undefined, back });
   const prefill =
     kind === "out" && UUID.test(sp.factory ?? "") && /^\d+(\.\d{1,2})?$/.test(sp.amount ?? "")
-      ? { factoryId: sp.factory!, amount: sp.amount!, kind: sp.part === "deposit" ? ("deposit" as const) : ("balance" as const) }
+      ? { supplierId: sp.factory!, amount: sp.amount!, kind: sp.part === "deposit" ? ("deposit" as const) : ("balance" as const) }
       : undefined;
 
   const ICON: Record<Kind, ReactNode> = {
@@ -218,7 +218,7 @@ async function OnOrder({
   kind: "in" | "out";
   orderId?: string;
   today: string;
-  prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance" };
+  prefill?: { supplierId: string; amount: string; kind: "deposit" | "balance" };
   back?: string;
   inWindow?: boolean;
 }) {
@@ -322,10 +322,10 @@ async function OnOrder({
     <>
       {picker}
       {owing.length ? (
-        <NewFactoryPayment
+        <NewSupplierPayment
           startOpen
           prefill={prefill}
-          action={factoryPaymentAction.bind(null, m.orderId, null, null)}
+          action={supplierPaymentAction.bind(null, m.orderId, null, null)}
           factories={owing}
           people={people}
           orderCurrency={o.currency}

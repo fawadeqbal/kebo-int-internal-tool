@@ -48,7 +48,7 @@ type Today = { today: string; now: string; total: number; late: number; rows: Fo
 type History = { action: string; summary: string }[];
 
 /**
- * Notes and call logs on inquiries, orders, customers and factories, and follow-ups (planned calls and
+ * Notes and call logs on inquiries, orders, customers and suppliers, and follow-ups (planned calls and
  * visits): who sees, adds, changes and removes them; Home's "today" list; the reminders, sent once; inquiry
  * notes as they always were; and another company reaches none of it.
  */
@@ -68,7 +68,7 @@ describe("notes and follow-ups", () => {
   let refNo: string;
   let customerId: string;
   let contactId: string;
-  let factoryId: string;
+  let supplierId: string;
   let otherContactId: string;
   const tag = Date.now().toString(36);
   const password = "Notes@12345678";
@@ -120,14 +120,14 @@ describe("notes and follow-ups", () => {
     const fq = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, {
-          newFactoryName: `Notes Valves ${tag}`,
+          newSupplierName: `Notes Valves ${tag}`,
           receivedOn: "2026-10-01",
           currency: "CNY",
           lines: [{ requestedItemId: item.id, description: "Valve", quantity: 10, unitPrice: 1000 }],
         })
         .expect(201)
     ).body;
-    factoryId = fq.factoryId ?? fq.factory?.id;
+    supplierId = fq.supplierId ?? fq.factory?.id;
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`)).body;
     const options = [{ ...draft.options[0], prices: draft.options[0].prices.map((p: Record<string, unknown>) => ({ ...p, unitPrice: 300 })) }];
     const r = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, { ...draft, currency: "USD", options }).expect(201)).body;
@@ -136,7 +136,7 @@ describe("notes and follow-ups", () => {
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
     orderId = deal.orders[0].id;
     refNo = deal.orders[0].refNo;
-    if (!factoryId) factoryId = (await db().party.findFirstOrThrow({ where: { ...isSupplier, name: `Notes Valves ${tag}` } })).id;
+    if (!supplierId) supplierId = (await db().party.findFirstOrThrow({ where: { ...isSupplier, name: `Notes Valves ${tag}` } })).id;
   });
 
   afterEach(() => {
@@ -201,7 +201,7 @@ describe("notes and follow-ups", () => {
     expect((await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body.notes.map((n: { id: string }) => n.id)).not.toContain(plain.body.id);
   });
 
-  /* ---------------------------------------------------------------- order, customer and factory notes */
+  /* ---------------------------------------------------------------- order, customer and supplier notes */
 
   it("order notes: whoever sees the order reads them, who moves orders adds them, the author changes them for a day", async () => {
     const at = new Date(Date.now() - 60_000).toISOString();
@@ -290,29 +290,29 @@ describe("notes and follow-ups", () => {
   });
 
   it("factory notes: who sees factories reads and adds them; no contact to choose; managers remove anyone's", async () => {
-    const note = (await api(app, sana).post(`/factories/${factoryId}/notes`, { body: "Saw the valves on the test bench", kind: "visit" }).expect(201)).body as Note;
-    expect(note.target).toEqual({ type: "factory", id: factoryId, label: `Notes Valves ${tag}` });
-    expect((await api(app, sana).post(`/factories/${factoryId}/notes`, { body: "x", contactId }).expect(422)).body.fieldErrors).toHaveProperty("contactId");
-    expect(((await api(app, bilal).get(`/factories/${factoryId}/notes`).expect(200)).body as Note[])[0]).toMatchObject({ id: note.id, can: { edit: false, delete: false } });
+    const note = (await api(app, sana).post(`/factories/${supplierId}/notes`, { body: "Saw the valves on the test bench", kind: "visit" }).expect(201)).body as Note;
+    expect(note.target).toEqual({ type: "factory", id: supplierId, label: `Notes Valves ${tag}` });
+    expect((await api(app, sana).post(`/factories/${supplierId}/notes`, { body: "x", contactId }).expect(422)).body.fieldErrors).toHaveProperty("contactId");
+    expect(((await api(app, bilal).get(`/factories/${supplierId}/notes`).expect(200)).body as Note[])[0]).toMatchObject({ id: note.id, can: { edit: false, delete: false } });
     await api(app, bilal).delete(`/notes/${note.id}`).expect(403);
-    const noFactories = await person("No suppliers", ["dashboard.view", "inquiries.viewAll"]);
-    await api(app, noFactories.token).get(`/factories/${factoryId}/notes`).expect(403);
-    await api(app, noFactories.token).post(`/factories/${factoryId}/notes`, { body: "x" }).expect(403);
-    await api(app, noFactories.token).delete(`/notes/${note.id}`).expect(404);
-    expect((await history(manager, "factory", factoryId)).some((e) => e.action === "note.added")).toBe(true);
+    const noSuppliers = await person("No suppliers", ["dashboard.view", "inquiries.viewAll"]);
+    await api(app, noSuppliers.token).get(`/factories/${supplierId}/notes`).expect(403);
+    await api(app, noSuppliers.token).post(`/factories/${supplierId}/notes`, { body: "x" }).expect(403);
+    await api(app, noSuppliers.token).delete(`/notes/${note.id}`).expect(404);
+    expect((await history(manager, "factory", supplierId)).some((e) => e.action === "note.added")).toBe(true);
     await api(app, manager).delete(`/notes/${note.id}`).expect(200);
   });
 
   /* ---------------------------------------------------------------- follow-ups */
 
   it("one table for every note: each is on exactly one record", async () => {
-    // A note on an inquiry, an order, a customer and a factory: four rows of the same table.
+    // A note on an inquiry, an order, a customer and a supplier: four rows of the same table.
     const ids: string[] = [];
-    for (const path of [`/inquiries/${inquiryId}`, `/orders/${orderId}`, `/customers/${customerId}`, `/factories/${factoryId}`])
+    for (const path of [`/inquiries/${inquiryId}`, `/orders/${orderId}`, `/customers/${customerId}`, `/factories/${supplierId}`])
       ids.push((await api(app, manager).post(`${path}/notes`, { body: `One table ${tag}` }).expect(201)).body.id as string);
-    const rows = await db().note.findMany({ where: { id: { in: ids } }, select: { inquiryId: true, orderId: true, customerId: true, factoryId: true } });
+    const rows = await db().note.findMany({ where: { id: { in: ids } }, select: { inquiryId: true, orderId: true, customerId: true, supplierId: true } });
     expect(rows.map((r) => Object.values(r).filter(Boolean).length)).toEqual([1, 1, 1, 1]);
-    expect(new Set(rows.flatMap((r) => Object.values(r).filter(Boolean)))).toEqual(new Set([inquiryId, orderId, customerId, factoryId]));
+    expect(new Set(rows.flatMap((r) => Object.values(r).filter(Boolean)))).toEqual(new Set([inquiryId, orderId, customerId, supplierId]));
     // The database refuses a note on no record, and one on two.
     const insert = (columns: string, values: string, ...args: string[]) =>
       db().$executeRawUnsafe(`insert into notes (id, body, author_id${columns}) values (gen_random_uuid(), 'x', $1::uuid${values})`, sanaId, ...args);
@@ -570,23 +570,23 @@ describe("notes and follow-ups", () => {
       `/inquiries/${inquiryId}/notes`,
       `/orders/${orderId}/notes`,
       `/customers/${customerId}/notes`,
-      `/factories/${factoryId}/notes`,
+      `/factories/${supplierId}/notes`,
       `/follow-ups/${fu.id}`,
       `/follow-ups?orderId=${orderId}`,
       `/follow-ups?customerId=${customerId}`,
-      `/follow-ups?factoryId=${factoryId}`,
+      `/follow-ups?supplierId=${supplierId}`,
       `/follow-ups?inquiryId=${inquiryId}`,
     ])
       await b.get(path).expect(404);
     await b.post(`/inquiries/${inquiryId}/notes`, { body: "x" }).expect(404);
     await b.post(`/orders/${orderId}/notes`, { body: "x" }).expect(404);
     await b.post(`/customers/${customerId}/notes`, { body: "x" }).expect(404);
-    await b.post(`/factories/${factoryId}/notes`, { body: "x" }).expect(404);
+    await b.post(`/factories/${supplierId}/notes`, { body: "x" }).expect(404);
     await b.patch(`/notes/${note.id}`, { body: "x" }).expect(404);
     await b.patch(`/notes/${inqNote.id}`, { body: "x" }).expect(404);
     await b.delete(`/notes/${note.id}`).expect(404);
     await b.delete(`/notes/${inqNote.id}`).expect(404);
-    for (const target of [{ orderId }, { customerId }, { factoryId }, { inquiryId }])
+    for (const target of [{ orderId }, { customerId }, { supplierId }, { inquiryId }])
       await b.post("/follow-ups", { title: "x", dueOn: "2026-01-01", ...target }).expect(404);
     await b.post("/follow-ups", { title: "x", dueOn: "2026-01-01", assigneeId: sanaId }).expect(400);
     await b.patch(`/follow-ups/${fu.id}`, { title: "x" }).expect(404);

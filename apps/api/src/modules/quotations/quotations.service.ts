@@ -67,10 +67,10 @@ const AT_THE_SUPPLIER = new Set<Incoterm>(["EXW", "FCA", "FAS", "FOB"]);
 /** NUMERIC(14,2) can hold up to this; totals above it are refused with a clear message. */
 const MAX_TOTAL_MINOR = 999_999_999_999_99;
 
-/** Lines with what is needed to number them (factory parts, or the customer's item parts). */
+/** Lines with what is needed to number them (supplier parts, or the customer's item parts). */
 export const numberedLineInclude = {
   // (Its price now, too: a quotation says when the offer's price changed after it was made.)
-  factoryQuoteLine: { select: { parentId: true, unitPrice: true } },
+  supplierQuoteLine: { select: { parentId: true, unitPrice: true } },
   requestedItem: { select: { parentId: true } },
 } satisfies Prisma.QuoteLineInclude;
 
@@ -78,12 +78,12 @@ const revisionInclude = {
   options: {
     orderBy: { sortOrder: "asc" },
     include: {
-      factoryQuote: {
+      supplierQuote: {
         select: {
           id: true,
           currency: true,
           factory: { select: { id: true, name: true } },
-          // What the factory gives (its terms now), beside what this option promises the customer.
+          // What the supplier gives (its terms now), beside what this option promises the customer.
           leadTime: true,
           leadDays: true,
           leadFrom: true,
@@ -109,8 +109,8 @@ export function numbersOf(lines: Prisma.QuoteLineGetPayload<{ include: typeof nu
   return numberQuoteLines(
     lines.map((l) => ({
       id: l.id,
-      factoryQuoteLineId: l.factoryQuoteLineId,
-      factoryParentId: l.factoryQuoteLine?.parentId ?? null,
+      supplierQuoteLineId: l.supplierQuoteLineId,
+      supplierParentId: l.supplierQuoteLine?.parentId ?? null,
       requestedItemId: l.requestedItemId,
       itemParentId: l.requestedItem?.parentId ?? null,
     })),
@@ -124,8 +124,8 @@ type Db = Tx | PrismaService["db"];
 /** One supplier offer a quotation can be made from (QuotationsService.offers). */
 type OfferChoice = Awaited<ReturnType<QuotationsService["offers"]>>["offers"][number];
 
-/** A factory offer's terms as facts (design "terms that travel"): see @kebo/shared offerTermsOf. */
-export const factoryTerms = offerTermsOf;
+/** A supplier offer's terms as facts (design "terms that travel"): see @kebo/shared offerTermsOf. */
+export const supplierTerms = offerTermsOf;
 
 /** An option's lead time as stored: its days and moment with the words worked out from them, or its words alone. */
 function optionLead(o: { leadDays?: number | null; leadFrom?: string | null; leadTime: string | null }) {
@@ -136,9 +136,9 @@ function optionLead(o: { leadDays?: number | null; leadFrom?: string | null; lea
 
 /**
  * Any number of quotations per deal, A, B, C… (QUO-2026-0531-B), each with revisions R1, R2… A revision offers
- * one or more options (older quotations have several; a quotation from one factory offer has one): an option is
- * one factory's whole offer — its lines exactly as the factory gave them, locked — with our prices, discount,
- * lead time and charges. (Without factory prices, an option is the customer's items priced by hand.) A revision
+ * one or more options (older quotations have several; a quotation from one supplier offer has one): an option is
+ * one supplier's whole offer — its lines exactly as the supplier gave them, locked — with our prices, discount,
+ * lead time and charges. (Without supplier prices, an option is the customer's items priced by hand.) A revision
  * is edited only as a draft; sending freezes it; the customer accepts exactly one option, which becomes the order.
  */
 /** Where a first revision's starting values came from (said under each field; all of them can be changed). */
@@ -176,9 +176,9 @@ export class QuotationsService {
   }
 
   /**
-   * Everything a revision can offer, with costs in `currency`: each factory
+   * Everything a revision can offer, with costs in `currency`: each supplier
    * offer (its lines numbered, which items it covers), and the customer's own
-   * items for an option without factory prices.
+   * items for an option without supplier prices.
    */
   async offers(user: SessionUser, inquiryId: string, currency: string, db: Db = this.prisma.db) {
     await this.inquiries.find(user, inquiryId, db);
@@ -186,7 +186,7 @@ export class QuotationsService {
     const items = await this.items(db, inquiryId);
     const refs = items.map((i) => ({ id: i.id, parentId: i.parentId, no: i.no }));
     const quotes = can(user, "sourcing.manage")
-      ? await db.factoryQuote.findMany({
+      ? await db.supplierQuote.findMany({
           // An offer still being typed in (no lines yet) cannot be offered.
           where: { inquiryId, deletedAt: null, lines: { some: {} } },
           include: { factory: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
@@ -210,15 +210,15 @@ export class QuotationsService {
           quantity: l.quantity.toString(),
           unit: l.unit,
           unitCost: cost === null ? null : fromMinor(cost),
-          /** The line's cost in the factory's currency: the offer's total is converted once (as its "≈" is). */
+          /** The line's cost in the supplier's currency: the offer's total is converted once (as its "≈" is). */
           costMinor: multiplyMinor(unitCostHere, l.quantity.toString()),
         };
       });
       return {
-        factoryQuoteId: q.id,
+        supplierQuoteId: q.id,
         factory: q.factory,
         currency: q.currency,
-        /** What the factory's prices already pay for (EXW, FOB…), and where. */
+        /** What the supplier's prices already pay for (EXW, FOB…), and where. */
         basis: q.basis,
         basisPlace: q.basisPlace,
         receivedOn: fromDbDate(q.receivedOn),
@@ -228,10 +228,10 @@ export class QuotationsService {
         leadDays: q.leadDays,
         leadFrom: isLeadFrom(q.leadFrom) ? q.leadFrom : null,
         /**
-         * What the factory gives (design "terms that travel"), to check a promise against: its lead time, its
+         * What the supplier gives (design "terms that travel"), to check a promise against: its lead time, its
          * payment as parts and its warranty (an older offer's words read for them where they say them plainly).
          */
-        terms: factoryTerms(q, sales.factoryAdvancePercent),
+        terms: supplierTerms(q, sales.supplierAdvancePercent),
         coverage: coverage(
           refs,
           q.lines.map((l) => l.requestedItemId),
@@ -251,7 +251,7 @@ export class QuotationsService {
       mainCurrency: sales.currency,
       rates: sales.exchangeRates,
       offers,
-      /** The customer's items, for an option priced by hand (no factory prices). */
+      /** The customer's items, for an option priced by hand (no supplier prices). */
       items: items.map((i) => ({
         id: i.id,
         no: i.no,
@@ -281,14 +281,14 @@ export class QuotationsService {
           extra,
         )
       : null;
-    const gap = o.factoryQuoteId ? basisGap(o.factoryBasis, selling) : null;
+    const gap = o.supplierQuoteId ? basisGap(o.supplierBasis, selling) : null;
     return {
       id: o.id,
       letter: o.letter,
       status: o.status,
-      /** The factory whose offer this is (internal; null when priced from the customer's items). */
-      factory: seeCosts ? (o.factoryQuote?.factory ?? null) : null,
-      factoryQuoteId: seeCosts ? o.factoryQuoteId : null,
+      /** The supplier whose offer this is (internal; null when priced from the customer's items). */
+      factory: seeCosts ? (o.supplierQuote?.factory ?? null) : null,
+      supplierQuoteId: seeCosts ? o.supplierQuoteId : null,
       leadTime: o.leadTime,
       /** The lead time we promise as days from a moment (null: only its words, an older option). */
       leadDays: o.leadDays,
@@ -313,7 +313,7 @@ export class QuotationsService {
         unitPrice: l.unitPrice.toFixed(2),
         lineTotal: l.lineTotal.toFixed(2),
         ...(seeCosts
-          ? { unitCost: l.unitCost?.toFixed(2) ?? null, factoryQuoteLineId: l.factoryQuoteLineId, fxRate: l.fxRate?.toString() ?? null }
+          ? { unitCost: l.unitCost?.toFixed(2) ?? null, supplierQuoteLineId: l.supplierQuoteLineId, fxRate: l.fxRate?.toString() ?? null }
           : {}),
       })),
       costing: costing && {
@@ -326,25 +326,25 @@ export class QuotationsService {
       },
       ...(seeCosts
         ? {
-            /** The factory's price basis this option was priced on, and what it takes to reach ours. */
-            factoryBasis: o.factoryBasis,
-            factoryBasisPlace: o.factoryBasisPlace,
-            /** What the option's factory gives now (its offer's terms), to check the promise against. */
-            factoryTerms: o.factoryQuote ? factoryTerms(o.factoryQuote, usualAdvance) : null,
+            /** The supplier's price basis this option was priced on, and what it takes to reach ours. */
+            supplierBasis: o.supplierBasis,
+            supplierBasisPlace: o.supplierBasisPlace,
+            /** What the option's supplier gives now (its offer's terms), to check the promise against. */
+            supplierTerms: o.supplierQuote ? supplierTerms(o.supplierQuote, usualAdvance) : null,
             /** The day the supplier's prices end (a quotation is never valid longer than them). */
-            factoryValidUntil: o.factoryQuote ? fromDbDateOrNull(o.factoryQuote.validUntil) : null,
-            factoryCurrency: o.factoryQuote?.currency ?? null,
+            supplierValidUntil: o.supplierQuote ? fromDbDateOrNull(o.supplierQuote.validUntil) : null,
+            supplierCurrency: o.supplierQuote?.currency ?? null,
             /**
              * The supplier's prices that changed after this was quoted (canvas "From the supplier offer to the quotation",
              * change 7): each line's price then and now, in the offer's currency (now null: gone from the offer). Lines
              * quoted before the price was kept say nothing.
              */
-            offerChanged: o.factoryQuote
+            offerChanged: o.supplierQuote
               ? o.lines.flatMap((l, i) => {
-                  if (l.factoryUnitPrice === null) return [];
-                  const now = l.factoryQuoteLine?.unitPrice ?? null;
-                  if (now !== null && now.equals(l.factoryUnitPrice)) return [];
-                  return [{ no: no[i]!, description: l.description.split("\n")[0]!, was: l.factoryUnitPrice.toFixed(2), now: now?.toFixed(2) ?? null }];
+                  if (l.supplierUnitPrice === null) return [];
+                  const now = l.supplierQuoteLine?.unitPrice ?? null;
+                  if (now !== null && now.equals(l.supplierUnitPrice)) return [];
+                  return [{ no: no[i]!, description: l.description.split("\n")[0]!, was: l.supplierUnitPrice.toFixed(2), now: now?.toFixed(2) ?? null }];
                 })
               : [],
             gap,
@@ -430,7 +430,7 @@ export class QuotationsService {
     const quotations = await this.quotationsOf(this.prisma.db, inquiryId);
     const items = await this.items(this.prisma.db, inquiryId);
     const settings = await this.settings.get();
-    const usual = settings.sales.factoryAdvancePercent;
+    const usual = settings.sales.supplierAdvancePercent;
     // What New quotations starts with: the currency of the deal's latest quotation (else the customer's own, or
     // the company's), the usual validity and margin.
     const newest = quotations.flatMap((q) => q.revisions).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
@@ -456,7 +456,7 @@ export class QuotationsService {
     };
   }
 
-  /** A revision's values as the editor sends them back (prices keyed by factory line, or by item without factory prices). */
+  /** A revision's values as the editor sends them back (prices keyed by supplier line, or by item without supplier prices). */
   private asInput(r: RevisionRow): RevisionInput {
     return {
       // Stored as text; only the business's currencies can be saved.
@@ -478,16 +478,16 @@ export class QuotationsService {
       warrantyFrom: isWarrantyFrom(r.warrantyFrom) ? r.warrantyFrom : null,
       notes: r.notes,
       options: r.options.map((o) => ({
-        factoryQuoteId: o.factoryQuoteId,
+        supplierQuoteId: o.supplierQuoteId,
         discount: Number(o.discount),
         leadTime: o.leadTime,
         leadDays: o.leadDays,
         leadFrom: isLeadFrom(o.leadFrom) ? o.leadFrom : null,
         prices: o.lines
-          .filter((l) => l.type === "goods" && (o.factoryQuoteId ? l.factoryQuoteLineId : l.requestedItemId))
-          .map((l) => ({ lineId: (o.factoryQuoteId ? l.factoryQuoteLineId : l.requestedItemId)!, unitPrice: Number(l.unitPrice) })),
+          .filter((l) => l.type === "goods" && (o.supplierQuoteId ? l.supplierQuoteLineId : l.requestedItemId))
+          .map((l) => ({ lineId: (o.supplierQuoteId ? l.supplierQuoteLineId : l.requestedItemId)!, unitPrice: Number(l.unitPrice) })),
         charges: o.lines
-          .filter((l) => l.type !== "goods" || (o.factoryQuoteId ? !l.factoryQuoteLineId : !l.requestedItemId))
+          .filter((l) => l.type !== "goods" || (o.supplierQuoteId ? !l.supplierQuoteLineId : !l.requestedItemId))
           .map((l) => ({
             type: l.type === "service" ? ("service" as const) : ("charge" as const),
             description: l.description,
@@ -518,8 +518,8 @@ export class QuotationsService {
     const available = await this.offers(user, inquiryId, latest?.currency ?? first!.currency);
     if (latest) {
       const input = this.asInput(latest);
-      const live = new Set(available.offers.map((o) => o.factoryQuoteId));
-      const options = input.options.filter((o) => !o.factoryQuoteId || live.has(o.factoryQuoteId));
+      const live = new Set(available.offers.map((o) => o.supplierQuoteId));
+      const options = input.options.filter((o) => !o.supplierQuoteId || live.has(o.supplierQuoteId));
       return {
         ...input,
         number: latest.number + 1,
@@ -609,8 +609,8 @@ export class QuotationsService {
   }
 
   /**
-   * An option quoting one factory offer: its lines priced at `margin` (on the price) over their cost, and what
-   * the factory gives promised to the customer from the same moment (the days can be raised; an older offer's
+   * An option quoting one supplier offer: its lines priced at `margin` (on the price) over their cost, and what
+   * the supplier gives promised to the customer from the same moment (the days can be raised; an older offer's
    * words as they are). Without an offer: the customer's items, to be priced by hand.
    */
   private optionFrom(
@@ -620,9 +620,9 @@ export class QuotationsService {
     /** Added to the supplier's days (Settings: leadSpareDays). */
     spare = 0,
   ): OptionInput {
-    if (!offer) return { factoryQuoteId: null, discount: 0, leadTime: null, leadDays: null, leadFrom: null, charges: [], costs: [], prices: items.map((i) => ({ lineId: i.id, unitPrice: 0 })) };
+    if (!offer) return { supplierQuoteId: null, discount: 0, leadTime: null, leadDays: null, leadFrom: null, charges: [], costs: [], prices: items.map((i) => ({ lineId: i.id, unitPrice: 0 })) };
     return {
-      factoryQuoteId: offer.factoryQuoteId,
+      supplierQuoteId: offer.supplierQuoteId,
       discount: 0,
       ...(offer.leadDays !== null
         ? { leadDays: offer.leadDays + spare, leadFrom: offer.leadFrom, leadTime: leadWords(offer.leadDays + spare, offer.leadFrom, "customer") }
@@ -659,7 +659,7 @@ export class QuotationsService {
       let base = existing[0] ? quotationBase(existing[0]) : null;
       const out: { id: string; refNo: string; letter: string; revisionId: string; number: number }[] = [];
       for (const offerId of input.offers) {
-        const offer = offerId ? available.offers.find((o) => o.factoryQuoteId === offerId) : null;
+        const offer = offerId ? available.offers.find((o) => o.supplierQuoteId === offerId) : null;
         if (offerId && !offer) throw new DomainError("One of the offers is no longer on this inquiry, or has no items yet. Reload the page.");
         const values: RevisionInput = {
           ...this.offerTerms({ ...first.terms, validUntil: input.validUntil }, offer),
@@ -719,7 +719,7 @@ export class QuotationsService {
   }
 
   /**
-   * The options as rows: each factory offer's lines exactly as the factory gave
+   * The options as rows: each supplier offer's lines exactly as the supplier gave
    * them (all of them, in its order, with its parts), priced by the person,
    * costs worked out here at today's rate; then the charges.
    */
@@ -740,17 +740,17 @@ export class QuotationsService {
         return p.unitPrice;
       };
       const lines: Omit<Prisma.QuoteLineCreateManyInput, "revisionId" | "optionId" | "lineTotal">[] = [];
-      let basis: { factoryBasis: Incoterm | null; factoryBasisPlace: string | null } = { factoryBasis: null, factoryBasisPlace: null };
-      if (o.factoryQuoteId) {
+      let basis: { supplierBasis: Incoterm | null; supplierBasisPlace: string | null } = { supplierBasis: null, supplierBasisPlace: null };
+      if (o.supplierQuoteId) {
         if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see supplier prices can quote a supplier's offer.");
-        if (seen.has(o.factoryQuoteId)) throw new DomainError("Each option must be a different supplier's offer.");
-        seen.add(o.factoryQuoteId);
-        const q = await tx.factoryQuote.findFirst({
-          where: { id: o.factoryQuoteId, inquiryId, deletedAt: null },
+        if (seen.has(o.supplierQuoteId)) throw new DomainError("Each option must be a different supplier's offer.");
+        seen.add(o.supplierQuoteId);
+        const q = await tx.supplierQuote.findFirst({
+          where: { id: o.supplierQuoteId, inquiryId, deletedAt: null },
           include: { lines: { orderBy: { sortOrder: "asc" } } },
         });
         if (!q) throw new DomainError(`Option ${letter}: that supplier offer is no longer on this inquiry. Reload the page.`);
-        basis = { factoryBasis: q.basis, factoryBasisPlace: q.basisPlace };
+        basis = { supplierBasis: q.basis, supplierBasisPlace: q.basisPlace };
         const rate = fxRate(q.currency, input.currency, sales.currency, sales.exchangeRates);
         for (const l of q.lines) {
           const cost = rate ? convertMinor(quoteUnitCostMinor(decimalToMinor(l.unitPrice), Number(l.taxRate), q.taxIncluded, sales.exportVatRefundPercent), rate) : null;
@@ -763,8 +763,8 @@ export class QuotationsService {
             unit: l.unit,
             unitPrice: priceOf(l.id, l.description),
             unitCost: cost === null ? null : fromMinor(cost),
-            factoryQuoteLineId: l.id,
-            factoryUnitPrice: l.unitPrice,
+            supplierQuoteLineId: l.id,
+            supplierUnitPrice: l.unitPrice,
             fxRate: rate,
           });
         }
@@ -791,7 +791,7 @@ export class QuotationsService {
           unitPrice: c.unitPrice,
           unitCost: c.unitCost ?? null,
         });
-      // Costs between the factory's basis and ours, in the quotation's currency at today's rate.
+      // Costs between the supplier's basis and ours, in the quotation's currency at today's rate.
       const costs: Omit<Prisma.OptionCostCreateManyInput, "optionId">[] = [];
       for (const c of o.costs.filter((x) => Number(x.amount) > 0)) {
         if (!can(user, "sourcing.manage")) throw new ForbiddenError("Only people who see supplier prices can enter costs.");
@@ -811,7 +811,7 @@ export class QuotationsService {
         option: {
           letter,
           sortOrder: n,
-          factoryQuoteId: o.factoryQuoteId ?? null,
+          supplierQuoteId: o.supplierQuoteId ?? null,
           ...basis,
           ...optionLead(o),
           subtotal: fromMinor(totals.subtotal),
@@ -916,7 +916,7 @@ export class QuotationsService {
   async revision(user: SessionUser, revisionId: string) {
     const { r } = await this.loadRevision(user, revisionId);
     const items = await this.items(this.prisma.db, r.quotation.inquiryId);
-    const usual = (await this.settings.get()).sales.factoryAdvancePercent;
+    const usual = (await this.settings.get()).sales.supplierAdvancePercent;
     return {
       quotation: { id: r.quotation.id, refNo: r.quotation.refNo, letter: r.quotation.letter, inquiryId: r.quotation.inquiryId },
       ...this.view(user, r, items, usual),
@@ -938,12 +938,12 @@ export class QuotationsService {
       const available = await this.offers(user, r.quotation.inquiryId, r.currency);
       input.options = input.options.map((o, n) => {
         const row = r.options[n];
-        const offer = o.factoryQuoteId ? available.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) : null;
+        const offer = o.supplierQuoteId ? available.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId) : null;
         if (!row || !offer) return o;
         return {
           ...o,
           prices: o.prices.map((p) => {
-            const line = row.lines.find((l) => l.factoryQuoteLineId === p.lineId);
+            const line = row.lines.find((l) => l.supplierQuoteLineId === p.lineId);
             const now = offer.lines.find((l) => l.id === p.lineId)?.unitCost ?? null;
             if (!line || line.unitCost === null || now === null || !(Number(line.unitPrice) > 0)) return p;
             // The margin it had, exactly (on the price), on the cost now.
@@ -963,7 +963,7 @@ export class QuotationsService {
     return { number: r.number, ...this.asInput(r) };
   }
 
-  /** A draft is saved whole: its options are rebuilt from the factory offers as they are now. */
+  /** A draft is saved whole: its options are rebuilt from the supplier offers as they are now. */
   async updateRevision(user: SessionUser, revisionId: string, input: RevisionInput) {
     this.assertCan(user);
     await this.prisma.tx(async (tx) => {

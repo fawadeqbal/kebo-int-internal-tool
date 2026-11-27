@@ -4,7 +4,7 @@ import { RECORD_TITLE } from "@kebo/shared";
 import type { OrderView } from "./types-orders";
 import { dealOf } from "./deal-data";
 import { orderOf } from "./order-data";
-import { customerOf, factoryOf } from "./party-data";
+import { customerOf, supplierOf } from "./party-data";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -23,4 +23,4 @@ export const inquiryTitle = (part?: string) => async ({ params }: Props) => {
   return titled(RECORD_TITLE.inquiry({ title: d.title, items: d.items, customer: d.customer.name }), part);
 };
 export const customerTitle = (part?: string) => async ({ params }: Props) => titled((await customerOf((await params).id)).name, part);
-export const supplierTitle = (part?: string) => async ({ params }: Props) => titled((await factoryOf((await params).id)).name, part);
+export const supplierTitle = (part?: string) => async ({ params }: Props) => titled((await supplierOf((await params).id)).name, part);

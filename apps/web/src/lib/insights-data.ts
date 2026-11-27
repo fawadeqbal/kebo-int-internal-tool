@@ -10,7 +10,7 @@ import type { LeaksReport, OpenBills, SpendingReport, ToPayList } from "./types-
 import type {
   CashFacts,
   CashReport,
-  FactoryGroups,
+  SupplierGroups,
   FactOrders,
   Funnel,
   InquiryGroups,
@@ -52,7 +52,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     facts<CashFacts>("cash", twelve),
     facts<FactOrders>("orders", { ...span, limit: 1000 }),
     maybe(() => api.get<Receivables>("/money/receivables")),
-    // Only the factories' parts due in the next 7 days (the list below), not every open one.
+    // Only the suppliers' parts due in the next 7 days (the list below), not every open one.
     money ? maybe(() => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
     money ? maybe(() => api.get<OpenBills>("/money/bills")) : null,
     money ? maybe(() => api.get<CashReport>("/money/cash-report", span)) : null,
@@ -83,7 +83,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     .sort((x, y) => y.daysLate - x.daysLate || (x.next?.dueOn ?? "9999").localeCompare(y.next?.dueOn ?? "9999"));
   const oweTotals = (owed?.totals ?? []).filter((x) => n(x.due) > 0);
 
-  // To pay in the next 7 days: the factories' parts late or due by then, and the bills that wait.
+  // To pay in the next 7 days: the suppliers' parts late or due by then, and the bills that wait.
   const soon = addDays(companyToday(), 7);
   const pay = [
     ...(toPay?.rows ?? [])
@@ -445,13 +445,13 @@ export async function loadCustomers(p: Period, today: string) {
   return { ...data, sheets };
 }
 
-/* ------------------------------------------------------------------------------------------- Factories */
+/* ------------------------------------------------------------------------------------------- Suppliers */
 
-export async function loadFactories(p: Period) {
+export async function loadSuppliers(p: Period) {
   const span = { from: p.from, to: p.to };
   const [period, ever, orders, count] = await Promise.all([
-    facts<FactoryGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
-    facts<FactoryGroups>("factories/groups", { period: "all", by: "factory" }),
+    facts<SupplierGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
+    facts<SupplierGroups>("factories/groups", { period: "all", by: "factory" }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
     api.get<{ total: number }>("/factories", { pageSize: 1 }).catch(() => ({ total: 0 })),
   ]);
@@ -726,7 +726,7 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
     case "customers":
       return (await loadCustomers(p, today)).sheets;
     case "factories":
-      return (await loadFactories(p)).sheets;
+      return (await loadSuppliers(p)).sheets;
     case "people":
       return (await loadPeople(p, today)).sheets;
     case "funnel":

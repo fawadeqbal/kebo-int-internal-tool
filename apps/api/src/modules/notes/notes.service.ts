@@ -41,8 +41,8 @@ const VERB: Record<NoteKind, string> = {
 };
 /** The column of notes that holds the record (a note is on exactly one). */
 const onRecord = (type: RecordType, id: string) =>
-  type === "inquiry" ? { inquiryId: id } : type === "order" ? { orderId: id } : type === "customer" ? { customerId: id } : { factoryId: id };
-/** Not seeing the record (or not seeing factories at all) means not seeing its notes. */
+  type === "inquiry" ? { inquiryId: id } : type === "order" ? { orderId: id } : type === "customer" ? { customerId: id } : { supplierId: id };
+/** Not seeing the record (or not seeing suppliers at all) means not seeing its notes. */
 const hidden = (e: unknown) => {
   throw e instanceof NotFoundError || e instanceof ForbiddenError ? new NotFoundError("Note") : e;
 };
@@ -53,7 +53,7 @@ const quote = (body: string) => {
 };
 
 /**
- * Notes and call logs on inquiries, orders, customers and factories: kind (note, call, visit, WhatsApp,
+ * Notes and call logs on inquiries, orders, customers and suppliers: kind (note, call, visit, WhatsApp,
  * email), the customer's contact it was with, when it happened, who wrote it. All in one table, notes,
  * each on exactly one record (an inquiry's old endpoint is unchanged). Who sees the record sees
  * its notes; who may change the record adds them; the author changes one within 24 hours; the author or
@@ -97,7 +97,7 @@ export class NotesService {
     return rows.map((n) => this.view(user, target, n));
   }
 
-  /** The contact must be one of the record's customer's (factories have none to choose). */
+  /** The contact must be one of the record's customer's (suppliers have none to choose). */
   private async checkContact(target: RecordRef, contactId: string | null | undefined) {
     if (!contactId) return;
     const bad = (message: string) => new z.ZodError([{ code: "custom", path: ["contactId"], message, input: contactId }]);
@@ -206,7 +206,7 @@ export class NotesService {
     const row = await this.prisma.db.note.findUnique({ where: { id: noteId }, include });
     if (!row) throw new NotFoundError("Note");
     const type: RecordType = row.inquiryId ? "inquiry" : row.orderId ? "order" : row.customerId ? "customer" : "factory";
-    const target = await seeRecord(this.prisma.db, user, type, (row.inquiryId ?? row.orderId ?? row.customerId ?? row.factoryId)!).catch(hidden);
+    const target = await seeRecord(this.prisma.db, user, type, (row.inquiryId ?? row.orderId ?? row.customerId ?? row.supplierId)!).catch(hidden);
     return { row: row as NoteRow, target };
   }
 

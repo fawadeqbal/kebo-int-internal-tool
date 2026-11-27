@@ -10,7 +10,7 @@ import { renderMessageEmail } from "../src/common/notify/message-email";
 import { CompanyContext } from "../src/common/company/company-context";
 import { toInfo } from "../src/common/company/companies.service";
 import { RemindersService } from "../src/modules/notifications/reminders.service";
-import { factoryPayment, orderWaiting, paymentDue, yourDay } from "../src/modules/notifications/messages";
+import { supplierPayment, orderWaiting, paymentDue, yourDay } from "../src/modules/notifications/messages";
 import type { OrderFacts } from "../src/modules/notifications/facts";
 import type { MailMessage } from "../src/common/notify/mailer";
 
@@ -112,7 +112,7 @@ describe("messages", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Jiangsu ${tag}`,
+        newSupplierName: `Jiangsu ${tag}`,
         receivedOn: "2026-11-01",
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "Filler", quantity: 1, unitPrice: 700000 }],
@@ -172,7 +172,7 @@ describe("messages", () => {
     expect(lateMoney).toMatchObject({ tag: "Payment late", urgent: true, subject: "Late: Lagos Water has not paid USD 83,650 (balance, SO-2026-0412)", link: "/orders/o1/payment" });
     expect(lateMoney.sentence).toBe("The balance of SO-2026-0412 was due on 05 Dec 2026. It is 4 days late.");
     expect(paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, null).subject).toBe("Lagos Water owes USD 83,650 (balance, SO-2026-0412) by 05 Dec 2026");
-    const pay = factoryPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Deposit", open: "304000.00", due: "2026-11-14", lateBy: null });
+    const pay = supplierPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Deposit", open: "304000.00", due: "2026-11-14", lateBy: null });
     expect(pay).toMatchObject({ tag: "Pay the supplier", subject: "Pay Jiangsu Filling: CNY 304,000 deposit (SO-2026-0412) — due 14 Nov 2026", button: "Pay the supplier", link: "/orders/o1/factory" });
     expect(pay.money).toContainEqual({ label: "Paid to the supplier", value: "CNY 0 of CNY 760,000" });
     const ready = orderWaiting(o, { title: "Ask the supplier for the ready date", due: "2026-11-10", lateBy: 4 });
@@ -195,7 +195,7 @@ describe("messages", () => {
     const inquiry = (await api(app, sana).post("/inquiries", { customerId, category: "Machinery", assigneeId: sanaId, items: [{ description: "Capper", quantity: 1, unit: "set" }] }).expect(201)).body;
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newFactoryName: `Henan ${tag}`, receivedOn: "2026-11-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Capper", quantity: 1, unitPrice: 50000 }] })
+      .post(`/inquiries/${inquiry.id}/factory-quotes`, { newSupplierName: `Henan ${tag}`, receivedOn: "2026-11-01", currency: "CNY", lines: [{ requestedItemId: item.id, description: "Capper", quantity: 1, unitPrice: 50000 }] })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
     const r = (await api(app, sana).post(`/inquiries/${inquiry.id}/quotation/revisions`, draft).expect(201)).body;

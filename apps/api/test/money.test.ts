@@ -4,7 +4,7 @@ import { api, signIn, startApp } from "./app";
 import { day } from "./dates";
 
 /**
- * Step 2: the customer's payment plan, what we owe and paid each factory,
+ * Step 2: the customer's payment plan, what we owe and paid each supplier,
  * expenses (managers only) and profit & loss per order and per month.
  */
 describe("money", () => {
@@ -14,7 +14,7 @@ describe("money", () => {
   let manager: string;
   let sanaId: string;
   let orderId: string;
-  let factoryId: string;
+  let supplierId: string;
   const tag = Date.now().toString(36);
   const money = async (who = sana) => (await api(app, who).get(`/orders/${orderId}/money`).expect(200)).body;
   const today = new Date().toISOString().slice(0, 10);
@@ -25,7 +25,7 @@ describe("money", () => {
     bilal = await signIn(app, "bilal@example.com");
     manager = await signIn(app, "manager@example.com", "Manager@12345");
     sanaId = (await api(app, sana).get("/auth/me")).body.id;
-    // Sana's deal: 10 pumps from a new factory at CNY 1,000 + 13% tax each, quoted at a margin, accepted.
+    // Sana's deal: 10 pumps from a new supplier at CNY 1,000 + 13% tax each, quoted at a margin, accepted.
     const customer = (
       await api(app, sana)
         .post("/customers", { name: `Accra Water ${tag}`, country: "GH", contacts: [{ name: "Kofi", email: `kofi-${tag}@accra.test` }] })
@@ -44,10 +44,10 @@ describe("money", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Wenling Pumps ${tag}`,
+        newSupplierName: `Wenling Pumps ${tag}`,
         receivedOn: "2026-10-01",
         currency: "CNY",
-        // The factory charges 13% tax on top of its prices.
+        // The supplier charges 13% tax on top of its prices.
         taxRate: 13,
         lines: [{ requestedItemId: item.id, description: "Centrifugal pump", quantity: 10, unitPrice: 1000 }],
       })
@@ -62,7 +62,7 @@ describe("money", () => {
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "sent" }).expect(200);
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "accepted" }).expect(200);
     orderId = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.orders[0].id;
-    factoryId = (await api(app, sana).get(`/factories?q=Wenling Pumps ${tag}`)).body.rows[0].id;
+    supplierId = (await api(app, sana).get(`/factories?q=Wenling Pumps ${tag}`)).body.rows[0].id;
   });
 
   afterAll(async () => {
@@ -80,10 +80,10 @@ describe("money", () => {
     expect(m.plan.items[0].dueOn).not.toBeNull();
     expect(m.plan.items[1]).toMatchObject({ dueRule: "on_ready", dueOn: null, rule: "on the ready date" });
     expect(m.plan).toMatchObject({ matchesTotal: true, next: { label: "Deposit 30%", open: "600.00" } });
-    // 10 × (1,000 + 13%) = CNY 11,300, looked after by Sana who added the factory.
+    // 10 × (1,000 + 13%) = CNY 11,300, looked after by Sana who added the supplier.
     expect(m.factories.rows).toEqual([
       expect.objectContaining({
-        factory: expect.objectContaining({ id: factoryId }),
+        factory: expect.objectContaining({ id: supplierId }),
         currency: "CNY",
         owed: "11300.00",
         paid: "0.00",
@@ -91,7 +91,7 @@ describe("money", () => {
         lookedAfterBy: { id: sanaId, name: expect.any(String) },
       }),
     ]);
-    // Staff see the plan and factory costs, never expenses or profit.
+    // Staff see the plan and supplier costs, never expenses or profit.
     expect(m.expenses).toBeNull();
     expect(m.profit).toBeNull();
     await api(app, bilal).get(`/orders/${orderId}/money`).expect(404);
@@ -160,9 +160,9 @@ describe("money", () => {
   });
 
   it("records what we pay the supplier: paid by the person who looks after it, at the Settings rate", async () => {
-    const pay = { factoryId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: today, reference: "FP-1" };
+    const pay = { supplierId, kind: "deposit", amount: 3390, currency: "CNY", paidOn: today, reference: "FP-1" };
     await api(app, sana).post(`/orders/${orderId}/factory-payments`, pay).expect(403);
-    // We owe the factory in CNY: a payment in USD would not count against it, so it is refused.
+    // We owe the supplier in CNY: a payment in USD would not count against it, so it is refused.
     expect((await api(app, manager).post(`/orders/${orderId}/factory-payments`, { ...pay, currency: "USD", amount: 477 }).expect(400)).body.error).toMatch(
       /^We owe .+ in CNY\. Record the payment in CNY: a payment in USD would not count against what we owe\./,
     );
@@ -195,7 +195,7 @@ describe("money", () => {
     expect(voided.factories.payments.at(-1).voided).toMatchObject({ reason: "Typed twice" });
     // And it shows in what we owe across orders.
     const owe = (await api(app, sana).get("/money/payables?mine=true").expect(200)).body;
-    expect(owe.find((r: { factory: { id: string } }) => r.factory.id === factoryId)).toMatchObject({
+    expect(owe.find((r: { factory: { id: string } }) => r.factory.id === supplierId)).toMatchObject({
       toPay: "7900.00",
       orders: [expect.objectContaining({ id: orderId, toPay: "7900.00" })],
     });
@@ -216,7 +216,7 @@ describe("money", () => {
     // 2,000 sold − goods cost on the lines − 150 expenses; cash: 650 in − 3,400 CNY out − 150.
     expect(Number(m.profit.earned)).toBeCloseTo(2000 - Number(m.profit.goodsCost) - 150, 2);
     expect(m.profit).toMatchObject({ revenue: "2000.00", expenses: "150.00", received: "650.00" });
-    expect(Number(m.profit.cash)).toBeCloseTo(650 - Number(m.profit.factoryPaid) - 150, 2);
+    expect(Number(m.profit.cash)).toBeCloseTo(650 - Number(m.profit.supplierPaid) - 150, 2);
 
     expect(
       (
@@ -249,7 +249,7 @@ describe("money", () => {
     const pnl = (await api(app, manager).get(`/money/profit-and-loss?year=${year}`).expect(200)).body;
     expect(pnl.months).toHaveLength(12);
     const m = pnl.months[Number(today.slice(5, 7)) - 1];
-    // This month: the customer's 650 came in, the factory payment and the expenses went out.
+    // This month: the customer's 650 came in, the supplier payment and the expenses went out.
     expect(Number(m.cash.in)).toBeGreaterThanOrEqual(650);
     expect(Number(m.cash.expenses)).toBeGreaterThanOrEqual(180 + 1000);
     expect(Number(m.earned.generalExpenses)).toBeGreaterThanOrEqual(1000);

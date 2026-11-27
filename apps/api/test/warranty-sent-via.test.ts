@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 
 /**
- * Two things an offer and a quotation keep: the warranty (the factory's on its offer, ours on the quotation,
+ * Two things an offer and a quotation keep: the warranty (the supplier's on its offer, ours on the quotation,
  * starting from Settings), and how a quotation went to the customer (email, WhatsApp, WeChat…).
  */
 describe("warranty and how a quotation was sent", () => {
@@ -39,7 +39,7 @@ describe("warranty and how a quotation was sent", () => {
   it("keeps the supplier's warranty on its offer, and leaves it alone when a save does not say it", async () => {
     const [item] = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items as { id: string }[];
     const body = {
-      newFactoryName: `Jiangsu Fill ${tag}`,
+      newSupplierName: `Jiangsu Fill ${tag}`,
       receivedOn: "2026-11-10",
       currency: "CNY",
       warranty: "18 months from shipment",
@@ -49,13 +49,13 @@ describe("warranty and how a quotation was sent", () => {
     const q = await offer();
     expect(q.warranty).toBe("18 months from shipment");
     // A save that does not carry the warranty (an older form) keeps it.
-    await api(app, sana).put(`/factory-quotes/${offerId}`, { factoryId: q.factory.id, receivedOn: q.receivedOn, currency: q.currency, leadTime: "40 days", reason: "Lead time came" }).expect(200);
+    await api(app, sana).put(`/factory-quotes/${offerId}`, { supplierId: q.factory.id, receivedOn: q.receivedOn, currency: q.currency, leadTime: "40 days", reason: "Lead time came" }).expect(200);
     expect((await offer()).warranty).toBe("18 months from shipment");
     // An empty one clears it.
-    await api(app, sana).put(`/factory-quotes/${offerId}`, { factoryId: q.factory.id, receivedOn: q.receivedOn, currency: q.currency, leadTime: "40 days", warranty: null, reason: "They gave none" }).expect(200);
+    await api(app, sana).put(`/factory-quotes/${offerId}`, { supplierId: q.factory.id, receivedOn: q.receivedOn, currency: q.currency, leadTime: "40 days", warranty: null, reason: "They gave none" }).expect(200);
     expect((await offer()).warranty).toBeNull();
     // Too long is refused.
-    await api(app, sana).put(`/factory-quotes/${offerId}`, { factoryId: q.factory.id, receivedOn: q.receivedOn, currency: q.currency, warranty: "x".repeat(301), reason: "Too long" }).expect(422);
+    await api(app, sana).put(`/factory-quotes/${offerId}`, { supplierId: q.factory.id, receivedOn: q.receivedOn, currency: q.currency, warranty: "x".repeat(301), reason: "Too long" }).expect(422);
   });
 
   it("starts a quotation with the company's warranty, and keeps the one written for it", async () => {

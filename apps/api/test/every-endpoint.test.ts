@@ -74,7 +74,7 @@ describe("every read endpoint answers for every record", () => {
       ...((await ok(manager, "/customers?pageSize=100")).rows as { id: string }[]).map((r) => ["customers", r.id] as [string, string]),
       ...((await ok(manager, "/factories?pageSize=100")).rows as { id: string }[]).map((r) => ["factories", r.id] as [string, string]),
     ];
-    const key = { inquiries: "inquiryId", orders: "orderId", customers: "customerId", factories: "factoryId" } as Record<string, string>;
+    const key = { inquiries: "inquiryId", orders: "orderId", customers: "customerId", factories: "supplierId" } as Record<string, string>;
     for (const [kind, id] of records) {
       for (const who of [manager, staff]) {
         await ok(who, `/${kind}/${id}/notes`);

@@ -70,7 +70,7 @@ export interface PaperChecks {
   options: { key: PaperOption; label: string; on: boolean; field?: boolean }[];
   paper: PaperVersion | null;
   versions: PaperVersion[];
-  /** The buyer the paper prints (as on the order) and what differs from the customer now; null: a paper to a factory. */
+  /** The buyer the paper prints (as on the order) and what differs from the customer now; null: a paper to a supplier. */
   buyer: { buyer: BuyerSnapshot; changes: string[] } | null;
   /** "Refresh from customer" (with a reason). */
   canRefreshBuyer: boolean;

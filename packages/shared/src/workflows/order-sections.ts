@@ -167,11 +167,11 @@ export interface StoredFacts {
   /** Received so far ("1720.79"), so a part paid is not "nothing in" (optional: older callers). */
   received?: string;
   paidInFullOn: ISODate | null;
-  factoryOrderedOn: ISODate | null;
-  /** The factory's own number for our order. */
-  factoryOrderNo?: string | null;
+  supplierOrderedOn: ISODate | null;
+  /** The supplier's own number for our order. */
+  supplierOrderNo?: string | null;
   /**
-   * Money owed to the factories, or null when the person may not see factory money; `plan`: its payment
+   * Money owed to the suppliers, or null when the person may not see supplier money; `plan`: its payment
    * plan's parts (advance when ordered, balance on the ready date) with where each stands.
    */
   factories:
@@ -188,9 +188,9 @@ export interface StoredFacts {
   lcChecks?: LcCheck[] | null;
   /** The route is still the one the quotation's terms implied (the order started on it). */
   routeFromQuotation?: boolean;
-  /** The order's ready date: the latest of its factories', once each has given one. */
+  /** The order's ready date: the latest of its suppliers', once each has given one. */
   readyOn: ISODate | null;
-  /** Each factory's own ready date (one per factory; one row, factory null, when the lines name none). */
+  /** Each supplier's own ready date (one per supplier; one row, supplier null, when the lines name none). */
   readyBy?: { factory: string | null; readyOn: ISODate | null }[];
   goods: { lines: number; received: number };
   packedAt: ISODate | null;
@@ -237,7 +237,7 @@ export function orderSteps(features: readonly string[] | null): FlowStep[] {
 export interface SectionFacts extends StoredFacts {
   /** Our promise to the customer. */
   shipBy?: ISODate | null;
-  /** Each factory's test: planned, done, how it went. */
+  /** Each supplier's test: planned, done, how it went. */
   fat?: { factory: string | null; plannedOn: ISODate | null; doneOn: ISODate | null; result: FatResult | null }[];
 }
 
@@ -279,11 +279,11 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
           ? { word: "Part paid", tone: "warn", tab: "part paid" }
           : { word: "Nothing in", tone: "warn", tab: "nothing in" };
 
-  // Factory order: sent, then paid (the money only for people who may see it).
-  const factoryPaid = !!f.factories?.length && f.factories.every((x) => Number(x.toPay) === 0 && Number(x.paid) > 0);
-  const factory: StageWord = !f.factoryOrderedOn
+  // Supplier order: sent, then paid (the money only for people who may see it).
+  const supplierPaid = !!f.factories?.length && f.factories.every((x) => Number(x.toPay) === 0 && Number(x.paid) > 0);
+  const supplier: StageWord = !f.supplierOrderedOn
     ? { word: "Not sent", tone: "neutral", tab: "not sent" }
-    : factoryPaid
+    : supplierPaid
       ? { word: "Paid", tone: "ok", tab: "paid" }
       : { word: "PO sent", tone: "ok", tab: "PO sent" };
 
@@ -325,7 +325,7 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
   const ready = asked.filter(done).length + (f.proforma || done("proforma_invoice") ? 1 : 0) + extra.filter((d) => documentDone(d.status)).length;
   const documents: StageWord = { word: `${ready} of ${total} documents`, tone: ready >= total ? "ok" : "neutral", tab: `${ready} of ${total}` };
 
-  return { payment, factory, production, shipping, delivery, documents };
+  return { payment, factory: supplier, production, shipping, delivery, documents };
 }
 
 const amount = (currency: string | null | undefined, value: string | null | undefined) => {
@@ -381,15 +381,15 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
           f.depositPercent > 0 ? `deposit ${f.depositPercent}% ${amount(cur, f.deposit)} to come` : `${amount(cur, f.due)} to come${through}`,
         );
 
-  // Factory order
+  // Supplier order
   const fac = f.factories ?? [];
   const names = list(fac.map((x) => x.name));
-  const factory = !f.factoryOrderedOn
+  const supplier = !f.supplierOrderedOn
     ? join(names || "Not ordered from the supplier yet", fac.length === 1 ? amount(fac[0]!.currency, fac[0]!.owed) : null)
     : join(
         names,
-        `ordered ${dayMonth(f.factoryOrderedOn)}`,
-        f.factoryOrderNo ? `their no. ${f.factoryOrderNo}` : null,
+        `ordered ${dayMonth(f.supplierOrderedOn)}`,
+        f.supplierOrderNo ? `their no. ${f.supplierOrderNo}` : null,
         fac.length === 1 ? (Number(fac[0]!.toPay) === 0 ? `${amount(fac[0]!.currency, fac[0]!.paid)} paid` : `${amount(fac[0]!.currency, fac[0]!.paid)} paid of ${amount(fac[0]!.currency, fac[0]!.owed)}`) : null,
       );
 
@@ -450,7 +450,7 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
   const row = (stage: (typeof ORDER_FLOW_STAGES)[number], fact: string, missing = ""): StageStand => ({ stage, label: ORDER_TAB_LABEL[stage], ...w[stage], fact, missing });
   return [
     row("payment", payment),
-    row("factory", factory),
+    row("factory", supplier),
     row("production", production, productionMissing),
     row("shipping", shipping, shippingMissing),
     row("delivery", delivery, deliveryMissing),
@@ -510,7 +510,7 @@ export const EDIT_CARDS: Record<string, { label: string; step?: FlowStep }> = {
   "request.customer": { label: "Customer" },
   "request.details": { label: "Details" },
   lines: { label: "Offer items" },
-  /** A factory offer's boxes (design 18 Nov): what changed in each part, with its reason. */
+  /** A supplier offer's boxes (design 18 Nov): what changed in each part, with its reason. */
   "offer.factory": { label: "Supplier" },
   "offer.prices": { label: "Prices" },
   "offer.terms": { label: "Delivery & payment" },

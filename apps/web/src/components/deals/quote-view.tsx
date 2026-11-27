@@ -22,13 +22,13 @@ const two = (v: string | number) => Number(v).toLocaleString("en-US", { minimumF
 /** The option that speaks for the revision: the accepted one, else the first. */
 export const optionOf = (r: RevisionView): OptionView | undefined => r.options.find((o) => o.status === "accepted") ?? r.options[0];
 
-/** What we promise against what the option's factory gives (people who see costs): lead time, payment, warranty. */
+/** What we promise against what the option's supplier gives (people who see costs): lead time, payment, warranty. */
 export function checksOf(r: RevisionView, o: OptionView | undefined): TermsCheck[] {
-  if (!o?.factory || !o.factoryTerms) return [];
-  const factoryMinor = o.costing ? o.costing.costMinor - o.costing.extraCostMinor : 0;
+  if (!o?.factory || !o.supplierTerms) return [];
+  const supplierMinor = o.costing ? o.costing.costMinor - o.costing.extraCostMinor : 0;
   return termsChecks(
     { leadDays: o.leadDays, leadFrom: o.leadFrom, parts: r.paymentParts, warrantyMonths: r.warrantyMonths, warrantyFrom: r.warrantyFrom, totalMinor: toMinor(o.total), currency: r.currency },
-    { factory: shortName(o.factory.name), ...o.factoryTerms, costMinor: factoryMinor > 0 ? factoryMinor : null },
+    { factory: shortName(o.factory.name), ...o.supplierTerms, costMinor: supplierMinor > 0 ? supplierMinor : null },
   );
 }
 

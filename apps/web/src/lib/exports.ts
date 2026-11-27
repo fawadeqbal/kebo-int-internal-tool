@@ -17,7 +17,7 @@ import type { SheetCol, SheetSpec } from "./sheet-spec";
 import type { DealDetail, DealRow, Paged } from "./types";
 import type { ReportView } from "./types-deals";
 import type { OrderRow, RevisionDoc } from "./types-orders";
-import type { AuditRow, CustomerRow, FactoryRow } from "./types-people";
+import type { AuditRow, CustomerRow, SupplierRow } from "./types-people";
 import type { CashBook, ExpenseList, Payable } from "./types-money";
 import type { Receivables } from "./types-insights";
 import type { LedgerListRow, LedgerParty } from "./types-ledger";
@@ -210,8 +210,8 @@ async function customers(q: Q): Promise<SheetSpec> {
   };
 }
 
-async function factories(q: Q): Promise<SheetSpec> {
-  const rows = await allPages<FactoryRow>("/factories", { q: q.q, mine: q.mine === "1" ? "true" : undefined, city: q.city, owner: q.owner, status: q.status });
+async function suppliers(q: Q): Promise<SheetSpec> {
+  const rows = await allPages<SupplierRow>("/factories", { q: q.q, mine: q.mine === "1" ? "true" : undefined, city: q.city, owner: q.owner, status: q.status });
   return {
     name: `Suppliers ${stamp()}`,
     title: "Suppliers",
@@ -365,7 +365,7 @@ async function ledger(q: Q): Promise<SheetSpec> {
   };
 }
 
-/** One customer's, factory's or person's ledger: opening, every row with the balance after it, closing. */
+/** One customer's, supplier's or person's ledger: opening, every row with the balance after it, closing. */
 async function ledgerParty(q: Q): Promise<SheetSpec> {
   const kind = q.kind === "customer" || q.kind === "factory" || q.kind === "staff" ? q.kind : null;
   if (!kind || !q.id || !UUID_RE.test(q.id)) throw new ExportNotFound();
@@ -667,10 +667,10 @@ async function quotation(q: Q): Promise<SheetSpec> {
 }
 
 /**
- * The inquiry's items as a list to send to factories: no customer name, no
- * target prices, with columns for the factory to fill in.
+ * The inquiry's items as a list to send to suppliers: no customer name, no
+ * target prices, with columns for the supplier to fill in.
  */
-async function factoryList(q: Q): Promise<SheetSpec> {
+async function supplierList(q: Q): Promise<SheetSpec> {
   if (!UUID.test(q.id ?? "")) throw new ExportNotFound();
   const d = await api.get<DealDetail>(`/inquiries/${q.id}`);
   return {
@@ -772,7 +772,7 @@ export const EXPORTS = {
   inquiries: deals,
   orders,
   customers,
-  factories,
+  factories: suppliers,
   receivables,
   payables,
   "cash-book": cashBook,
@@ -782,7 +782,7 @@ export const EXPORTS = {
   report,
   insights: insightsSheets,
   quotation,
-  "factory-list": factoryList,
+  "factory-list": supplierList,
   ledger,
   "ledger-party": ledgerParty,
 } satisfies Record<string, (q: Q) => Promise<SheetSpec | SheetSpec[]>>;

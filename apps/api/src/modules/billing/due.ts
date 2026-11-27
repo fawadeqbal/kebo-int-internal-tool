@@ -5,7 +5,7 @@ import type { PrismaService, Tx } from "../../database/prisma.service";
 type Db = PrismaService["db"] | Tx;
 
 /*
- * The money rules of position.ts (orderPosition, factoryPosition) said in SQL,
+ * The money rules of position.ts (orderPosition, supplierPosition) said in SQL,
  * so the screens that list what is owed read only those orders, not every
  * order there ever was. The figures agree with the TypeScript to the cent
  * (test/single-truth.test.ts checks it): exact numeric arithmetic and round()
@@ -67,19 +67,19 @@ export async function ordersWithMoneyDue(prisma: PrismaService, fx: MoneyCtx): P
 }
 
 /**
- * What one order line owes its factory, in minor units of the factory's
+ * What one order line owes its supplier, in minor units of the supplier's
  * currency: its frozen price with tax on top (or as it is, when the price had
  * the tax included), rounded to the cent, times the quantity, rounded again.
  * Exact numeric arithmetic and round() (half away from zero), the same as
- * factoryUnitCostMinor and multiplyMinor in @kebo/money, so the database and
+ * supplierUnitCostMinor and multiplyMinor in @kebo/money, so the database and
  * the app agree to the cent.
  */
 export const owedLineSql = (price: Prisma.Sql, tax: Prisma.Sql, included: Prisma.Sql, quantity: Prisma.Sql) =>
   Prisma.sql`round(round(${price} * (case when ${included} then 100 else 100 + greatest(coalesce(${tax}, 0), 0) end)) * ${quantity})`;
 
-export interface FactoryPositionRow {
+export interface SupplierPositionRow {
   orderId: string;
-  factoryId: string;
+  supplierId: string;
   currency: string;
   owedMinor: number;
   paidMinor: number;
@@ -88,14 +88,14 @@ export interface FactoryPositionRow {
 }
 
 /**
- * What we owe each factory on each order (not cancelled), as factoryPosition:
+ * What we owe each supplier on each order (not cancelled), as supplierPosition:
  * its lines' prices with tax, less what we paid it in that currency and the
  * expenses it bears (in the expense's currency when it owes in it, else its
  * first currency A→Z, turned at the expense's rate and the Settings rate).
  */
-export async function factoryPositionsSql(db: Db, fx: MoneyCtx, orderIds?: string[]): Promise<FactoryPositionRow[]> {
+export async function supplierPositionsSql(db: Db, fx: MoneyCtx, orderIds?: string[]): Promise<SupplierPositionRow[]> {
   const perMain = Prisma.sql`(case when t.currency = ${fx.main} then 1::numeric else nullif((${JSON.stringify(fx.rates)}::jsonb ->> t.currency::text)::numeric, 0) end)`;
-  return db.$queryRaw<FactoryPositionRow[]>`
+  return db.$queryRaw<SupplierPositionRow[]>`
     with owed as (
       select ol.order_id, ol.factory_id, ol.factory_currency as currency,
              sum(${owedLineSql(Prisma.sql`ol.factory_unit_price`, Prisma.sql`ol.factory_tax_rate`, Prisma.sql`ol.factory_tax_included`, Prisma.sql`ol.quantity`)}) as owed
@@ -127,7 +127,7 @@ export async function factoryPositionsSql(db: Db, fx: MoneyCtx, orderIds?: strin
       where t.currency is not null
       group by 1, 2, 3
     )
-    select owed.order_id as "orderId", owed.factory_id as "factoryId", owed.currency::text as currency,
+    select owed.order_id as "orderId", owed.factory_id as "supplierId", owed.currency::text as currency,
            owed.owed::float8 as "owedMinor", coalesce(paid.paid, 0)::float8 as "paidMinor", coalesce(taken.taken, 0)::float8 as "takenOffMinor",
            greatest(owed.owed - coalesce(paid.paid, 0) - coalesce(taken.taken, 0), 0)::float8 as "toPayMinor"
     from owed
@@ -136,10 +136,10 @@ export async function factoryPositionsSql(db: Db, fx: MoneyCtx, orderIds?: strin
 }
 
 /**
- * Orders where we still owe a factory: what the factory lines cost (their
- * prices frozen on the order, with tax, in the factory's currency) against
- * what we paid that factory in that currency and the expenses it bears.
+ * Orders where we still owe a supplier: what the supplier lines cost (their
+ * prices frozen on the order, with tax, in the supplier's currency) against
+ * what we paid that supplier in that currency and the expenses it bears.
  */
-export async function ordersOwingFactories(prisma: PrismaService, fx: MoneyCtx): Promise<string[]> {
-  return [...new Set((await factoryPositionsSql(prisma.db, fx)).filter((r) => r.toPayMinor > 0).map((r) => r.orderId))];
+export async function ordersOwingSuppliers(prisma: PrismaService, fx: MoneyCtx): Promise<string[]> {
+  return [...new Set((await supplierPositionsSql(prisma.db, fx)).filter((r) => r.toPayMinor > 0).map((r) => r.orderId))];
 }

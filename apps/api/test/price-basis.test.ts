@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 
 /**
- * Step 3: a factory's price basis (EXW, FOB…) and the costs between it and
+ * Step 3: a supplier's price basis (EXW, FOB…) and the costs between it and
  * the basis we sell on, part of each option's cost so the margin is true.
  */
 describe("supplier's Incoterm", () => {
@@ -30,7 +30,7 @@ describe("supplier's Incoterm", () => {
     const offer = async (name: string, basis: string | null, basisPlace: string | null, price: number) => {
       const q = (
         await api(app, sana)
-          .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `${name} ${tag}`, receivedOn: "2026-10-26", currency: "CNY", basis, basisPlace })
+          .post(`/inquiries/${inquiryId}/factory-quotes`, { newSupplierName: `${name} ${tag}`, receivedOn: "2026-10-26", currency: "CNY", basis, basisPlace })
           .expect(201)
       ).body.id;
       await api(app, sana)
@@ -50,21 +50,21 @@ describe("supplier's Incoterm", () => {
     const s = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body;
     expect(s.quotes.find((q: { id: string }) => q.id === exw)).toMatchObject({ basis: "EXW", basisPlace: "Zhengzhou" });
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body;
-    expect(offers.offers.find((o: { factoryQuoteId: string }) => o.factoryQuoteId === cfr)).toMatchObject({ basis: "CFR", basisPlace: "Lagos" });
-    await api(app, sana).put(`/factory-quotes/${exw}`, { newFactoryName: `Henan Agri ${tag}`, receivedOn: "2026-10-26", currency: "CNY", basis: "XYZ" }).expect(422);
+    expect(offers.offers.find((o: { supplierQuoteId: string }) => o.supplierQuoteId === cfr)).toMatchObject({ basis: "CFR", basisPlace: "Lagos" });
+    await api(app, sana).put(`/factory-quotes/${exw}`, { newSupplierName: `Henan Agri ${tag}`, receivedOn: "2026-10-26", currency: "CNY", basis: "XYZ" }).expect(422);
   });
 
   it("adds the costs to reach the basis we sell on, in any currency, to the option's cost", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body;
-    const lineOf = (q: string) => offers.offers.find((o: { factoryQuoteId: string }) => o.factoryQuoteId === q).lines[0].id;
+    const lineOf = (q: string) => offers.offers.find((o: { supplierQuoteId: string }) => o.supplierQuoteId === q).lines[0].id;
     const body = {
       ...draft,
       incoterm: "CFR",
       incotermPlace: "Lagos",
       options: [
         {
-          factoryQuoteId: exw,
+          supplierQuoteId: exw,
           discount: 0,
           prices: [{ lineId: lineOf(exw), unitPrice: 14000 }],
           charges: [],
@@ -73,7 +73,7 @@ describe("supplier's Incoterm", () => {
             { step: "freight", amount: 2500, currency: "USD" },
           ],
         },
-        { factoryQuoteId: cfr, discount: 0, prices: [{ lineId: lineOf(cfr), unitPrice: 14000 }], charges: [] },
+        { supplierQuoteId: cfr, discount: 0, prices: [{ lineId: lineOf(cfr), unitPrice: 14000 }], charges: [] },
       ],
     };
     // A currency without a rate cannot be turned into USD.
@@ -86,15 +86,15 @@ describe("supplier's Incoterm", () => {
     revisionId = r.id;
     const [a, b] = r.options;
     // EXW → CFR: to the port and sea freight; CNY 3,550 at 7.1 = USD 500.
-    expect(a).toMatchObject({ factoryBasis: "EXW", factoryBasisPlace: "Zhengzhou", gap: { needed: ["to_port", "freight"], extra: [] } });
+    expect(a).toMatchObject({ supplierBasis: "EXW", supplierBasisPlace: "Zhengzhou", gap: { needed: ["to_port", "freight"], extra: [] } });
     expect(a.costs).toEqual([
       { step: "to_port", amount: "3550.00", currency: "CNY", cost: "500.00", note: "Truck to Qingdao" },
       { step: "freight", amount: "2500.00", currency: "USD", cost: "2500.00", note: null },
     ]);
-    // Factory 71,000 / 7.1 = 10,000 + 3,000 to reach CFR = 13,000 against 14,000 sold.
+    // Supplier 71,000 / 7.1 = 10,000 + 3,000 to reach CFR = 13,000 against 14,000 sold.
     expect(a.costing).toMatchObject({ cost: "13000.00", extraCost: "3000.00", sales: "14000.00", profit: "1000.00", marginPercent: 7.1 });
-    // The CFR factory already pays the freight: nothing to add.
-    expect(b).toMatchObject({ factoryBasis: "CFR", gap: { needed: [], extra: [] }, costs: [] });
+    // The CFR supplier already pays the freight: nothing to add.
+    expect(b).toMatchObject({ supplierBasis: "CFR", gap: { needed: [], extra: [] }, costs: [] });
     expect(b.costing).toMatchObject({ cost: "12000.00", extraCost: "0.00" });
   });
 
@@ -105,7 +105,7 @@ describe("supplier's Incoterm", () => {
       { step: "to_port", amount: 3550, currency: "CNY", note: "Truck to Qingdao" },
       { step: "freight", amount: 2500, currency: "USD", note: null },
     ]);
-    // Selling FOB now: the CFR factory's price includes freight we do not sell.
+    // Selling FOB now: the CFR supplier's price includes freight we do not sell.
     const r2 = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/quotation/revisions`, {

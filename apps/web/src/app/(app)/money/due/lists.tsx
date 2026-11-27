@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Fragment, Suspense } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { can, EXPENSE_CATEGORY_LABEL, expenseShort, FACTORY_DUE_RULE_LABEL } from "@kebo/shared";
+import { can, EXPENSE_CATEGORY_LABEL, expenseShort, SUPPLIER_DUE_RULE_LABEL } from "@kebo/shared";
 import {
   buildHref,
   buttonClass,
@@ -38,8 +38,8 @@ import type { OpenBills, ToPayList } from "@/lib/types-money";
 import { optional } from "@/components/print/data";
 import { FilterCard } from "@/components/common/filter-card";
 import { PayCostWindow, RepayWindow } from "@/components/order-sections/costs-windows";
-import { PayFactoryInList, PlanInList } from "@/components/money/due-windows";
-import { factoryPaymentAction, sendRequestAction } from "../actions";
+import { PaySupplierInList, PlanInList } from "@/components/money/due-windows";
+import { supplierPaymentAction, sendRequestAction } from "../actions";
 import { paymentAction, submitPaymentAction } from "../../orders/actions";
 import { moneyTile } from "@/lib/money-tile";
 
@@ -402,8 +402,8 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
         r.late > 0
           ? `${days(r.late)} late`
           : r.dueOn
-            ? `${date(r.dueOn)} · ${FACTORY_DUE_RULE_LABEL[r.dueRule].toLowerCase()}`
-            : FACTORY_DUE_RULE_LABEL[r.dueRule],
+            ? `${date(r.dueOn)} · ${SUPPLIER_DUE_RULE_LABEL[r.dueRule].toLowerCase()}`
+            : SUPPLIER_DUE_RULE_LABEL[r.dueRule],
       part: r,
     })),
     ...(bills?.rows ?? []).map((b): Owed => ({
@@ -635,22 +635,22 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
   );
 }
 
-/** "Pay" on a factory's part: the order's own Pay the factory window, with the part filled in, open at once. */
+/** "Pay" on a supplier's part: the order's own Pay the supplier window, with the part filled in, open at once. */
 async function PayPart({ part, today }: { part: ToPayList["rows"][number]; today: string }) {
   const [m, people, settings] = await Promise.all([orderMoneyOf(part.order.id), optional(getPeople), getSettings()]);
   const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
   if (!m.factories?.canRecord || !owing.length) return null;
   return (
-    <PayFactoryInList
+    <PaySupplierInList
       label="Pay"
       sub={`${part.order.refNo} · ${part.supplier.name}`}
-      action={factoryPaymentAction.bind(null, part.order.id, null, null)}
+      action={supplierPaymentAction.bind(null, part.order.id, null, null)}
       factories={owing}
       people={people ?? []}
       orderCurrency={m.currency}
       fx={{ main: settings.sales.currency, rates: settings.sales.exchangeRates }}
       today={today}
-      prefill={{ factoryId: part.supplier.id, amount: part.open, kind: part.part }}
+      prefill={{ supplierId: part.supplier.id, amount: part.open, kind: part.part }}
     />
   );
 }

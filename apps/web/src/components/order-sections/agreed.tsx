@@ -24,7 +24,7 @@ import { Dash } from "@kebo/ui";
 /*
  * The order's Overview, design "RFQ Desk — terms that travel" (16 Nov 2026): what was agreed with the customer
  * in the four groups every offer, quotation and order uses (Delivery · Payment · Warranty · Conditions), and the
- * customer beside the factory — what we promised against what the factory gives us, with what to look at.
+ * customer beside the supplier — what we promised against what the supplier gives us, with what to look at.
  */
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -64,7 +64,7 @@ export function shipByNote(a: Agreed, shipBy: string | null): { ok: boolean; tex
   return f.on && shipBy ? { ok: true, text: `worked out: the deposit came in ${dayMonth(f.on)}` } : { ok: false, text: "worked out once the deposit is in" };
 }
 
-/* ---------------------------------------------------------------- the customer and the factory, side by side */
+/* ---------------------------------------------------------------- the customer and the supplier, side by side */
 
 export interface SideRow {
   key: "basis" | "lead" | "payment" | "warranty";
@@ -86,19 +86,19 @@ export interface SideTable {
   look: number;
 }
 
-/** What the factory's goods cost us, in the order's currency (at the rate quoted: about). */
+/** What the supplier's goods cost us, in the order's currency (at the rate quoted: about). */
 const aboutCost = (minor: number, currency: string) => `≈ ${money((minor / 100).toFixed(2), currency)}`;
 const same = (a: string | null, b: string | null) => (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 const asCheck = (c: TermsCheck | null): SideRow["check"] => (c ? { ok: c.ok, word: c.word, text: c.ok ? undefined : c.text } : null);
 
 /**
- * What we promised the customer against what each factory gives us (its offer): the delivery basis, the lead time
- * (with ship by and the factory's ready date), the payment (the plan's parts against the offer's) and the warranty
- * — green when we give no more than the factory gives us, amber with what to do when we promise more.
+ * What we promised the customer against what each supplier gives us (its offer): the delivery basis, the lead time
+ * (with ship by and the supplier's ready date), the payment (the plan's parts against the offer's) and the warranty
+ * — green when we give no more than the supplier gives us, amber with what to do when we promise more.
  */
 export function sideBySide(o: OrderView, m: OrderMoney | null): SideTable[] {
   const a = o.agreed;
-  if (!a || !o.factoryTerms?.length) return [];
+  if (!a || !o.supplierTerms?.length) return [];
   const items = m?.plan.items ?? [];
   const planMinor = items.reduce((t, i) => t + toMinor(i.amount), 0);
   const ourParts = planParts(
@@ -117,7 +117,7 @@ export function sideBySide(o: OrderView, m: OrderMoney | null): SideTable[] {
   };
   const ourBasis = `${o.incoterm}${o.incotermPlace ? ` ${o.incotermPlace}` : ""}`;
   const ourWarranty = a.warrantyMonths !== null ? `${plural(a.warrantyMonths, "month")} from ${WARRANTY_FROM_LABEL[isWarrantyFrom(a.warrantyFrom) ? a.warrantyFrom : "shipment"]}` : a.warranty;
-  return o.factoryTerms.map((f) => {
+  return o.supplierTerms.map((f) => {
     const name = shortName(f.factory.name);
     const t = f.terms;
     const theirs: TheirTerms = {

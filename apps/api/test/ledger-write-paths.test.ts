@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Every write of money (customer payment entries and what they pay, factory payments, expenses, transfers
+ * Every write of money (customer payment entries and what they pay, supplier payments, expenses, transfers
  * between accounts, money accounts, orders made) posts to the ledger in the same method: a new write path that
  * does not fails here. The customer-money functions (treasury/customer-money.ts) are called inside such methods. Writes that change no money (listed with why) are let through.
  */

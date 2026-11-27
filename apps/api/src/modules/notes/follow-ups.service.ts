@@ -22,9 +22,11 @@ const TARGET_KEYS = [
   ["inquiry", "inquiryId"],
   ["order", "orderId"],
   ["customer", "customerId"],
-  ["factory", "factoryId"],
+  ["factory", "supplierId"],
 ] as const satisfies readonly (readonly [RecordType, string])[];
-type TargetIds = { inquiryId?: string | null; orderId?: string | null; customerId?: string | null; factoryId?: string | null };
+type TargetIds = { inquiryId?: string | null; orderId?: string | null; customerId?: string | null; supplierId?: string | null };
+/** The column that links a follow-up to each kind of record ("factory" is the stored word for a supplier). */
+const TARGET_KEY = Object.fromEntries(TARGET_KEYS) as Record<RecordType, keyof TargetIds>;
 
 /** The record a row or an input names: { type, id } or null (a general one). */
 export function targetOf(v: TargetIds): { type: RecordType; id: string } | null {
@@ -35,7 +37,7 @@ const columnsFor = (t: { type: RecordType; id: string } | null) => ({
   inquiryId: t?.type === "inquiry" ? t.id : null,
   orderId: t?.type === "order" ? t.id : null,
   customerId: t?.type === "customer" ? t.id : null,
-  factoryId: t?.type === "factory" ? t.id : null,
+  supplierId: t?.type === "factory" ? t.id : null,
 });
 
 /** "09:05": the time of day of a moment in a time zone. */
@@ -70,7 +72,7 @@ export const isLate = (r: { doneAt: Date | null; dueOn: ISODate; dueAt: string |
   !r.doneAt && (r.dueOn < today || (r.dueOn === today && r.dueAt !== null && r.dueAt < now));
 
 /**
- * Follow-ups: planned calls, visits and meetings for someone, on an inquiry, order, customer or factory
+ * Follow-ups: planned calls, visits and meetings for someone, on an inquiry, order, customer or supplier
  * (or none). Everyone may add them on the records they see and give them to anyone. Each person sees the
  * ones for them or made by them, and every one on a record they see; followups.viewAll sees all. Those it
  * is for, who made it, and managers (followups.viewAll) change, tick, reopen and remove them; others who
@@ -132,7 +134,7 @@ export class FollowUpsService {
         dueAt: r.dueAt,
         place: r.place,
         note: r.note,
-        /** The record it is on: { type: inquiry | order | customer | factory, id, label } or null. */
+        /** The record it is on: { type: inquiry | order | customer | supplier, id, label } or null. */
         target: t ? { type: t.type, id: t.id, label: ref?.label ?? "" } : null,
         /** Where it opens: the record, or the follow-ups list. */
         link: ref?.link ?? FOLLOW_UPS_LINK,
@@ -236,7 +238,7 @@ export class FollowUpsService {
 
   /**
    * ?mine=true: those for me. Otherwise everyone's with followups.viewAll, else those for me or made by me.
-   * With inquiryId | orderId | customerId | factoryId: every one on that record (when I see it).
+   * With inquiryId | orderId | customerId | supplierId: every one on that record (when I see it).
    * ?on= / ?from= / ?to=: by the day due; ?open=true: not done, ?open=false: done.
    * Open ones by when they are due (those without a time first that day); done ones the latest done first.
    */
@@ -246,7 +248,7 @@ export class FollowUpsService {
     const scope: Prisma.FollowUpWhereInput[] = [];
     if (t)
       scope.push(
-        t.type === "inquiry" ? { inquiryId: t.id } : t.type === "order" ? { orderId: t.id } : t.type === "customer" ? { customerId: t.id } : { factoryId: t.id },
+        t.type === "inquiry" ? { inquiryId: t.id } : t.type === "order" ? { orderId: t.id } : t.type === "customer" ? { customerId: t.id } : { supplierId: t.id },
       );
     if (q.mine) scope.push({ assigneeId: user.id });
     else if (!t && !can(user, "followups.viewAll")) scope.push({ OR: [{ assigneeId: user.id }, { createdById: user.id }] });
@@ -258,8 +260,8 @@ export class FollowUpsService {
     if (q.about)
       scope.push(
         q.about === "none"
-          ? { inquiryId: null, orderId: null, customerId: null, factoryId: null }
-          : { [`${q.about}Id`]: { not: null } },
+          ? { inquiryId: null, orderId: null, customerId: null, supplierId: null }
+          : { [TARGET_KEY[q.about]]: { not: null } },
       );
     const { today, time } = this.now();
     const lateWhere: Prisma.FollowUpWhereInput = { doneAt: null, OR: [{ dueOn: { lt: toDbDate(today) } }, { dueOn: toDbDate(today), dueAt: { lt: time } }] };
@@ -434,7 +436,7 @@ export class FollowUpsService {
             inquiryId: row.inquiryId,
             orderId: row.orderId,
             customerId: row.customerId,
-            factoryId: row.factoryId,
+            supplierId: row.supplierId,
             assigneeId: nextFor,
             createdById: next ? user.id : row.createdById,
             auto: next ? null : step!.auto,

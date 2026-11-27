@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { readSettings, SETTINGS, type Settings, type SettingsKey } from "@kebo/shared";
+import { readSettings, SETTINGS, type Settings, type SettingsKey, withOldNamesToo } from "@kebo/shared";
 import type { Prisma } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -56,18 +56,18 @@ export class SettingsService {
 
   /**
    * Whether the main currency can still change: only while no money is recorded
-   * (orders, payments, factory payments, expenses), since those keep rates
+   * (orders, payments, supplier payments, expenses), since those keep rates
    * against it. `locked` says why not, in plain words.
    */
   async mainCurrencyLock(): Promise<{ locked: boolean; reason: string | null }> {
     const db = this.prisma.db;
-    const [orders, payments, factoryPayments, expenses] = await Promise.all([
+    const [orders, payments, supplierPayments, expenses] = await Promise.all([
       db.order.count({ take: 1 }),
       db.moneyMovement.count({ take: 1 }),
       db.allocation.count({ where: { target: "purchase" }, take: 1 }),
       db.expense.count({ take: 1 }),
     ]);
-    const has = [orders && "orders", payments && "payments", factoryPayments && "supplier payments", expenses && "expenses"].filter(
+    const has = [orders && "orders", payments && "payments", supplierPayments && "supplier payments", expenses && "expenses"].filter(
       (x): x is string => !!x,
     );
     if (!has.length) return { locked: false, reason: null };
@@ -134,8 +134,9 @@ export class SettingsService {
     await this.prisma.tx(async (tx) => {
       await tx.setting.upsert({
         where: { companyId_key: { companyId: user.companyId, key } },
-        create: { key, value: stored as Prisma.InputJsonValue },
-        update: { value: stored as Prisma.InputJsonValue },
+        // Both names for now: if the deploy falls back, the API from before the change still reads the group.
+        create: { key, value: withOldNamesToo(stored) as Prisma.InputJsonValue },
+        update: { value: withOldNamesToo(stored) as Prisma.InputJsonValue },
       });
       await this.audit.record(tx, {
         userId: user.id,
@@ -146,7 +147,7 @@ export class SettingsService {
         newValues: value as never,
         reason,
       });
-      // What a factory bears in another currency is taken off at today's rate (factoryPosition): the ledger follows.
+      // What a supplier bears in another currency is taken off at today's rate (supplierPosition): the ledger follows.
       if (changed.includes("exchangeRates" as never)) {
         const borne = await tx.expense.findMany({ where: { borneBy: "factory", voidedAt: null, orderId: { not: null } }, select: { id: true } });
         await this.ledger.post(tx, borne.map((e) => ({ type: "expense" as const, id: e.id })), { userId: user.id, reason: reason ?? "Exchange rates changed" });

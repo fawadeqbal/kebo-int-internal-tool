@@ -18,7 +18,7 @@ const pct = (part: number, whole: number) => (whole > 0 ? roundHalfAway((part / 
 const LIMITS = {
   /** Spent on a deal still open, as a share of its quotation. */
   dealSpendPercent: 5,
-  /** Paid to factories before the customer paid us, for longer than this. */
+  /** Paid to suppliers before the customer paid us, for longer than this. */
   stuckDays: 30,
   /** Profit lost after the sale, as a share of the profit planned. */
   leakPercent: 25,
@@ -31,13 +31,13 @@ export type Warning = { level: "bad" | "warn"; text: string; href: string | null
 /**
  * Where we lose money (managers), for a period: what lost deals cost and why we lost them, customers who cost
  * more than they earn, win rate and selling cost by person and by product category, profit that leaked after
- * the sale (planned against actual), expenses against sales month by month, money stuck with factories before
- * the customer paid, what visits to each factory cost — and warnings when something crosses a line.
+ * the sale (planned against actual), expenses against sales month by month, money stuck with suppliers before
+ * the customer paid, what visits to each supplier cost — and warnings when something crosses a line.
  *
  * Every order figure (sales, profit on the quote, profit now expected, costs over plan, received, what we owe
- * and paid factories) is read from the Insights tables (FactsReadService), so it is the figure Insights and the
+ * and paid suppliers) is read from the Insights tables (FactsReadService), so it is the figure Insights and the
  * order's Costs page show; deals' outcomes from inquiry_facts; the monthly trend is Insights' sales and costs.
- * Only plain sums of expenses (a deal's selling cost, visits to a factory) are added up here, each at its own
+ * Only plain sums of expenses (a deal's selling cost, visits to a supplier) are added up here, each at its own
  * rate (`convert`), as Insights' cash does.
  */
 @Injectable()
@@ -183,14 +183,14 @@ export class LeaksService {
     const leakRows = money.rows
       .filter((o) => o.orderedOn >= from && o.orderedOn <= to)
       .map((o) => {
-        // Paid to factories beyond what we owe them (extra work, a price that changed). Rate rounding is not
+        // Paid to suppliers beyond what we owe them (extra work, a price that changed). Rate rounding is not
         // a cost: only more than half a percent (and more than 1.00) counts.
-        const over = o.factoryPaidMinor - o.factoryOwedMinor;
-        const factoryExtra = over > Math.max(100, o.factoryOwedMinor * 0.005) ? over : 0;
+        const over = o.supplierPaidMinor - o.supplierOwedMinor;
+        const supplierExtra = over > Math.max(100, o.supplierOwedMinor * 0.005) ? over : 0;
         // Planned: the profit on the quote. After the sale: its costs over plan (expenses not in the planned
-        // costs, bank charges), what was spent on the deal before it, and factories paid beyond what we owe.
+        // costs, bank charges), what was spent on the deal before it, and suppliers paid beyond what we owe.
         const beforeSale = spentOn.get(o.inquiryId)?.selling ?? 0;
-        const actual = o.profitExpectedMinor - beforeSale - factoryExtra;
+        const actual = o.profitExpectedMinor - beforeSale - supplierExtra;
         return {
           id: o.orderId,
           refNo: o.refNo,
@@ -199,7 +199,7 @@ export class LeaksService {
           plannedMinor: o.profitQuoteMinor,
           orderCostsMinor: o.costsOverPlanMinor,
           beforeSaleMinor: beforeSale,
-          factoryExtraMinor: factoryExtra,
+          supplierExtraMinor: supplierExtra,
           actualMinor: actual,
           leakMinor: o.profitQuoteMinor - actual,
           uncosted: o.costedMinor < o.salesMinor,
@@ -232,7 +232,7 @@ export class LeaksService {
     for (const r of leakRows) {
       const c = cust(r.customer);
       c.sales += r.revenueMinor;
-      c.profit += r.plannedMinor - r.orderCostsMinor - r.factoryExtraMinor;
+      c.profit += r.plannedMinor - r.orderCostsMinor - r.supplierExtraMinor;
     }
     for (const e of periodExpenses) {
       if (!e.customer || e.orderId) continue;
@@ -269,8 +269,8 @@ export class LeaksService {
         });
     }
 
-    /* ----- money stuck: paid to factories before the customer paid us (open orders) */
-    const open = money.rows.filter((o) => o.status === "open" && o.factoryPaidMinor - o.receivedMinor > 0);
+    /* ----- money stuck: paid to suppliers before the customer paid us (open orders) */
+    const open = money.rows.filter((o) => o.status === "open" && o.supplierPaidMinor - o.receivedMinor > 0);
     const firstPaid = open.length
       ? (
           await this.prisma.db.allocation.groupBy({
@@ -288,7 +288,7 @@ export class LeaksService {
           refNo: o.refNo,
           customer: o.customer,
           currency: main,
-          stuckMinor: o.factoryPaidMinor - o.receivedMinor,
+          stuckMinor: o.supplierPaidMinor - o.receivedMinor,
           days: first ? daysBetween(fromDbDate(first), today) : 0,
         };
       })
@@ -316,14 +316,14 @@ export class LeaksService {
         href: "/money/company-costs",
       });
 
-    /* ----- factories: what visits and costs there came to */
-    const factories = new Map<string, { factory: { id: string; name: string }; spent: number; count: number }>();
+    /* ----- suppliers: what visits and costs there came to */
+    const suppliers = new Map<string, { factory: { id: string; name: string }; spent: number; count: number }>();
     for (const e of periodExpenses) {
       if (!e.factory) continue;
-      const f = factories.get(e.factory.id) ?? { factory: e.factory, spent: 0, count: 0 };
+      const f = suppliers.get(e.factory.id) ?? { factory: e.factory, spent: 0, count: 0 };
       f.spent += inMain(e);
       f.count += 1;
-      factories.set(e.factory.id, f);
+      suppliers.set(e.factory.id, f);
     }
 
     /* ----- amounts not on an account (the cash book cannot match the bank) */
@@ -378,7 +378,7 @@ export class LeaksService {
         planned: fromMinor(r.plannedMinor),
         orderCosts: fromMinor(r.orderCostsMinor),
         beforeSale: fromMinor(r.beforeSaleMinor),
-        factoryExtra: fromMinor(r.factoryExtraMinor),
+        supplierExtra: fromMinor(r.supplierExtraMinor),
         actual: fromMinor(r.actualMinor),
         leaked: fromMinor(r.leakMinor),
         uncosted: r.uncosted,
@@ -416,7 +416,7 @@ export class LeaksService {
         amount: fromMinor(s.stuckMinor),
         days: s.days,
       })),
-      factories: [...factories.values()]
+      factories: [...suppliers.values()]
         .sort((a, b) => b.spent - a.spent)
         .map((f) => ({ factory: f.factory, spent: fromMinor(f.spent), count: f.count })),
       warnings: warnings.sort((a, b) => (a.level === b.level ? 0 : a.level === "bad" ? -1 : 1)),

@@ -6,7 +6,7 @@ import { api, signIn, startApp } from "./app";
 type OrderRow = { id: string; currency: string };
 type Pay = { id: string; file: { name: string; type: string; size: number } | null };
 
-/** A photo or PDF kept with a payment as proof: money in from customers and out to factories. */
+/** A photo or PDF kept with a payment as proof: money in from customers and out to suppliers. */
 describe("payment files", () => {
   let app: INestApplication;
   let manager: string;
@@ -143,7 +143,7 @@ describe("payment files", () => {
       type: "application/pdf",
     });
     await api(app, manager).get(`/files/${saved.file.id}`).expect(200);
-    // Opening it follows the order's money page: whoever sees the factory payments there.
+    // Opening it follows the order's money page: whoever sees the supplier payments there.
     const seen = (await api(app, sana).get(`/orders/${orderId}/money`)).body?.factories?.payments as Pay[] | undefined;
     await api(app, sana)
       .get(`/files/${saved.file.id}`)

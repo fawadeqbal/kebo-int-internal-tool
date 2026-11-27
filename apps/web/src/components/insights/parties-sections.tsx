@@ -11,7 +11,7 @@ import {
   CUSTOMER_CHIPS,
   type CustomerChip,
   type loadCustomers,
-  type loadFactories,
+  type loadSuppliers,
   type loadFunnel,
   type loadPeople,
 } from "@/lib/insights-data";
@@ -171,16 +171,16 @@ export function CustomersSection({
   );
 }
 
-/* ------------------------------------------------------------------------------------------- Factories */
+/* ------------------------------------------------------------------------------------------- Suppliers */
 
-export function FactoriesSection({
+export function SuppliersSection({
   d,
   p,
   page,
   params,
   base,
 }: {
-  d: Awaited<ReturnType<typeof loadFactories>>;
+  d: Awaited<ReturnType<typeof loadSuppliers>>;
   p: Period;
   page: number;
   params: Record<string, string | undefined>;

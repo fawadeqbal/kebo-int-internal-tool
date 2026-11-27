@@ -1,7 +1,7 @@
 /**
  * The one word for where an order stands, the same on its own page, in the lists, on the board and on Home:
  * Confirmed → In production → Shipped → Arrived → Delivered → Done (or Cancelled). It is worked out from what
- * is stored (the day we ordered from the factory, the shipments, the delivery, closed), never typed, so two
+ * is stored (the day we ordered from the supplier, the shipments, the delivery, closed), never typed, so two
  * screens cannot say different things about the same order.
  */
 export type OrderWord = "Confirmed" | "In production" | "Shipped" | "Arrived" | "Delivered" | "Done" | "Cancelled";
@@ -21,7 +21,7 @@ export const orderWordColumn = (w: OrderWord): "confirmed" | "in_production" | "
 
 export interface OrderWordFacts {
   status: "open" | "closed" | "cancelled";
-  /** We ordered from the factory. */
+  /** We ordered from the supplier. */
   ordered: boolean;
   /** Each shipment: its status, and whether a day it left is recorded. */
   shipments: { status: string; left: boolean }[];

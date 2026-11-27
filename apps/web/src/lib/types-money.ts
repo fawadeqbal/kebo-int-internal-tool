@@ -6,8 +6,8 @@ import type {
   CustomerMoneyState,
   ExpenseBearer,
   ExpenseCategory,
-  FactoryDueRule,
-  FactoryPlanStatus,
+  SupplierDueRule,
+  SupplierPlanStatus,
   FlowStep,
   InquiryStage,
   LostReason,
@@ -74,7 +74,7 @@ export interface OrderMoney {
     cancelled: { paperId: string; ref: string; number: string; revision: number; sentOn: string; amount: string | null; label: string | null }[];
     /** May send a request to the customer (kept as sent). */
     canSend: boolean;
-    /** The order's dates the rules read (the ready date: the latest factory's). */
+    /** The order's dates the rules read (the ready date: the latest supplier's). */
     dates: { readyOn: string | null; shippedOn: string | null; papersOn: string | null; satOn?: string | null };
     matchesTotal: boolean;
     difference: string;
@@ -82,13 +82,13 @@ export interface OrderMoney {
     canEdit: boolean;
   };
   factories: {
-    rows: FactoryOwed[];
+    rows: SupplierOwed[];
     /** Where the customer's money for this order stands, for the person paying its suppliers. */
     customer: { state: CustomerMoneyState; words: string; warn: boolean };
-    payments: FactoryPaymentView[];
+    payments: SupplierPaymentView[];
     canRecord: boolean;
-    /** Each factory's payment plan with what is paid on each part. */
-    plans: FactoryPlanView[];
+    /** Each supplier's payment plan with what is paid on each part. */
+    plans: SupplierPlanView[];
     canPlan: boolean;
   } | null;
   expenses: ExpenseView[] | null;
@@ -118,28 +118,28 @@ export interface OrderMoney {
     marginPercent: number | null;
     coveragePercent: number | null;
     received: string;
-    factoryPaid: string;
+    supplierPaid: string;
     cash: string;
   } | null;
   missingRate: string | null;
   cancelled: boolean;
 }
 
-export interface FactoryOwed {
+export interface SupplierOwed {
   factory: { id: string; name: string };
   lookedAfterBy: Person | null;
   currency: string;
   lines: number;
   owed: string;
-  /** Paid, with the expenses the factory bears. */
+  /** Paid, with the expenses the supplier bears. */
   paid: string;
-  /** Expenses the factory bears, taken off what we owe it. */
+  /** Expenses the supplier bears, taken off what we owe it. */
   takenOff: string;
   toPay: string;
   overpaid: string | null;
 }
 
-export interface FactoryPaymentView {
+export interface SupplierPaymentView {
   id: string;
   factory: { id: string; name: string };
   recordedBy: { id: string; name: string } | null;
@@ -148,7 +148,7 @@ export interface FactoryPaymentView {
   changedAt: string | null;
   /** When it last changed: its Change sends it back, so a change never overwrites someone else's. */
   updatedAt: string;
-  /** Paid to that factory so far and still to pay, once it counted (null when removed). */
+  /** Paid to that supplier so far and still to pay, once it counted (null when removed). */
   after: { paid: string; toPay: string } | null;
   kind: PaymentKind;
   amount: string;
@@ -176,7 +176,7 @@ export interface ExpenseView {
   customer: { id: string; name: string } | null;
   /** The deal it was spent on (won or lost); an order's expense is on its deal. */
   deal: { id: string; refNo: string; title: string; stage: InquiryStage } | null;
-  /** The factory visited or paid for. */
+  /** The supplier visited or paid for. */
   factory: { id: string; name: string } | null;
   /** Which of our accounts it was paid from. */
   account: { id: string; name: string } | null;
@@ -258,7 +258,7 @@ export interface OrderCosts {
     receiptsMissingAmounts: { currency: string; amount: string }[];
     borneByUs: string;
     chargedToCustomer: string;
-    takenOffFactory: string;
+    takenOffSupplier: string;
   };
   planned: {
     key: string;
@@ -277,8 +277,8 @@ export interface OrderCosts {
     sale: string;
     uncosted: string;
     factory: string;
-    /** What the factories charge (with tax) and what is still to pay them after payments and what they bear. */
-    factoryOwed: { currency: string; amount: string; toPay?: string }[];
+    /** What the suppliers charge (with tax) and what is still to pay them after payments and what they bear. */
+    supplierOwed: { currency: string; amount: string; toPay?: string }[];
     planned: string;
     notPlanned: string;
     bankCharges: string;
@@ -309,7 +309,7 @@ export interface CostSheetRow {
   label: string;
   category: ExpenseCategory | null;
   owedTo: string | null;
-  /** Where it comes from: the factory order, a shipment, the customer's payments, the quotation, or typed on the sheet. */
+  /** Where it comes from: the supplier order, a shipment, the customer's payments, the quotation, or typed on the sheet. */
   from: "factory" | "shipment" | "payment" | "quotation" | "typed";
   amount: string;
   currency: string;
@@ -364,7 +364,7 @@ export interface Payable {
     word: OrderWord;
     customer: string;
     toPay: string;
-    /** The next part of the factory's payment plan and when it is due. */
+    /** The next part of the supplier's payment plan and when it is due. */
     next?: { label: string; due: string | null; open: string; status: string } | null;
   }[];
 }
@@ -398,7 +398,7 @@ export interface CustomerAccount {
     net: string;
     sellingCostPerWin: string | null;
     received: string;
-    factoryPaid: string;
+    supplierPaid: string;
     cash: string;
     uncostedRevenue: string;
     bankCharges: string;
@@ -511,7 +511,7 @@ export interface LeaksReport {
     planned: string;
     orderCosts: string;
     beforeSale: string;
-    factoryExtra: string;
+    supplierExtra: string;
     actual: string;
     leaked: string;
     uncosted: boolean;
@@ -581,17 +581,17 @@ export interface CustomerPayments {
   }[];
 }
 
-export interface FactoryPlanView {
+export interface SupplierPlanView {
   factory: { id: string; name: string };
   currency: string;
-  /** This factory's own ready date (its "on the ready date" parts fall due then). */
+  /** This supplier's own ready date (its "on the ready date" parts fall due then). */
   readyOn?: string | null;
   owed: string;
   /** Saved for this order (false: the company's default until saved). */
   saved: boolean;
   /** The plan does not add up to what we owe (prices changed since). */
   differs: string | null;
-  /** Paid, with the expenses the factory bears (taken off what we owe it). */
+  /** Paid, with the expenses the supplier bears (taken off what we owe it). */
   paid: string;
   takenOff?: string;
   toPay: string;
@@ -603,19 +603,19 @@ export interface FactoryPlanView {
     label: string;
     percent: number | null;
     amount: string;
-    dueRule: FactoryDueRule;
+    dueRule: SupplierDueRule;
     dueOn: string | null;
     /** on_ship_plus_days: how many days after the goods leave. */
     dueDays: number | null;
     due: string | null;
     paid: string;
     open: string;
-    status: FactoryPlanStatus;
+    status: SupplierPlanStatus;
     inDays: number | null;
     /** The payments that paid this part (a payment can pay more than one part), oldest first. */
     payments: { id: string; amount: string }[];
   }[];
-  next: { label: string; due: string | null; open: string; status: FactoryPlanStatus } | null;
+  next: { label: string; due: string | null; open: string; status: SupplierPlanStatus } | null;
 }
 
 /** The customer's credit (GET /customers/:id/credit, and in the customer's payments). */
@@ -731,9 +731,9 @@ export interface ToPayList {
     paid: string;
     open: string;
     dueOn: string | null;
-    dueRule: FactoryDueRule;
+    dueRule: SupplierDueRule;
     late: number;
-    status: FactoryPlanStatus;
+    status: SupplierPlanStatus;
     /** The order's route and what the customer has paid on it (in the order's currency). */
     customerMoney: { route: PaymentRoute | null; currency: string; total: string; received: string; state: string; words: string; warn: boolean };
   }[];

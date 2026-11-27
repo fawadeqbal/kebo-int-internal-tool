@@ -38,7 +38,7 @@ export default async function AppLayout({ children, window: win }: { children: R
     api.get<{ unread: number }>("/notifications", { take: 1 }),
     getSettings(),
     companyP,
-    // Our money accounts, for every form that records money (payments, factory payments, expenses): the list to choose from only.
+    // Our money accounts, for every form that records money (payments, supplier payments, expenses): the list to choose from only.
     has("payments.record") || has("expenses.manage") || has("money.submit") ? api.get<AccountOption[]>("/money/accounts", { choose: "true" }).catch(() => []) : [],
     companyP.then((c) => {
       const approves = approvesIn(c);

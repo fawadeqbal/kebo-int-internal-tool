@@ -12,7 +12,7 @@ import { ITEM_COLUMNS } from "@/components/lines/item-columns";
 
 export { ITEM_COLUMNS };
 
-/** One of the customer's items while it is typed (a saved one keeps its id, so factory prices stay linked). */
+/** One of the customer's items while it is typed (a saved one keeps its id, so supplier prices stay linked). */
 export interface ItemState {
   id: string | null;
   key: string;
@@ -22,7 +22,7 @@ export interface ItemState {
   quantity: string;
   unit: string;
   targetPrice: string;
-  /** A factory has priced it: changing it asks why. */
+  /** A supplier has priced it: changing it asks why. */
   priced: boolean;
 }
 

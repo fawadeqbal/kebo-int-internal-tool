@@ -98,8 +98,8 @@ describe("one figure: Home, Reports and Leaks read the same tables as Insights",
     for (const o of l.orders) {
       const f = rows.rows.find((x) => x.orderId === o.id)!;
       expect([o.revenue, o.planned, o.orderCosts]).toEqual([f.sales, f.profitQuote, f.costsOverPlan]);
-      // Actual: profit now expected, less what the deal cost before the order and factories paid beyond what we owe.
-      expect(cents(o.actual) + cents(o.beforeSale) + cents(o.factoryExtra)).toBe(cents(f.profitExpected));
+      // Actual: profit now expected, less what the deal cost before the order and suppliers paid beyond what we owe.
+      expect(cents(o.actual) + cents(o.beforeSale) + cents(o.supplierExtra)).toBe(cents(f.profitExpected));
     }
     for (const t of l.trend) {
       expect(t.sales).toBe(months.rows.find((x) => x.period === t.month)?.sales ?? "0.00");

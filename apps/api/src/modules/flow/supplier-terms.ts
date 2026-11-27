@@ -3,8 +3,8 @@ import { isLeadFrom, isWarrantyFrom, leadWords, warrantyLine, type LeadFrom, typ
 import { addDays, type ISODate } from "@kebo/utils";
 
 /*
- * Agreed with the factory (design "RFQ Desk — terms that travel", step 3b): what each purchase order keeps as
- * agreed with its factory — copied from the offer its lines were bought on when it is sent, changed there later
+ * Agreed with the supplier (design "RFQ Desk — terms that travel", step 3b): what each purchase order keeps as
+ * agreed with its supplier — copied from the offer its lines were bought on when it is sent, changed there later
  * with a reason — and, until then, the offer's own terms. The same four groups as the customer's: Delivery (basis,
  * lead time and the ready date worked out from it), Payment (the plan's parts and the note), Warranty, Conditions.
  */
@@ -25,9 +25,9 @@ export const offerTermsSelect = {
   paymentTerms: true,
   paymentParts: true,
   moq: true,
-} satisfies Prisma.FactoryQuoteSelect;
+} satisfies Prisma.SupplierQuoteSelect;
 
-export type OfferTermsRow = Prisma.FactoryQuoteGetPayload<{ select: typeof offerTermsSelect }>;
+export type OfferTermsRow = Prisma.SupplierQuoteGetPayload<{ select: typeof offerTermsSelect }>;
 
 /** The purchase order's own copy. */
 export const poTermsSelect = {
@@ -46,7 +46,7 @@ export const poTermsSelect = {
 
 export type PoTermsRow = Prisma.PurchaseOrderGetPayload<{ select: typeof poTermsSelect }>;
 
-export interface FactoryTerms {
+export interface SupplierTerms {
   basis: OfferTermsRow["basis"];
   basisPlace: string | null;
   leadDays: number | null;
@@ -59,14 +59,14 @@ export interface FactoryTerms {
   /** Printed after the payment's parts. An older offer's payment words are its terms, not a note: none. */
   paymentNote: string | null;
   moq: string | null;
-  /** Our notes to the factory, printed last (the offer has none of ours). */
+  /** Our notes to the supplier, printed last (the offer has none of ours). */
   notes: string | null;
   /** The warranty as the paper prints it. */
   warrantyLine: string | null;
 }
 
 /** What the offer said, in the agreed shape. */
-export function offeredTerms(q: OfferTermsRow | null): FactoryTerms {
+export function offeredTerms(q: OfferTermsRow | null): SupplierTerms {
   const t = {
     basis: q?.basis ?? null,
     basisPlace: q?.basisPlace ?? null,
@@ -83,10 +83,10 @@ export function offeredTerms(q: OfferTermsRow | null): FactoryTerms {
   return { ...t, warrantyLine: warrantyLine(t) };
 }
 
-/** Agreed with the factory: the purchase order's own copy, else (not sent yet, or sent before it was kept) its offer's. */
-export function factoryAgreed(po: PoTermsRow, q: OfferTermsRow | null) {
+/** Agreed with the supplier: the purchase order's own copy, else (not sent yet, or sent before it was kept) its offer's. */
+export function supplierAgreed(po: PoTermsRow, q: OfferTermsRow | null) {
   const offered = offeredTerms(q);
-  const own: FactoryTerms = po.termsCopied
+  const own: SupplierTerms = po.termsCopied
     ? (() => {
         const t = {
           basis: po.basis,
@@ -135,7 +135,7 @@ export function copyOfOffer(
  * waiting for the advance (on: null); after the drawings (not worked out). Null: no lead time in days.
  */
 export function readyFromLead(
-  t: Pick<FactoryTerms, "leadDays" | "leadFrom">,
+  t: Pick<SupplierTerms, "leadDays" | "leadFrom">,
   orderedOn: ISODate | null,
   advancePaidOn: ISODate | null,
 ): { by: "advance"; on: ISODate | null; readyOn: ISODate | null } | { by: "order"; on: ISODate | null; readyOn: ISODate | null } | { by: "drawings" } | null {

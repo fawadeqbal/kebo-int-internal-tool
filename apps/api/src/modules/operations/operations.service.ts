@@ -9,7 +9,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { LimitsService } from "../../common/company/limits.service";
 import { SettingsService } from "../settings/settings.service";
 import { Clock } from "../../common/time/clock.service";
-import { factoryBorneExpenses, factoryPositionOf, fxOf, supplierPaidRelation } from "../billing/api";
+import { supplierBorneExpenses, supplierPositionOf, fxOf, supplierPaidRelation } from "../billing/api";
 
 /** Shipments still on the way: not yet arrived (or cleared). */
 const UNDER_WAY: ShipmentStatus[] = ["planned", "booked", "loaded", "departed"];
@@ -79,21 +79,21 @@ export class OperationsService {
 
   /**
    * One purchase order per supplier on each order not cancelled (people who see costs): ordered on and their
-   * order number (the factory step), that supplier's ready date, and what we owe and paid it (Billing's rule).
+   * order number (the supplier step), that supplier's ready date, and what we owe and paid it (Billing's rule).
    * `open`: only those with something still to pay or not ready yet.
    */
   async purchaseOrders(user: SessionUser, open: boolean, withCancelled = false, orderId?: string) {
     if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier costs.");
     const fx = fxOf(await this.settings.get(), await this.limits.allows("expenses"));
     const orders = await this.prisma.db.order.findMany({
-      where: { ...orderAccess(user), ...(orderId ? { id: orderId } : {}), ...(withCancelled ? {} : { status: { not: "cancelled" } }), lines: { some: { factoryId: { not: null } } } },
+      where: { ...orderAccess(user), ...(orderId ? { id: orderId } : {}), ...(withCancelled ? {} : { status: { not: "cancelled" } }), lines: { some: { supplierId: { not: null } } } },
       select: {
         id: true,
         refNo: true,
         stage: true,
         status: true,
-        factoryOrderedOn: true,
-        factoryOrderNo: true,
+        supplierOrderedOn: true,
+        supplierOrderNo: true,
         customer: { select: { id: true, name: true } },
         purchaseOrders: { select: { id: true, number: true, supplierId: true, sentOn: true, sentEarlyReason: true, supplierRef: true } },
         // What the order's one status word reads: "shipped" here is that word, not the stored stage.
@@ -102,17 +102,17 @@ export class OperationsService {
         lines: {
           select: {
             receivedOn: true,
-            factoryId: true,
-            factoryUnitPrice: true,
-            factoryCurrency: true,
-            factoryTaxRate: true,
-            factoryTaxIncluded: true,
+            supplierId: true,
+            supplierUnitPrice: true,
+            supplierCurrency: true,
+            supplierTaxRate: true,
+            supplierTaxIncluded: true,
             quantity: true,
             factory: { select: { id: true, name: true } },
           },
         },
         supplierPaid: supplierPaidRelation,
-        expenses: factoryBorneExpenses,
+        expenses: supplierBorneExpenses,
         ...readySelect,
       },
       orderBy: { orderedOn: "desc" },
@@ -122,17 +122,17 @@ export class OperationsService {
     const features = await this.limits.features();
     const rows = orders.flatMap((o) => {
       const names = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.name] as const] : [])));
-      const ready = new Map(readyByOf(o).map((r) => [r.factoryId, r.readyOn] as const));
-      // Where the order stands, by its one worked-out word: still with the factory, or shipped and after.
+      const ready = new Map(readyByOf(o).map((r) => [r.supplierId, r.readyOn] as const));
+      // Where the order stands, by its one worked-out word: still with the supplier, or shipped and after.
       const at = orderWordColumn(orderWord(wordFactsOf(o), features));
       const beforeShipping = at === "confirmed" || at === "in_production";
-      return factoryPositionOf(o, fx)
+      return supplierPositionOf(o, fx)
         .filter((f) => f.lines > 0)
         .map((f) => {
-          const readyOn: ISODate | null = ready.get(f.factoryId) ?? null;
-          const po = o.purchaseOrders.find((p) => p.supplierId === f.factoryId) ?? null;
-          const sentOn = po?.sentOn ? fromDbDate(po.sentOn) : o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null;
-          const mine = o.lines.filter((l) => l.factoryId === f.factoryId);
+          const readyOn: ISODate | null = ready.get(f.supplierId) ?? null;
+          const po = o.purchaseOrders.find((p) => p.supplierId === f.supplierId) ?? null;
+          const sentOn = po?.sentOn ? fromDbDate(po.sentOn) : o.supplierOrderedOn ? fromDbDate(o.supplierOrderedOn) : null;
+          const mine = o.lines.filter((l) => l.supplierId === f.supplierId);
           const status =
             o.status === "cancelled"
               ? "cancelled"
@@ -154,9 +154,9 @@ export class OperationsService {
             sentEarlyReason: po?.sentEarlyReason ?? null,
             order: { id: o.id, refNo: o.refNo, stage: o.stage, closed: o.status === "closed", beforeShipping },
             customer: o.customer,
-            supplier: { id: f.factoryId, name: names.get(f.factoryId) ?? "Supplier" },
+            supplier: { id: f.supplierId, name: names.get(f.supplierId) ?? "Supplier" },
             orderedOn: sentOn,
-            supplierRef: po?.supplierRef ?? o.factoryOrderNo,
+            supplierRef: po?.supplierRef ?? o.supplierOrderNo,
             readyOn,
             /** Ready date passed and the order not shipped yet. */
             late: !!readyOn && readyOn < today && beforeShipping,
@@ -188,7 +188,7 @@ export class OperationsService {
     const counts = Object.fromEntries(PURCHASE_ORDER_TABS.map((t) => [t, searched.filter((r) => inTab(r, t)).length])) as Record<PurchaseOrderTab, number>;
     const listed = searched.filter((r) => inTab(r, q.status));
     const late = all.filter((r) => r.status === "late");
-    // What we still owe factories, in each currency, largest first.
+    // What we still owe suppliers, in each currency, largest first.
     const owe = new Map<string, number>();
     for (const r of all) if (r.status !== "cancelled" && Number(r.toPay) > 0) owe.set(r.currency, (owe.get(r.currency) ?? 0) + Number(r.toPay));
     return {

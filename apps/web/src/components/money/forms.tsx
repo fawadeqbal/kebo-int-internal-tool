@@ -16,7 +16,7 @@ import { convertText, rateOf, type Fx } from "@/lib/fx";
 import type { ActionState } from "@/lib/actions";
 import { money } from "@/lib/format";
 import type { Person } from "@/lib/types";
-import type { FactoryOwed, FactoryPaymentView } from "@/lib/types-money";
+import type { SupplierOwed, SupplierPaymentView } from "@/lib/types-money";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -268,15 +268,15 @@ function useMoneyFields(fx: Fx, per: string, initial: { currency: string; amount
 
 const rateText = (r: number) => r.toFixed(4).replace(/\.?0+$/, "");
 
-/* ---------------------------------------------------------------- factory payments */
+/* ---------------------------------------------------------------- supplier payments */
 
 /**
- * Money sent to a factory for this order (new, or a change that asks why). The
+ * Money sent to a supplier for this order (new, or a change that asks why). The
  * rate turns it into the order's currency for profit; empty uses Settings.
  */
-export function FactoryPaymentForm({
+export function SupplierPaymentForm({
   action,
-  factories,
+  factories: suppliers,
   people,
   orderCurrency,
   fx,
@@ -290,30 +290,30 @@ export function FactoryPaymentForm({
   /** In a window that already has the title: no frame, no heading. */
   bare?: boolean;
   action: Action;
-  factories: FactoryOwed[];
+  factories: SupplierOwed[];
   people: Person[];
   orderCurrency: string;
   /** Settings rates: the amount is converted when the currency changes. */
   fx: Fx;
   today: string;
-  payment?: FactoryPaymentView;
+  payment?: SupplierPaymentView;
   onClose: () => void;
   /** The payment was recorded but its file was not. */
   onFileError?: (message: string) => void;
-  /** A part of the factory's payment plan to pay (its amount, what for, and their invoice for it). */
-  prefill?: { factoryId: string; amount: string; kind: PaymentKind; reference?: string | null };
+  /** A part of the supplier's payment plan to pay (its amount, what for, and their invoice for it). */
+  prefill?: { supplierId: string; amount: string; kind: PaymentKind; reference?: string | null };
 }) {
-  const first = (prefill && factories.find((f) => f.factory.id === prefill.factoryId)) ?? factories.find((f) => Number(f.toPay) > 0) ?? factories[0];
-  const [factoryKey, setFactoryKey] = useState(
+  const first = (prefill && suppliers.find((f) => f.factory.id === prefill.supplierId)) ?? suppliers.find((f) => Number(f.toPay) > 0) ?? suppliers[0];
+  const [supplierKey, setSupplierKey] = useState(
     payment ? `${payment.factory.id}:${payment.currency}` : first ? `${first.factory.id}:${first.currency}` : "",
   );
-  const chosen = factories.find((f) => `${f.factory.id}:${f.currency}` === factoryKey);
+  const chosen = suppliers.find((f) => `${f.factory.id}:${f.currency}` === supplierKey);
   const m = useMoneyFields(fx, orderCurrency, {
     currency: payment?.currency ?? chosen?.currency ?? orderCurrency,
     amount: payment?.amount ?? prefill?.amount ?? "",
     rate: payment ? String(payment.rate) : "",
   });
-  // We owe each factory in its offer's currency, and only a payment in that currency counts against it.
+  // We owe each supplier in its offer's currency, and only a payment in that currency counts against it.
   const owedIn = chosen && Number(chosen.owed) > 0 ? chosen.currency : null;
   const kept = !!payment && payment.factory.id === chosen?.factory.id && payment.currency === m.currency;
   const mismatch = !!owedIn && m.currency !== owedIn && !kept;
@@ -335,28 +335,28 @@ export function FactoryPaymentForm({
       {(s) => (
         <>
           {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a supplier"}</p>}
-          <input type="hidden" name="factoryId" value={chosen?.factory.id ?? payment?.factory.id ?? ""} />
+          <input type="hidden" name="supplierId" value={chosen?.factory.id ?? payment?.factory.id ?? ""} />
           <div className={RULES.form.fields}>
             <Field
               label="Supplier"
               htmlFor="fp-factory"
-              error={s.errors?.factoryId}
+              error={s.errors?.supplierId}
               hint={owedIn && chosen ? (Number(chosen.toPay) > 0 ? `Owed in ${owedIn}: ${money(chosen.toPay, owedIn)} left to pay` : `Owed in ${owedIn}: paid in full`) : undefined}
             >
               <Select
                 id="fp-factory"
-                value={factoryKey}
+                value={supplierKey}
                 onChange={(e) => {
-                  setFactoryKey(e.target.value);
-                  // The currency follows the factory: what we owe them is in their offer's currency.
-                  const f = factories.find((x) => `${x.factory.id}:${x.currency}` === e.target.value);
+                  setSupplierKey(e.target.value);
+                  // The currency follows the supplier: what we owe them is in their offer's currency.
+                  const f = suppliers.find((x) => `${x.factory.id}:${x.currency}` === e.target.value);
                   if (f && f.currency !== m.currency) m.setCurrency(f.currency, false);
                 }}
               >
-                {factories.map((f) => (
+                {suppliers.map((f) => (
                   <option key={`${f.factory.id}:${f.currency}`} value={`${f.factory.id}:${f.currency}`}>
                     {f.factory.name}
-                    {factories.filter((x) => x.factory.id === f.factory.id).length > 1 ? ` (${f.currency})` : ""}
+                    {suppliers.filter((x) => x.factory.id === f.factory.id).length > 1 ? ` (${f.currency})` : ""}
                     {Number(f.toPay) > 0 ? "" : " · paid"}
                   </option>
                 ))}
@@ -482,12 +482,12 @@ export function FactoryPaymentForm({
 }
 
 /** "Record a payment to a factory" button that opens the form. */
-export function NewFactoryPayment({
+export function NewSupplierPayment({
   label = "Record a payment to a supplier",
   quiet,
   startOpen = false,
   ...props
-}: Omit<Parameters<typeof FactoryPaymentForm>[0], "onClose" | "payment" | "onFileError"> & { label?: string; quiet?: boolean; startOpen?: boolean }) {
+}: Omit<Parameters<typeof SupplierPaymentForm>[0], "onClose" | "payment" | "onFileError"> & { label?: string; quiet?: boolean; startOpen?: boolean }) {
   const [open, setOpen] = useState(startOpen);
   const [fileError, setFileError] = useState<string | null>(null);
   if (!open)
@@ -508,6 +508,6 @@ export function NewFactoryPayment({
         </Button>
       </div>
     );
-  return <FactoryPaymentForm {...props} onClose={() => setOpen(false)} onFileError={setFileError} />;
+  return <SupplierPaymentForm {...props} onClose={() => setOpen(false)} onFileError={setFileError} />;
 }
 

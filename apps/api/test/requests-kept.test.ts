@@ -20,7 +20,7 @@ describe("payment requests and receipts kept as sent", () => {
   let manager: string;
   let me: string;
   let customerId: string;
-  let factoryId: string;
+  let supplierId: string;
   let today = "";
   const tag = Date.now().toString(36);
   const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -109,7 +109,7 @@ describe("payment requests and receipts kept as sent", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "DPP-260", quantity: 1, unitPrice: 200000, taxRate: 0 }],
@@ -148,7 +148,7 @@ describe("payment requests and receipts kept as sent", () => {
         })
         .expect(201)
     ).body.id;
-    factoryId = (
+    supplierId = (
       await api(app, sana)
         .post("/factories", { name: `Kept Works ${tag}` })
         .expect(201)

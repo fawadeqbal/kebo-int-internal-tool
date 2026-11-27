@@ -12,7 +12,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { NotesService } from "./notes.service";
 
 /**
- * Notes and call logs on orders, customers and factories (inquiries: POST /inquiries/:id/notes as before,
+ * Notes and call logs on orders, customers and suppliers (inquiries: POST /inquiries/:id/notes as before,
  * and GET here). A note: { id, target: { type, id, label }, kind, body, at, contact: { id, name } | null,
  * author: { id, name }, createdAt, editedAt, can: { edit, delete } }.
  */
@@ -54,17 +54,17 @@ export class NotesController {
     return this.notes.add(user, "customer", id, body);
   }
 
-  /** sourcing.manage (who sees factories) */
+  /** sourcing.manage (who sees suppliers) */
   @SignedIn("anyone signed in to the company")
   @Get("factories/:id/notes")
   factory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.notes.list(user, "factory", id);
   }
 
-  /** As on orders, without contactId (factories have no contact list) — sourcing.manage */
+  /** As on orders, without contactId (suppliers have no contact list) — sourcing.manage */
   @SignedIn("checked inside: the record and who they are")
   @Post("factories/:id/notes")
-  addToFactory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(recordNoteInput)) body: RecordNoteInput) {
+  addToSupplier(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(recordNoteInput)) body: RecordNoteInput) {
     return this.notes.add(user, "factory", id, body);
   }
 

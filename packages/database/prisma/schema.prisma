@@ -106,7 +106,7 @@ enum LineType {
   charge
 }
 
-/// The costs between a factory's price basis and ours (to the port, sea freight, insurance, destination delivery, import duties).
+/// The costs between a supplier's price basis and ours (to the port, sea freight, insurance, destination delivery, import duties).
 enum BasisStep {
   to_port
   freight
@@ -193,12 +193,14 @@ enum BankContractStatus {
   closed
 }
 
-/// Asking a factory for a price for an inquiry, and what came of it.
-enum FactoryRequestStatus {
+/// Asking a supplier for a price for an inquiry, and what came of it.
+enum SupplierRequestStatus {
   sent
   quoted
   declined
   no_reply
+
+  @@map("FactoryRequestStatus")
 }
 
 enum ShipMode {
@@ -330,42 +332,42 @@ model User {
   assignedDeals     Inquiry[]          @relation("InquiryAssignee")
   createdDeals      Inquiry[]          @relation("InquiryCreator")
   orderMoves        OrderStageChange[]
-  factories         Party[]            @relation("FactoryOwner")
+  factories         Party[]            @relation("SupplierOwner")
   relMovementPaidBy MoneyMovement[]    @relation("MovementPaidBy")
   expensesPaid      Expense[]          @relation("ExpensePaidBy")
 
   reminderStates ReminderState[]
 
   /// What they made or did (kept when they are switched off; people are not deleted).
-  relPartyCreator          Party[]              @relation("PartyCreator")
-  relInquiryStageChanger   InquiryStageChange[] @relation("InquiryStageChanger")
-  relAssignmentAssignee    InquiryAssignment[]  @relation("AssignmentAssignee")
-  relAssignmentAssigner    InquiryAssignment[]  @relation("AssignmentAssigner")
-  relNoteAuthor            Note[]               @relation("NoteAuthor")
-  relAttachmentUploader    Attachment[]         @relation("AttachmentUploader")
-  relFactoryQuoteCreator   FactoryQuote[]       @relation("FactoryQuoteCreator")
-  relRevisionCreator       QuotationRevision[]  @relation("RevisionCreator")
-  relOrderCreator          Order[]              @relation("OrderCreator")
-  relExpenseRecorder       Expense[]            @relation("ExpenseRecorder")
-  relAllocationRecorder    Allocation[]         @relation("AllocationRecorder")
-  relTargetUpdater         SalesTarget[]        @relation("TargetUpdater")
-  relAuditUser             AuditLog[]           @relation("AuditUser")
-  relFactoryRequestCreator FactoryRequest[]     @relation("FactoryRequestCreator")
-  relOrderSatEngineer      OrderDelivery[]      @relation("OrderSatEngineer")
-  relOrderFatAttendee      OrderFactory[]       @relation("OrderFatAttendee")
-  relPersonTarget          PersonTarget[]       @relation("PersonTargetOwner")
-  relPersonTargetUpdater   PersonTarget[]       @relation("PersonTargetUpdater")
-  relMovementRecorder      MoneyMovement[]      @relation("MovementRecorder")
-  relPapersMade            OrderPaper[]         @relation("PaperMadeBy")
-  relOrderFacts            OrderFact[]          @relation("OrderFactHandledBy")
-  relInquiryFacts          InquiryFact[]        @relation("InquiryFactHandledBy")
-  relSubmissionsSent       MoneySubmission[]    @relation("SubmissionSubmittedBy")
-  relSubmissionsDecided    MoneySubmission[]    @relation("SubmissionDecidedBy")
-  relFollowUpsAssigned     FollowUp[]           @relation("FollowUpAssignee")
-  relFollowUpsCreated      FollowUp[]           @relation("FollowUpCreatedBy")
-  relFollowUpsDone         FollowUp[]           @relation("FollowUpDoneBy")
-  relLedgerStaff           LedgerEntry[]        @relation("LedgerStaff")
-  relLedgerPostedBy        LedgerEntry[]        @relation("LedgerPostedBy")
+  relPartyCreator           Party[]              @relation("PartyCreator")
+  relInquiryStageChanger    InquiryStageChange[] @relation("InquiryStageChanger")
+  relAssignmentAssignee     InquiryAssignment[]  @relation("AssignmentAssignee")
+  relAssignmentAssigner     InquiryAssignment[]  @relation("AssignmentAssigner")
+  relNoteAuthor             Note[]               @relation("NoteAuthor")
+  relAttachmentUploader     Attachment[]         @relation("AttachmentUploader")
+  relSupplierQuoteCreator   SupplierQuote[]      @relation("SupplierQuoteCreator")
+  relRevisionCreator        QuotationRevision[]  @relation("RevisionCreator")
+  relOrderCreator           Order[]              @relation("OrderCreator")
+  relExpenseRecorder        Expense[]            @relation("ExpenseRecorder")
+  relAllocationRecorder     Allocation[]         @relation("AllocationRecorder")
+  relTargetUpdater          SalesTarget[]        @relation("TargetUpdater")
+  relAuditUser              AuditLog[]           @relation("AuditUser")
+  relSupplierRequestCreator SupplierRequest[]    @relation("SupplierRequestCreator")
+  relOrderSatEngineer       OrderDelivery[]      @relation("OrderSatEngineer")
+  relOrderFatAttendee       OrderSupplier[]      @relation("OrderFatAttendee")
+  relPersonTarget           PersonTarget[]       @relation("PersonTargetOwner")
+  relPersonTargetUpdater    PersonTarget[]       @relation("PersonTargetUpdater")
+  relMovementRecorder       MoneyMovement[]      @relation("MovementRecorder")
+  relPapersMade             OrderPaper[]         @relation("PaperMadeBy")
+  relOrderFacts             OrderFact[]          @relation("OrderFactHandledBy")
+  relInquiryFacts           InquiryFact[]        @relation("InquiryFactHandledBy")
+  relSubmissionsSent        MoneySubmission[]    @relation("SubmissionSubmittedBy")
+  relSubmissionsDecided     MoneySubmission[]    @relation("SubmissionDecidedBy")
+  relFollowUpsAssigned      FollowUp[]           @relation("FollowUpAssignee")
+  relFollowUpsCreated       FollowUp[]           @relation("FollowUpCreatedBy")
+  relFollowUpsDone          FollowUp[]           @relation("FollowUpDoneBy")
+  relLedgerStaff            LedgerEntry[]        @relation("LedgerStaff")
+  relLedgerPostedBy         LedgerEntry[]        @relation("LedgerPostedBy")
 
   purchaseOrdersSent PurchaseOrder[] @relation("PurchaseOrderSentBy")
   requestKeys        RequestKey[]
@@ -563,7 +565,7 @@ model Counter {
 }
 
 // ============================================================================
-// Parties: customers (with contacts) and factories
+// Parties: customers (with contacts) and suppliers
 // ============================================================================
 
 /// A company or person we deal with: a customer, a supplier, or both (see PartyRole). One row per party;
@@ -595,7 +597,7 @@ model Party {
   notes           String?
   /// The person in our team who looks after this party.
   ownerId         String?   @map("owner_id") @db.Uuid
-  owner           User?     @relation("FactoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owner           User?     @relation("SupplierOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdById     String?   @map("created_by") @db.Uuid
   createdBy       User?     @relation("PartyCreator", fields: [createdById], references: [id], onDelete: SetNull)
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
@@ -618,16 +620,16 @@ model Party {
   ledger       LedgerEntry[]   @relation("LedgerEntryCustomer")
 
   // As a supplier
-  quotes             FactoryQuote[]     @relation("FactoryQuoteFactory")
-  factoryExpenses    Expense[]          @relation("ExpenseFactory")
-  orderLines         OrderLine[]        @relation("OrderLineFactory")
-  requests           FactoryRequest[]   @relation("FactoryRequestFactory")
-  payables           Invoice[]          @relation("SupplierInvoices")
-  orderParts         OrderFactory[]     @relation("OrderFactoryFactory")
-  factoryOrderFacts  FactoryOrderFact[] @relation("FactoryOrderFactFactory")
-  factoryRecordNotes Note[]             @relation("NoteFactory")
-  factoryFollowUps   FollowUp[]         @relation("FollowUpFactory")
-  factoryLedger      LedgerEntry[]      @relation("LedgerEntryFactory")
+  quotes              SupplierQuote[]     @relation("SupplierQuoteSupplier")
+  supplierExpenses    Expense[]           @relation("ExpenseSupplier")
+  orderLines          OrderLine[]         @relation("OrderLineSupplier")
+  requests            SupplierRequest[]   @relation("SupplierRequestSupplier")
+  payables            Invoice[]           @relation("SupplierInvoices")
+  orderParts          OrderSupplier[]     @relation("OrderSupplierSupplier")
+  supplierOrderFacts  SupplierOrderFact[] @relation("SupplierOrderFactSupplier")
+  supplierRecordNotes Note[]              @relation("NoteSupplier")
+  supplierFollowUps   FollowUp[]          @relation("FollowUpSupplier")
+  supplierLedger      LedgerEntry[]       @relation("LedgerEntrySupplier")
 
   purchaseOrders PurchaseOrder[] @relation("PurchaseOrderSupplier")
 
@@ -723,22 +725,22 @@ model Inquiry {
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
-  items         RequestedItem[]
-  stageChanges  InquiryStageChange[]
-  assignments   InquiryAssignment[]
-  notes         Note[]
-  followUps     FollowUp[]
-  attachments   Attachment[]
-  factoryQuotes FactoryQuote[]
-  /// Any number of quotations: A, B, C… (each from one factory offer, or own prices), each with its revisions.
-  quotations    Quotation[]
-  fact          InquiryFact?
-  orderFacts    OrderFact[]
+  items          RequestedItem[]
+  stageChanges   InquiryStageChange[]
+  assignments    InquiryAssignment[]
+  notes          Note[]
+  followUps      FollowUp[]
+  attachments    Attachment[]
+  supplierQuotes SupplierQuote[]
+  /// Any number of quotations: A, B, C… (each from one supplier offer, or own prices), each with its revisions.
+  quotations     Quotation[]
+  fact           InquiryFact?
+  orderFacts     OrderFact[]
   /// At most one order that is not cancelled (partial unique index in the integrity migration).
-  orders        Order[]
-  expenses      Expense[]
+  orders         Order[]
+  expenses       Expense[]
 
-  factoryRequests FactoryRequest[]
+  supplierRequests SupplierRequest[]
 
   @@unique([companyId, refNo])
   @@index([stage])
@@ -757,7 +759,7 @@ model RequestedItem {
   company     Company         @relation(fields: [companyId], references: [id])
   inquiryId   String          @map("inquiry_id") @db.Uuid
   inquiry     Inquiry         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  /// A part of another item, split at factory pricing (numbered 3.1, 3.2 under item 3). One level only.
+  /// A part of another item, split at supplier pricing (numbered 3.1, 3.2 under item 3). One level only.
   parentId    String?         @map("parent_id") @db.Uuid
   parent      RequestedItem?  @relation("ItemParts", fields: [parentId], references: [id], onDelete: Cascade)
   parts       RequestedItem[] @relation("ItemParts")
@@ -768,8 +770,8 @@ model RequestedItem {
   targetPrice Decimal?        @map("target_price") @db.Decimal(14, 2)
   sortOrder   Int             @default(0) @map("sort_order")
 
-  factoryLines FactoryQuoteLine[] @relation("AnswersItem")
-  quoteLines   QuoteLine[]
+  supplierLines SupplierQuoteLine[] @relation("AnswersItem")
+  quoteLines    QuoteLine[]
 
   @@index([inquiryId])
   @@index([parentId])
@@ -823,51 +825,51 @@ model InquiryAssignment {
 
 /// Files on a deal. Optionally tied to an order step (inspection report, payment slip, B/L copy).
 model Attachment {
-  id             String           @id @default(uuid()) @db.Uuid
+  id              String           @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company        Company          @relation(fields: [companyId], references: [id])
+  companyId       String           @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company          @relation(fields: [companyId], references: [id])
   /// A file on a deal (and its order): the inquiry. A proof (bank slip, receipt photo) is on its record instead.
-  inquiryId      String?          @map("inquiry_id") @db.Uuid
-  inquiry        Inquiry?         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  inquiryId       String?          @map("inquiry_id") @db.Uuid
+  inquiry         Inquiry?         @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
   /// The proof of a payment entry (bank slip, transfer screenshot): one live file per record; a new one replaces it.
-  movementId     String?          @map("movement_id") @db.Uuid
-  movement       MoneyMovement?   @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  movementId      String?          @map("movement_id") @db.Uuid
+  movement        MoneyMovement?   @relation(fields: [movementId], references: [id], onDelete: Cascade)
   /// The receipt or ticket of an expense.
-  expenseId      String?          @map("expense_id") @db.Uuid
-  expense        Expense?         @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  expenseId       String?          @map("expense_id") @db.Uuid
+  expense         Expense?         @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   /// The photo sent with money for approval (it moves to what is recorded when approved).
-  submissionId   String?          @map("submission_id") @db.Uuid
-  submission     MoneySubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  /// The factory offer this file is evidence for (its quotation, catalogue, WeChat screenshots). Internal: only people who see factory prices.
-  factoryQuoteId String?          @map("factory_quote_id") @db.Uuid
-  factoryQuote   FactoryQuote?    @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
-  fileName       String           @map("file_name") @db.VarChar(255)
-  mimeType       String           @map("mime_type") @db.VarChar(150)
-  size           Int
-  storageKey     String           @map("storage_key")
+  submissionId    String?          @map("submission_id") @db.Uuid
+  submission      MoneySubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  /// The supplier offer this file is evidence for (its quotation, catalogue, WeChat screenshots). Internal: only people who see supplier prices.
+  supplierQuoteId String?          @map("factory_quote_id") @db.Uuid
+  supplierQuote   SupplierQuote?   @relation(fields: [supplierQuoteId], references: [id], onDelete: SetNull)
+  fileName        String           @map("file_name") @db.VarChar(255)
+  mimeType        String           @map("mime_type") @db.VarChar(150)
+  size            Int
+  storageKey      String           @map("storage_key")
   /// urs | drawing | photo | specification | factory_quote | other
-  kind           String           @default("other") @db.VarChar(20)
-  note           String?          @db.VarChar(300)
-  uploadedById   String           @map("uploaded_by") @db.Uuid
-  uploadedBy     User             @relation("AttachmentUploader", fields: [uploadedById], references: [id])
-  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  kind            String           @default("other") @db.VarChar(20)
+  note            String?          @db.VarChar(300)
+  uploadedById    String           @map("uploaded_by") @db.Uuid
+  uploadedBy      User             @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  deletedAt       DateTime?        @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
   /// Added on an order (Documents v3: uploaded or dropped on a step): the order and the step it belongs to.
-  orderId        String?          @map("order_id") @db.Uuid
-  order          Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  /// payment | factory | production | shipping | documents | delivery
-  step           String?          @db.VarChar(20)
+  orderId         String?          @map("order_id") @db.Uuid
+  order           Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  /// payment | supplier | production | shipping | documents | delivery
+  step            String?          @db.VarChar(20)
   /// The section of the order's page the file belongs to (see @kebo/shared ORDER_SECTIONS): booking, vessel, fat…
-  section        String?          @db.VarChar(30)
+  section         String?          @db.VarChar(30)
   /// A photo of one package and its marks (section "packing"): the package's number as marked ("3", "7-10").
-  packageNo      String?          @map("package_no") @db.VarChar(20)
+  packageNo       String?          @map("package_no") @db.VarChar(20)
   /// "Replace with a newer one": the newer file. The old one is kept (as an earlier version), out of the lists.
-  replacedById   String?          @map("replaced_by") @db.Uuid
-  replacedBy     Attachment?      @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
-  earlier        Attachment[]     @relation("AttachmentVersions")
+  replacedById    String?          @map("replaced_by") @db.Uuid
+  replacedBy      Attachment?      @relation("AttachmentVersions", fields: [replacedById], references: [id], onDelete: SetNull)
+  earlier         Attachment[]     @relation("AttachmentVersions")
   /// 1 for the first file; each replacement counts up.
-  version        Int              @default(1)
+  version         Int              @default(1)
 
   orderDocuments OrderDocument[]
 
@@ -875,7 +877,7 @@ model Attachment {
   @@index([orderId])
   @@index([orderId, section])
   @@index([replacedById])
-  @@index([factoryQuoteId])
+  @@index([supplierQuoteId])
   @@index([movementId])
   @@index([expenseId])
   @@index([submissionId])
@@ -885,29 +887,29 @@ model Attachment {
 }
 
 // ============================================================================
-// Sourcing: factory prices for a deal (internal, never shown to customers)
+// Sourcing: supplier prices for a deal (internal, never shown to customers)
 // ============================================================================
 
-model FactoryQuote {
+model SupplierQuote {
   id             String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId      String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company        Company   @relation(fields: [companyId], references: [id])
   inquiryId      String    @map("inquiry_id") @db.Uuid
   inquiry        Inquiry   @relation(fields: [inquiryId], references: [id])
-  factoryId      String    @map("factory_id") @db.Uuid
-  factory        Party     @relation("FactoryQuoteFactory", fields: [factoryId], references: [id])
-  /// The factory's own quotation number.
+  supplierId     String    @map("factory_id") @db.Uuid
+  factory        Party     @relation("SupplierQuoteSupplier", fields: [supplierId], references: [id])
+  /// The supplier's own quotation number.
   reference      String?   @db.VarChar(80)
   receivedOn     DateTime  @map("received_on") @db.Date
   validUntil     DateTime? @map("valid_until") @db.Date
   currency       String    @default("CNY") @db.Char(3)
-  /// The factory's prices have the tax in them (true: the price is our cost, the tax inside is only
+  /// The supplier's prices have the tax in them (true: the price is our cost, the tax inside is only
   /// shown) or not (false: each line's tax % is added on top).
   taxIncluded    Boolean   @default(false) @map("tax_included")
   /// The offer's tax %, given to its lines (a line can still have its own).
   taxRate        Decimal   @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  /// The factory's price basis (EXW, FOB, CFR…): what its prices already pay for.
+  /// The supplier's price basis (EXW, FOB, CFR…): what its prices already pay for.
   basis          Incoterm?
   /// Where the basis applies: "Zhangjiagang" (EXW), "Qingdao" (FOB)…
   basisPlace     String?   @map("basis_place") @db.VarChar(60)
@@ -919,11 +921,11 @@ model FactoryQuote {
   leadFrom       String?   @map("lead_from")
   moq            String?   @db.VarChar(60)
   paymentTerms   String?   @map("payment_terms")
-  /// The advance the factory asks when we order, in % (empty: the company's default in Settings). Seeds the
-  /// factory's payment plan on the order and is printed on the purchase order; paymentTerms stays as a note.
+  /// The advance the supplier asks when we order, in % (empty: the company's default in Settings). Seeds the
+  /// supplier's payment plan on the order and is printed on the purchase order; paymentTerms stays as a note.
   /// With paymentParts: their "when we order" parts added up.
   advancePercent Decimal?  @map("advance_percent") @db.Decimal(5, 2)
-  /// The factory's payment as parts, like its plan on an order: [{ label, percent, rule, days }] with the rules
+  /// The supplier's payment as parts, like its plan on an order: [{ label, percent, rule, days }] with the rules
   /// on_order | on_ready | after_shipping (days). Empty (an older offer): advancePercent, the rest when ready.
   paymentParts   Json?     @map("payment_parts")
   /// The warranty's words: what it covers ("parts, not labour"); an older offer's whole sentence.
@@ -933,57 +935,57 @@ model FactoryQuote {
   warrantyFrom   String?   @map("warranty_from")
   notes          String?
   createdById    String    @map("created_by") @db.Uuid
-  createdBy      User      @relation("FactoryQuoteCreator", fields: [createdById], references: [id])
+  createdBy      User      @relation("SupplierQuoteCreator", fields: [createdById], references: [id])
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  lines   FactoryQuoteLine[]
+  lines   SupplierQuoteLine[]
   options QuotationOption[]
   files   Attachment[]
 
-  requests FactoryRequest[]
+  requests SupplierRequest[]
 
   @@index([inquiryId])
-  @@index([factoryId])
+  @@index([supplierId])
   @@index([companyId])
   @@index([createdById])
   @@map("factory_quotes")
 }
 
-model FactoryQuoteLine {
-  id              String             @id @default(uuid()) @db.Uuid
+model SupplierQuoteLine {
+  id              String              @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId       String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company         Company            @relation(fields: [companyId], references: [id])
-  factoryQuoteId  String             @map("factory_quote_id") @db.Uuid
-  factoryQuote    FactoryQuote       @relation(fields: [factoryQuoteId], references: [id], onDelete: Cascade)
-  /// The customer's item this answers (empty for extras the factory added).
-  requestedItemId String?            @map("requested_item_id") @db.Uuid
-  requestedItem   RequestedItem?     @relation("AnswersItem", fields: [requestedItemId], references: [id], onDelete: SetNull)
+  companyId       String              @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company             @relation(fields: [companyId], references: [id])
+  supplierQuoteId String              @map("factory_quote_id") @db.Uuid
+  supplierQuote   SupplierQuote       @relation(fields: [supplierQuoteId], references: [id], onDelete: Cascade)
+  /// The customer's item this answers (empty for extras the supplier added).
+  requestedItemId String?             @map("requested_item_id") @db.Uuid
+  requestedItem   RequestedItem?      @relation("AnswersItem", fields: [requestedItemId], references: [id], onDelete: SetNull)
   description     String
-  model           String?            @db.VarChar(120)
-  quantity        Decimal            @db.Decimal(12, 2)
-  unit            String             @default("pcs") @db.VarChar(20)
-  /// The factory's price for one unit: without tax, or with tax included, as its offer says.
-  unitPrice       Decimal            @map("unit_price") @db.Decimal(14, 2)
+  model           String?             @db.VarChar(120)
+  quantity        Decimal             @db.Decimal(12, 2)
+  unit            String              @default("pcs") @db.VarChar(20)
+  /// The supplier's price for one unit: without tax, or with tax included, as its offer says.
+  unitPrice       Decimal             @map("unit_price") @db.Decimal(14, 2)
   /// This item's tax % (the offer's unless changed): added on top of the price, or already in it when the offer's prices include tax.
-  taxRate         Decimal            @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  sortOrder       Int                @default(0) @map("sort_order")
-  /// A part of another line of the same offer (the factory's own breakdown: machine, conveyor, spares…).
-  parentId        String?            @map("parent_id") @db.Uuid
-  parent          FactoryQuoteLine?  @relation("FactoryLineParts", fields: [parentId], references: [id], onDelete: Cascade)
-  parts           FactoryQuoteLine[] @relation("FactoryLineParts")
+  taxRate         Decimal             @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  sortOrder       Int                 @default(0) @map("sort_order")
+  /// A part of another line of the same offer (the supplier's own breakdown: machine, conveyor, spares…).
+  parentId        String?             @map("parent_id") @db.Uuid
+  parent          SupplierQuoteLine?  @relation("SupplierLineParts", fields: [parentId], references: [id], onDelete: Cascade)
+  parts           SupplierQuoteLine[] @relation("SupplierLineParts")
   /// Another spec of that line of the same offer (35 or 41 stations): a choice beside it, left out of the offer's total.
-  alternativeOfId String?            @map("alternative_of_id") @db.Uuid
-  alternativeOf   FactoryQuoteLine?  @relation("FactoryLineSpecs", fields: [alternativeOfId], references: [id], onDelete: SetNull)
-  alternatives    FactoryQuoteLine[] @relation("FactoryLineSpecs")
-  /// The same product across factories' offers: a line copied from another offer keeps that line's key, so offers can be compared product by product.
-  productKey      String?            @map("product_key") @db.Uuid
+  alternativeOfId String?             @map("alternative_of_id") @db.Uuid
+  alternativeOf   SupplierQuoteLine?  @relation("SupplierLineSpecs", fields: [alternativeOfId], references: [id], onDelete: SetNull)
+  alternatives    SupplierQuoteLine[] @relation("SupplierLineSpecs")
+  /// The same product across suppliers' offers: a line copied from another offer keeps that line's key, so offers can be compared product by product.
+  productKey      String?             @map("product_key") @db.Uuid
 
   quoteLines QuoteLine[]
 
-  @@index([factoryQuoteId])
+  @@index([supplierQuoteId])
   @@index([parentId])
   @@index([alternativeOfId])
   @@index([productKey])
@@ -1078,43 +1080,43 @@ model QuotationRevision {
   @@map("quotation_revisions")
 }
 
-/// An option the customer can choose: one factory's offer (its lines, our prices),
-/// or, without factory prices, the customer's own items priced by hand.
+/// An option the customer can choose: one supplier's offer (its lines, our prices),
+/// or, without supplier prices, the customer's own items priced by hand.
 model QuotationOption {
-  id                String            @id @default(uuid()) @db.Uuid
+  id                 String            @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId         String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company           Company           @relation(fields: [companyId], references: [id])
-  revisionId        String            @map("revision_id") @db.Uuid
-  revision          QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  companyId          String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company            Company           @relation(fields: [companyId], references: [id])
+  revisionId         String            @map("revision_id") @db.Uuid
+  revision           QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
   /// A, B, C…
-  letter            String            @db.VarChar(2)
-  sortOrder         Int               @default(0) @map("sort_order")
-  factoryQuoteId    String?           @map("factory_quote_id") @db.Uuid
-  factoryQuote      FactoryQuote?     @relation(fields: [factoryQuoteId], references: [id])
-  status            OptionStatus      @default(open)
+  letter             String            @db.VarChar(2)
+  sortOrder          Int               @default(0) @map("sort_order")
+  supplierQuoteId    String?           @map("factory_quote_id") @db.Uuid
+  supplierQuote      SupplierQuote?    @relation(fields: [supplierQuoteId], references: [id])
+  status             OptionStatus      @default(open)
   /// The lead time we promise in words ("45 days after the deposit"): worked out from leadDays when given.
-  leadTime          String?           @map("lead_time") @db.VarChar(120)
+  leadTime           String?           @map("lead_time") @db.VarChar(120)
   /// The lead time as days from a moment: after_payment (the deposit) | after_order | after_drawings.
-  leadDays          Int?              @map("lead_days")
-  leadFrom          String?           @map("lead_from")
-  subtotal          Decimal           @default(0) @db.Decimal(14, 2)
-  discount          Decimal           @default(0) @db.Decimal(14, 2)
-  total             Decimal           @default(0) @db.Decimal(14, 2)
-  /// The factory's price basis when the option was saved (the offer can change later).
-  factoryBasis      Incoterm?         @map("factory_basis")
-  factoryBasisPlace String?           @map("factory_basis_place") @db.VarChar(60)
+  leadDays           Int?              @map("lead_days")
+  leadFrom           String?           @map("lead_from")
+  subtotal           Decimal           @default(0) @db.Decimal(14, 2)
+  discount           Decimal           @default(0) @db.Decimal(14, 2)
+  total              Decimal           @default(0) @db.Decimal(14, 2)
+  /// The supplier's price basis when the option was saved (the offer can change later).
+  supplierBasis      Incoterm?         @map("factory_basis")
+  supplierBasisPlace String?           @map("factory_basis_place") @db.VarChar(60)
 
   lines QuoteLine[]
   costs OptionCost[]
 
   @@unique([revisionId, letter])
-  @@index([factoryQuoteId])
+  @@index([supplierQuoteId])
   @@index([companyId])
   @@map("quotation_options")
 }
 
-/// A cost between the factory's price basis and the one we sell on (EXW → FOB: to the port…), part of the option's cost.
+/// A cost between the supplier's price basis and the one we sell on (EXW → FOB: to the port…), part of the option's cost.
 model OptionCost {
   id        String          @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
@@ -1137,40 +1139,40 @@ model OptionCost {
 }
 
 model QuoteLine {
-  id                 String            @id @default(uuid()) @db.Uuid
+  id                  String             @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId          String            @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company            Company           @relation(fields: [companyId], references: [id])
-  revisionId         String            @map("revision_id") @db.Uuid
-  revision           QuotationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
-  optionId           String            @map("option_id") @db.Uuid
-  option             QuotationOption   @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  requestedItemId    String?           @map("requested_item_id") @db.Uuid
-  requestedItem      RequestedItem?    @relation(fields: [requestedItemId], references: [id], onDelete: SetNull)
-  type               LineType          @default(goods)
-  description        String
-  model              String?           @db.VarChar(120)
-  quantity           Decimal           @db.Decimal(12, 2)
-  unit               String            @default("pcs") @db.VarChar(20)
-  unitPrice          Decimal           @map("unit_price") @db.Decimal(14, 2)
-  lineTotal          Decimal           @map("line_total") @db.Decimal(14, 2)
+  companyId           String             @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company             Company            @relation(fields: [companyId], references: [id])
+  revisionId          String             @map("revision_id") @db.Uuid
+  revision            QuotationRevision  @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  optionId            String             @map("option_id") @db.Uuid
+  option              QuotationOption    @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  requestedItemId     String?            @map("requested_item_id") @db.Uuid
+  requestedItem       RequestedItem?     @relation(fields: [requestedItemId], references: [id], onDelete: SetNull)
+  type                LineType           @default(goods)
+  description         String
+  model               String?            @db.VarChar(120)
+  quantity            Decimal            @db.Decimal(12, 2)
+  unit                String             @default("pcs") @db.VarChar(20)
+  unitPrice           Decimal            @map("unit_price") @db.Decimal(14, 2)
+  lineTotal           Decimal            @map("line_total") @db.Decimal(14, 2)
   /// Internal costing (never printed): what one unit costs us in the quotation currency, and where from.
-  unitCost           Decimal?          @map("unit_cost") @db.Decimal(14, 2)
-  factoryQuoteLineId String?           @map("factory_quote_line_id") @db.Uuid
-  factoryQuoteLine   FactoryQuoteLine? @relation(fields: [factoryQuoteLineId], references: [id], onDelete: SetNull)
+  unitCost            Decimal?           @map("unit_cost") @db.Decimal(14, 2)
+  supplierQuoteLineId String?            @map("factory_quote_line_id") @db.Uuid
+  supplierQuoteLine   SupplierQuoteLine? @relation(fields: [supplierQuoteLineId], references: [id], onDelete: SetNull)
   /// The supplier's price it was quoted from, in the offer's currency (internal): when the offer's price is no
   /// longer this, the quotation says the offer changed after it was made.
-  factoryUnitPrice   Decimal?          @map("factory_unit_price") @db.Decimal(14, 2)
-  /// Factory currency units per quotation currency unit when the cost was converted.
-  fxRate             Decimal?          @map("fx_rate") @db.Decimal(24, 14)
-  sortOrder          Int               @default(0) @map("sort_order")
+  supplierUnitPrice   Decimal?           @map("factory_unit_price") @db.Decimal(14, 2)
+  /// Supplier currency units per quotation currency unit when the cost was converted.
+  fxRate              Decimal?           @map("fx_rate") @db.Decimal(24, 14)
+  sortOrder           Int                @default(0) @map("sort_order")
 
   orderLines OrderLine[]
 
   @@index([revisionId])
   @@index([optionId])
   @@index([companyId])
-  @@index([factoryQuoteLineId])
+  @@index([supplierQuoteLineId])
   @@index([requestedItemId])
   @@map("quote_lines")
 }
@@ -1238,7 +1240,7 @@ model Order {
   deliveryConditions String?           @map("delivery_conditions")
   paymentConditions  String?           @map("payment_conditions")
   conditionsNotes    String?           @map("conditions_notes")
-  // The ready date is each factory's (OrderFactory.readyOn); the order's is the latest of them (worked out).
+  // The ready date is each supplier's (OrderSupplier.readyOn); the order's is the latest of them (worked out).
   /// Heading over the lines on the documents, e.g. "COMPLETE AUTOMATIC LIQUID SYRUP FILLING LINE".
   documentTitle      String?           @map("document_title") @db.VarChar(200)
   /// The contract destination, e.g. "Hairatan, Afghanistan": printed on the proforma and the contract, and the
@@ -1259,49 +1261,49 @@ model Order {
   /// so changing the rates in Settings never moves past months. Empty: not known (Settings is used).
   mainCurrency       String?           @map("main_currency") @db.Char(3)
   mainRate           Decimal?          @map("main_rate") @db.Decimal(24, 14)
-  /// When we placed the order with the factory.
-  factoryOrderedOn   DateTime?         @map("factory_ordered_on") @db.Date
-  /// The factory's own number for our order ("their order no.").
-  factoryOrderNo     String?           @map("factory_order_no") @db.VarChar(60)
+  /// When we placed the order with the supplier.
+  supplierOrderedOn  DateTime?         @map("factory_ordered_on") @db.Date
+  /// The supplier's own number for our order ("their order no.").
+  supplierOrderNo    String?           @map("factory_order_no") @db.VarChar(60)
   closedAt           DateTime?         @map("closed_at") @db.Timestamptz
   createdById        String            @map("created_by") @db.Uuid
   createdBy          User              @relation("OrderCreator", fields: [createdById], references: [id])
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
-  lines        OrderLine[]
-  stageChanges OrderStageChange[]
-  allocations  Allocation[]
+  lines         OrderLine[]
+  stageChanges  OrderStageChange[]
+  allocations   Allocation[]
   /// What we paid its suppliers (their payments' parts).
-  supplierPaid Allocation[]       @relation("PurchaseParts")
+  supplierPaid  Allocation[]        @relation("PurchaseParts")
   /// What the customer is invoiced: the instalments of the order (deposit, balance…).
-  receivables  Invoice[]          @relation("OrderReceivables")
-  expenses     Expense[]
-  costs        OrderCost[]
-  bankContract OrderBankContract?
-  shipments    Shipment[]
-  documents    OrderDocument[]
-  bankSteps    OrderBankStep[]
-  satChecks    SatCheck[]
-  claims       OrderClaim[]
-  files        Attachment[]
+  receivables   Invoice[]           @relation("OrderReceivables")
+  expenses      Expense[]
+  costs         OrderCost[]
+  bankContract  OrderBankContract?
+  shipments     Shipment[]
+  documents     OrderDocument[]
+  bankSteps     OrderBankStep[]
+  satChecks     SatCheck[]
+  claims        OrderClaim[]
+  files         Attachment[]
   /// What its suppliers invoice: each supplier's instalments on the order.
-  payables     Invoice[]          @relation("OrderPayables")
-  submissions  MoneySubmission[]
+  payables      Invoice[]           @relation("OrderPayables")
+  submissions   MoneySubmission[]
   /// How the customer pays: the payment route and its terms (one row, made with the order).
-  paymentTerms OrderPaymentTerms?
+  paymentTerms  OrderPaymentTerms?
   /// Delivery and the site acceptance test (one row, once there is something to keep).
-  delivery     OrderDelivery?
+  delivery      OrderDelivery?
   /// Why and how it was cancelled (one row when it was).
-  cancellation OrderCancellation?
-  /// Each factory's ready date (the order's ready date is the latest of them).
-  factories    OrderFactory[]
-  papers       OrderPaper[]
-  fact         OrderFact?
-  factoryFacts FactoryOrderFact[]
-  recordNotes  Note[]
-  followUps    FollowUp[]
-  ledger       LedgerEntry[]
+  cancellation  OrderCancellation?
+  /// Each supplier's ready date (the order's ready date is the latest of them).
+  factories     OrderSupplier[]
+  papers        OrderPaper[]
+  fact          OrderFact?
+  supplierFacts SupplierOrderFact[]
+  recordNotes   Note[]
+  followUps     FollowUp[]
+  ledger        LedgerEntry[]
 
   purchaseOrders PurchaseOrder[]
 
@@ -1317,43 +1319,43 @@ model Order {
 
 /// The accepted lines, frozen; shipped and invoiced quantities are tracked against them.
 model OrderLine {
-  id          String     @id @default(uuid()) @db.Uuid
+  id            String     @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId   String     @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company     Company    @relation(fields: [companyId], references: [id])
-  orderId     String     @map("order_id") @db.Uuid
-  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  quoteLineId String?    @map("quote_line_id") @db.Uuid
-  quoteLine   QuoteLine? @relation(fields: [quoteLineId], references: [id], onDelete: SetNull)
-  type        LineType   @default(goods)
-  description String
-  model       String?    @db.VarChar(120)
+  companyId     String     @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company       Company    @relation(fields: [companyId], references: [id])
+  orderId       String     @map("order_id") @db.Uuid
+  order         Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  quoteLineId   String?    @map("quote_line_id") @db.Uuid
+  quoteLine     QuoteLine? @relation(fields: [quoteLineId], references: [id], onDelete: SetNull)
+  type          LineType   @default(goods)
+  description   String
+  model         String?    @db.VarChar(120)
   /// The customs code printed on the commercial invoice and the contract (e.g. 8422.40): the customer's country's.
-  hsCode      String?    @map("hs_code") @db.VarChar(20)
+  hsCode        String?    @map("hs_code") @db.VarChar(20)
   /// China's code for the item (the supplier's), printed on the China customs copy; empty: the same as the customer's.
-  hsCodeCn    String?    @map("hs_code_cn") @db.VarChar(20)
+  hsCodeCn      String?    @map("hs_code_cn") @db.VarChar(20)
   /// The item's name and specs in Chinese, printed under the English on papers in English + 中文.
-  descriptionZh String?  @map("description_zh")
+  descriptionZh String?    @map("description_zh")
   /// Who wrote the Chinese: "machine" (the translator, to be checked) or "staff" (typed or checked).
-  zhBy        String?    @map("zh_by") @db.VarChar(10)
-  quantity    Decimal    @db.Decimal(12, 2)
-  unit        String     @default("pcs") @db.VarChar(20)
-  unitPrice   Decimal    @map("unit_price") @db.Decimal(14, 2)
-  lineTotal   Decimal    @map("line_total") @db.Decimal(14, 2)
-  unitCost    Decimal?   @map("unit_cost") @db.Decimal(14, 2)
-  sortOrder   Int        @default(0) @map("sort_order")
+  zhBy          String?    @map("zh_by") @db.VarChar(10)
+  quantity      Decimal    @db.Decimal(12, 2)
+  unit          String     @default("pcs") @db.VarChar(20)
+  unitPrice     Decimal    @map("unit_price") @db.Decimal(14, 2)
+  lineTotal     Decimal    @map("line_total") @db.Decimal(14, 2)
+  unitCost      Decimal?   @map("unit_cost") @db.Decimal(14, 2)
+  sortOrder     Int        @default(0) @map("sort_order")
 
-  /// The factory's price this line was bought at, frozen when the order was made: what we owe the
-  /// factory is worked out from these, so changing or removing the offer later never changes it.
-  factoryId          String?  @map("factory_id") @db.Uuid
-  factory            Party?   @relation("OrderLineFactory", fields: [factoryId], references: [id], onDelete: Restrict)
-  factoryUnitPrice   Decimal? @map("factory_unit_price") @db.Decimal(14, 2)
-  factoryTaxRate     Decimal? @map("factory_tax_rate") @db.Decimal(5, 2)
-  /// The factory's price already had the tax in it (its offer said so): the tax is not added again.
-  factoryTaxIncluded Boolean  @default(false) @map("factory_tax_included")
-  factoryCurrency    String?  @map("factory_currency") @db.Char(3)
+  /// The supplier's price this line was bought at, frozen when the order was made: what we owe the
+  /// supplier is worked out from these, so changing or removing the offer later never changes it.
+  supplierId          String?  @map("factory_id") @db.Uuid
+  factory             Party?   @relation("OrderLineSupplier", fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierUnitPrice   Decimal? @map("factory_unit_price") @db.Decimal(14, 2)
+  supplierTaxRate     Decimal? @map("factory_tax_rate") @db.Decimal(5, 2)
+  /// The supplier's price already had the tax in it (its offer said so): the tax is not added again.
+  supplierTaxIncluded Boolean  @default(false) @map("factory_tax_included")
+  supplierCurrency    String?  @map("factory_currency") @db.Char(3)
 
-  /// How many have come in from the factory so far (goods lines), and when last.
+  /// How many have come in from the supplier so far (goods lines), and when last.
   receivedQty        Decimal   @default(0) @map("received_qty") @db.Decimal(12, 2)
   receivedOn         DateTime? @map("received_on") @db.Date
   /// The packing list, filled in before shipping (goods lines): the totals of its cases (OrderLineCase), kept
@@ -1373,7 +1375,7 @@ model OrderLine {
   cases OrderLineCase[]
 
   @@index([orderId])
-  @@index([factoryId])
+  @@index([supplierId])
   @@index([companyId])
   @@index([quoteLineId])
   @@map("order_lines")
@@ -1447,7 +1449,7 @@ model Translation {
   @@map("translations")
 }
 
-/// A cost between the factory's price basis and the one we sold on (EXW → CFR: to the port, sea freight…),
+/// A cost between the supplier's price basis and the one we sold on (EXW → CFR: to the port, sea freight…),
 /// copied from the accepted option when the order was made: part of the order's cost.
 model OrderCost {
   id        String    @id @default(uuid()) @db.Uuid
@@ -1494,40 +1496,40 @@ model OrderStageChange {
 }
 
 // ============================================================================
-// Order flow: asking factories, the bank route, production, shipping,
+// Order flow: asking suppliers, the bank route, production, shipping,
 // the document set and its bank chain, delivery and SAT, claims
 // ============================================================================
 
-/// One factory asked for a price on an inquiry (the spec sent), and whether it answered.
-model FactoryRequest {
-  id             String               @id @default(uuid()) @db.Uuid
+/// One supplier asked for a price on an inquiry (the spec sent), and whether it answered.
+model SupplierRequest {
+  id              String                @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId      String               @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company        Company              @relation(fields: [companyId], references: [id])
-  inquiryId      String               @map("inquiry_id") @db.Uuid
-  inquiry        Inquiry              @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  factoryId      String               @map("factory_id") @db.Uuid
-  factory        Party                @relation("FactoryRequestFactory", fields: [factoryId], references: [id], onDelete: Restrict)
-  status         FactoryRequestStatus @default(sent)
-  sentOn         DateTime             @map("sent_on") @db.Date
+  companyId       String                @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company         Company               @relation(fields: [companyId], references: [id])
+  inquiryId       String                @map("inquiry_id") @db.Uuid
+  inquiry         Inquiry               @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  supplierId      String                @map("factory_id") @db.Uuid
+  factory         Party                 @relation("SupplierRequestSupplier", fields: [supplierId], references: [id], onDelete: Restrict)
+  status          SupplierRequestStatus @default(sent)
+  sentOn          DateTime              @map("sent_on") @db.Date
   /// How the list was sent: wechat | email | whatsapp | phone | visit | other.
-  channel        String?              @db.VarChar(20)
+  channel         String?               @db.VarChar(20)
   /// When we asked them to answer by.
-  replyBy        DateTime?            @map("reply_by") @db.Date
+  replyBy         DateTime?             @map("reply_by") @db.Date
   /// The offer they sent back, once entered.
-  factoryQuoteId String?              @map("factory_quote_id") @db.Uuid
-  factoryQuote   FactoryQuote?        @relation(fields: [factoryQuoteId], references: [id], onDelete: SetNull)
-  note           String?              @db.VarChar(500)
-  createdById    String               @map("created_by") @db.Uuid
-  createdBy      User                 @relation("FactoryRequestCreator", fields: [createdById], references: [id])
-  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  supplierQuoteId String?               @map("factory_quote_id") @db.Uuid
+  supplierQuote   SupplierQuote?        @relation(fields: [supplierQuoteId], references: [id], onDelete: SetNull)
+  note            String?               @db.VarChar(500)
+  createdById     String                @map("created_by") @db.Uuid
+  createdBy       User                  @relation("SupplierRequestCreator", fields: [createdById], references: [id])
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@unique([inquiryId, factoryId])
-  @@index([factoryId])
+  @@unique([inquiryId, supplierId])
+  @@index([supplierId])
   @@index([companyId])
   @@index([createdById])
-  @@index([factoryQuoteId])
+  @@index([supplierQuoteId])
   @@map("factory_requests")
 }
 
@@ -1600,8 +1602,8 @@ model OrderCancellation {
   reason        String?
   /// Money received when it was cancelled: credit | refund | fee (null: none had come in).
   customerMoney String?  @map("customer_money") @db.VarChar(10)
-  /// Money paid to the factory: refund_due | loss (null: none had been paid).
-  factoryMoney  String?  @map("factory_money") @db.VarChar(12)
+  /// Money paid to the supplier: refund_due | loss (null: none had been paid).
+  supplierMoney String?  @map("factory_money") @db.VarChar(12)
 
   @@index([companyId])
   @@map("order_cancellations")
@@ -1642,55 +1644,55 @@ model OrderBankContract {
 /// the container, seal, vessel, ports and ETD/ETA; Shipment 1 (the first made) is the one the papers print.
 /// An order without the shipping module still has one, typed from the order's Details card.
 model Shipment {
-  id                   String         @id @default(uuid()) @db.Uuid
+  id                   String          @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
-  companyId            String         @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
-  company              Company        @relation(fields: [companyId], references: [id])
-  orderId              String         @map("order_id") @db.Uuid
-  order                Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  mode                 ShipMode       @default(sea)
-  status               ShipmentStatus @default(planned)
-  forwarder            String?        @db.VarChar(120)
-  bookingNo            String?        @map("booking_no") @db.VarChar(60)
+  companyId            String          @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
+  company              Company         @relation(fields: [companyId], references: [id])
+  orderId              String          @map("order_id") @db.Uuid
+  order                Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  mode                 ShipMode        @default(sea)
+  status               ShipmentStatus  @default(planned)
+  forwarder            String?         @db.VarChar(120)
+  bookingNo            String?         @map("booking_no") @db.VarChar(60)
   /// The bill of lading (sea) or air waybill (air) number.
-  blNo                 String?        @map("bl_no") @db.VarChar(60)
-  vessel               String?        @db.VarChar(120)
-  portOfLoading        String?        @map("port_of_loading") @db.VarChar(120)
-  portOfDischarge      String?        @map("port_of_discharge") @db.VarChar(120)
-  containerNo          String?        @map("container_no") @db.VarChar(120)
+  blNo                 String?         @map("bl_no") @db.VarChar(60)
+  vessel               String?         @db.VarChar(120)
+  portOfLoading        String?         @map("port_of_loading") @db.VarChar(120)
+  portOfDischarge      String?         @map("port_of_discharge") @db.VarChar(120)
+  containerNo          String?         @map("container_no") @db.VarChar(120)
   /// 20GP, 40HQ, LCL…
-  containerType        String?        @map("container_type") @db.VarChar(20)
-  sealNo               String?        @map("seal_no") @db.VarChar(40)
+  containerType        String?         @map("container_type") @db.VarChar(20)
+  sealNo               String?         @map("seal_no") @db.VarChar(40)
   /// The day the container was loaded.
-  loadedOn             DateTime?      @map("loaded_on") @db.Date
+  loadedOn             DateTime?       @map("loaded_on") @db.Date
   /// The container's verified gross mass (VGM), kg.
-  vgmKg                Decimal?       @map("vgm_kg") @db.Decimal(10, 2)
-  etd                  DateTime?      @db.Date
-  eta                  DateTime?      @db.Date
-  departedOn           DateTime?      @map("departed_on") @db.Date
-  arrivedOn            DateTime?      @map("arrived_on") @db.Date
+  vgmKg                Decimal?        @map("vgm_kg") @db.Decimal(10, 2)
+  etd                  DateTime?       @db.Date
+  eta                  DateTime?       @db.Date
+  departedOn           DateTime?       @map("departed_on") @db.Date
+  arrivedOn            DateTime?       @map("arrived_on") @db.Date
   note                 String?
   /// The forwarder's person and phone, the customs broker, and the carrier's tracking number.
-  forwarderContact     String?        @map("forwarder_contact") @db.VarChar(120)
-  forwarderPhone       String?        @map("forwarder_phone") @db.VarChar(40)
-  customsBroker        String?        @map("customs_broker") @db.VarChar(120)
-  trackingNo           String?        @map("tracking_no") @db.VarChar(80)
+  forwarderContact     String?         @map("forwarder_contact") @db.VarChar(120)
+  forwarderPhone       String?         @map("forwarder_phone") @db.VarChar(40)
+  customsBroker        String?         @map("customs_broker") @db.VarChar(120)
+  trackingNo           String?         @map("tracking_no") @db.VarChar(80)
   /// The freight agreed with the forwarder, and the insurance on the goods.
-  freightAmount        Decimal?       @map("freight_amount") @db.Decimal(14, 2)
-  freightCurrency      String?        @map("freight_currency") @db.Char(3)
-  insurer              String?        @db.VarChar(120)
-  insurancePolicyNo    String?        @map("insurance_policy_no") @db.VarChar(60)
+  freightAmount        Decimal?        @map("freight_amount") @db.Decimal(14, 2)
+  freightCurrency      String?         @map("freight_currency") @db.Char(3)
+  insurer              String?         @db.VarChar(120)
+  insurancePolicyNo    String?         @map("insurance_policy_no") @db.VarChar(60)
   /// prepaid | collect
-  freightTerms         String?        @map("freight_terms") @db.VarChar(10)
-  insuredValue         Decimal?       @map("insured_value") @db.Decimal(14, 2)
+  freightTerms         String?         @map("freight_terms") @db.VarChar(10)
+  insuredValue         Decimal?        @map("insured_value") @db.Decimal(14, 2)
   /// What the insurance costs us (the premium), in `insuranceCurrency`: it is a cost of the order by itself.
-  insurancePremium     Decimal?       @map("insurance_premium") @db.Decimal(14, 2)
-  insuranceCurrency    String?        @map("insurance_currency") @db.Char(3)
+  insurancePremium     Decimal?        @map("insurance_premium") @db.Decimal(14, 2)
+  insuranceCurrency    String?         @map("insurance_currency") @db.Char(3)
   /// Customs at the destination.
-  customsDeclarationNo String?        @map("customs_declaration_no") @db.VarChar(60)
-  clearedOn            DateTime?      @map("cleared_on") @db.Date
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  customsDeclarationNo String?         @map("customs_declaration_no") @db.VarChar(60)
+  clearedOn            DateTime?       @map("cleared_on") @db.Date
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz
   /// The packages it takes.
   cases                OrderLineCase[]
 
@@ -1751,7 +1753,7 @@ model OrderPaper {
   order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   /// The print slug: sales-contract, commercial-invoice, purchase-order…
   kind      String          @db.VarChar(40)
-  /// Which one when an order has several of the kind (a purchase order: the factory's id); empty otherwise.
+  /// Which one when an order has several of the kind (a purchase order: the supplier's id); empty otherwise.
   ref       String          @default("") @db.VarChar(60)
   /// CI-2026-0031 (follows the order's number); the same in every version.
   number    String          @db.VarChar(40)
@@ -1830,7 +1832,7 @@ model OrderClaim {
   openedOn   DateTime    @map("opened_on") @db.Date
   resolvedOn DateTime?   @map("resolved_on") @db.Date
   resolution String?
-  /// What the claim is worth, and who bears it: factory | us | customer.
+  /// What the claim is worth, and who bears it: supplier | us | customer.
   amount     Decimal?    @db.Decimal(14, 2)
   currency   String?     @db.Char(3)
   bearer     String?     @db.VarChar(10)
@@ -1843,7 +1845,7 @@ model OrderClaim {
 }
 
 // ============================================================================
-// Money: payments in (customer) and out (factory), invoices
+// Money: payments in (customer) and out (supplier), invoices
 // ============================================================================
 
 /// An invoice (Billing): one instalment, of the customer (receivable: on `orderId`) or of a supplier
@@ -1877,7 +1879,7 @@ model Invoice {
   sortOrder       Int       @default(0) @map("sort_order")
   /// Receivable, built from the route: deposit | balance (null: typed by hand).
   part            String?   @db.VarChar(10)
-  /// When it falls due. Receivable: fixed (dueOn) | on_ready (the order's ready date, the latest factory's) |
+  /// When it falls due. Receivable: fixed (dueOn) | on_ready (the order's ready date, the latest supplier's) |
   /// on_ship_plus_days (`dueDays` after the goods left) | after_papers (`dueDays` after the papers reached the
   /// customer's bank, LC); null: no date yet. Payable: on_order | on_ready (that supplier's) | fixed.
   dueRule         String?   @map("due_rule") @db.VarChar(20)
@@ -1914,9 +1916,9 @@ model Expense {
   /// The deal it was spent on (a trip to check products, samples…), won or lost; for an order always its deal.
   inquiryId       String?       @map("inquiry_id") @db.Uuid
   inquiry         Inquiry?      @relation(fields: [inquiryId], references: [id])
-  /// The factory visited or paid for (a trip to check its products, an inspection there).
-  factoryId       String?       @map("factory_id") @db.Uuid
-  factory         Party?        @relation("ExpenseFactory", fields: [factoryId], references: [id])
+  /// The supplier visited or paid for (a trip to check its products, an inspection there).
+  supplierId      String?       @map("factory_id") @db.Uuid
+  factory         Party?        @relation("ExpenseSupplier", fields: [supplierId], references: [id])
   /// See EXPENSE_CATEGORIES in @kebo/shared.
   category        String        @db.VarChar(30)
   description     String        @db.VarChar(200)
@@ -1933,15 +1935,15 @@ model Expense {
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
   accountId       String?       @map("account_id") @db.Uuid
   account         MoneyAccount? @relation(fields: [accountId], references: [id])
-  /// On an order: the step it belongs to (FlowStep: payment, factory, production, shipping, documents, delivery).
+  /// On an order: the step it belongs to (FlowStep: payment, supplier, production, shipping, documents, delivery).
   step            String?       @db.VarChar(20)
-  /// Who bears it: us (cuts the order's profit), customer (added to what they owe), factory (taken off what we owe it).
+  /// Who bears it: us (cuts the order's profit), customer (added to what they owe), supplier (taken off what we owe it).
   borneBy         String        @default("us") @map("borne_by") @db.VarChar(10)
   /// Paid by `paidBy` from their own money: we owe it back until `repaidOn`.
   ownMoney        Boolean       @default(false) @map("own_money")
   /// A cost known before it is paid (a forwarder's bill): it counts from `spentOn` and we owe it to `payee` until `repaidOn`.
   payLater        Boolean       @default(false) @map("pay_later")
-  /// Who we owe it to, in words (the forwarder, the insurer, a courier). A factory's cost names `factory` instead.
+  /// Who we owe it to, in words (the forwarder, the insurer, a courier). A supplier's cost names `factory` instead.
   payee           String?       @db.VarChar(120)
   /// Made by the system from another record and kept in step with it: "shipment:<id>:freight", "shipment:<id>:insurance".
   source          String?       @db.VarChar(80)
@@ -1968,7 +1970,7 @@ model Expense {
   @@index([orderId])
   @@index([customerId])
   @@index([inquiryId])
-  @@index([factoryId])
+  @@index([supplierId])
   @@index([spentOn])
   @@index([accountId])
   @@index([repaidAccountId])
@@ -2150,19 +2152,19 @@ model MoneyMovement {
  * not part of the balance). Balance = in − used − refund.
  */
 
-/// One factory's part of an order: the ready date it gave (one per factory; the order's ready date is the
-/// latest of them). factoryId null: the goods of an order whose lines name no factory.
-model OrderFactory {
+/// One supplier's part of an order: the ready date it gave (one per supplier; the order's ready date is the
+/// latest of them). supplierId null: the goods of an order whose lines name no supplier.
+model OrderSupplier {
   id              String    @id @default(uuid()) @db.Uuid
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId       String    @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company         Company   @relation(fields: [companyId], references: [id])
   orderId         String    @map("order_id") @db.Uuid
   order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  factoryId       String?   @map("factory_id") @db.Uuid
-  factory         Party?    @relation("OrderFactoryFactory", fields: [factoryId], references: [id], onDelete: Restrict)
+  supplierId      String?   @map("factory_id") @db.Uuid
+  factory         Party?    @relation("OrderSupplierSupplier", fields: [supplierId], references: [id], onDelete: Restrict)
   readyOn         DateTime? @map("ready_on") @db.Date
-  /// When the factory told us the ready date, and how (wechat, email, phone, visit, other).
+  /// When the supplier told us the ready date, and how (wechat, email, phone, visit, other).
   readyToldOn     DateTime? @map("ready_told_on") @db.Date
   readyToldVia    String?   @map("ready_told_via") @db.VarChar(20)
   readyNote       String?   @map("ready_note") @db.VarChar(500)
@@ -2174,14 +2176,14 @@ model OrderFactory {
   /// passed | passed_with_remarks | failed
   fatResult       String?   @map("fat_result") @db.VarChar(20)
   fatRemarks      String?   @map("fat_remarks") @db.VarChar(1000)
-  /// Where the goods of this factory were received (the forwarder's warehouse, our warehouse…).
+  /// Where the goods of this supplier were received (the forwarder's warehouse, our warehouse…).
   goodsReceivedAt String?   @map("goods_received_at") @db.VarChar(160)
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  /// One row per factory of the order (nulls not distinct: one row for an order with no factory).
-  @@unique([orderId, factoryId])
-  @@index([factoryId])
+  /// One row per supplier of the order (nulls not distinct: one row for an order with no supplier).
+  @@unique([orderId, supplierId])
+  @@index([supplierId])
   @@index([companyId])
   @@index([fatAttendedById])
   @@map("order_factories")
@@ -2364,8 +2366,8 @@ model Company {
   inquiryStageChanges InquiryStageChange[]
   inquiryAssignments  InquiryAssignment[]
   attachments         Attachment[]
-  factoryQuotes       FactoryQuote[]
-  factoryQuoteLines   FactoryQuoteLine[]
+  supplierQuotes      SupplierQuote[]
+  supplierQuoteLines  SupplierQuoteLine[]
   quotations          Quotation[]
   quotationRevisions  QuotationRevision[]
   quotationOptions    QuotationOption[]
@@ -2382,7 +2384,7 @@ model Company {
   salesTargets        SalesTarget[]
   reminderStates      ReminderState[]
   personTargets       PersonTarget[]
-  factoryRequests     FactoryRequest[]
+  supplierRequests    SupplierRequest[]
   orderBankContracts  OrderBankContract[]
   orderDeliveries     OrderDelivery[]
   orderPaymentTerms   OrderPaymentTerms[]
@@ -2395,11 +2397,11 @@ model Company {
   translations        Translation[]
   orderClaims         OrderClaim[]
   moneyMovements      MoneyMovement[]
-  orderFactories      OrderFactory[]
+  orderSuppliers      OrderSupplier[]
   orderPapers         OrderPaper[]
   orderFacts          OrderFact[]
   inquiryFacts        InquiryFact[]
-  factoryOrderFacts   FactoryOrderFact[]
+  supplierOrderFacts  SupplierOrderFact[]
   factsQueue          FactsQueue[]
   ledgerEntries       LedgerEntry[]
   ledgerState         LedgerState?
@@ -2724,7 +2726,7 @@ model InquiryFact {
   /// The company's day it came in (APP_TIME_ZONE).
   receivedOn       DateTime       @map("received_on") @db.Date
   firstQuoteOn     DateTime?      @map("first_quote_on") @db.Date
-  /// At least one factory offer came in.
+  /// At least one supplier offer came in.
   gotPrices        Boolean        @map("got_prices")
   /// The latest sent quotation at its accepted option, else its lowest, at today's Settings rate (null: none sent).
   quotedValueMain  Decimal?       @map("quoted_value_main") @db.Decimal(16, 2)
@@ -2744,19 +2746,19 @@ model InquiryFact {
   @@map("inquiry_facts")
 }
 
-/// One ready-made row per order × factory (the factories its lines are bought from): what we owe it
-/// (factoryPosition), its plan's open parts, its ready date against the promise, its offers on the deal.
-model FactoryOrderFact {
+/// One ready-made row per order × supplier (the suppliers its lines are bought from): what we owe it
+/// (supplierPosition), its plan's open parts, its ready date against the promise, its offers on the deal.
+model SupplierOrderFact {
   orderId       String      @map("order_id") @db.Uuid
   order         Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  factoryId     String      @map("factory_id") @db.Uuid
-  factory       Party       @relation("FactoryOrderFactFactory", fields: [factoryId], references: [id], onDelete: Cascade)
+  supplierId    String      @map("factory_id") @db.Uuid
+  factory       Party       @relation("SupplierOrderFactSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
   /// The company this row belongs to (row-level security keeps companies apart; filled from the connection).
   companyId     String      @default(dbgenerated("app_company()")) @map("company_id") @db.Uuid
   company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   status        OrderStatus
   orderedOn     DateTime    @map("ordered_on") @db.Date
-  /// The factory's currency; null when the order owes it in more than one (then only the main figures).
+  /// The supplier's currency; null when the order owes it in more than one (then only the main figures).
   currency      String?     @db.Char(3)
   owed          Decimal?    @db.Decimal(16, 2)
   paid          Decimal?    @db.Decimal(16, 2)
@@ -2771,16 +2773,16 @@ model FactoryOrderFact {
   readyActual   DateTime?   @map("ready_actual") @db.Date
   daysLate      Int?        @map("days_late")
   onTime        Boolean?    @map("on_time")
-  /// Offers this factory sent on the order's deal, and whether the order was bought on one of them.
+  /// Offers this supplier sent on the order's deal, and whether the order was bought on one of them.
   offersSent    Int         @map("offers_sent")
   offerWon      Boolean     @map("offer_won")
-  /// Claims on the order (claims name no factory yet: each of the order's factories carries them).
+  /// Claims on the order (claims name no supplier yet: each of the order's suppliers carries them).
   claims        Int
   computedAt    DateTime    @default(now()) @map("computed_at") @db.Timestamptz
 
-  @@id([orderId, factoryId])
+  @@id([orderId, supplierId])
   @@index([companyId, orderedOn])
-  @@index([factoryId])
+  @@index([supplierId])
   @@map("factory_order_facts")
 }
 
@@ -2853,8 +2855,8 @@ model Note {
   order      Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId String?   @map("customer_id") @db.Uuid
   customer   Party?    @relation("NoteCustomer", fields: [customerId], references: [id], onDelete: Cascade)
-  factoryId  String?   @map("factory_id") @db.Uuid
-  factory    Party?    @relation("NoteFactory", fields: [factoryId], references: [id], onDelete: Cascade)
+  supplierId String?   @map("factory_id") @db.Uuid
+  factory    Party?    @relation("NoteSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
   /// note | call | visit | whatsapp | email
   kind       String    @default("note") @db.VarChar(10)
   body       String
@@ -2871,7 +2873,7 @@ model Note {
   @@index([inquiryId, at])
   @@index([orderId, at])
   @@index([customerId, at])
-  @@index([factoryId, at])
+  @@index([supplierId, at])
   @@index([companyId])
   @@index([authorId])
   @@index([contactId])
@@ -2879,7 +2881,7 @@ model Note {
 }
 
 /// A planned call, visit or meeting for someone (Home's "Follow-ups today"), on at most one record: an
-/// inquiry, an order, a customer or a factory (none: a general one). The worker reminds the person it is
+/// inquiry, an order, a customer or a supplier (none: a general one). The worker reminds the person it is
 /// for at the start of the day it is due and, when it has a time, 30 minutes before.
 model FollowUp {
   id          String    @id @default(uuid()) @db.Uuid
@@ -2901,8 +2903,8 @@ model FollowUp {
   order       Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId  String?   @map("customer_id") @db.Uuid
   customer    Party?    @relation("FollowUpCustomer", fields: [customerId], references: [id], onDelete: Cascade)
-  factoryId   String?   @map("factory_id") @db.Uuid
-  factory     Party?    @relation("FollowUpFactory", fields: [factoryId], references: [id], onDelete: Cascade)
+  supplierId  String?   @map("factory_id") @db.Uuid
+  factory     Party?    @relation("FollowUpSupplier", fields: [supplierId], references: [id], onDelete: Cascade)
   assigneeId  String    @map("assignee_id") @db.Uuid
   assignee    User      @relation("FollowUpAssignee", fields: [assigneeId], references: [id])
   createdById String    @map("created_by") @db.Uuid
@@ -2923,17 +2925,17 @@ model FollowUp {
   @@index([inquiryId])
   @@index([orderId])
   @@index([customerId])
-  @@index([factoryId])
+  @@index([supplierId])
   @@index([createdById])
   @@index([assigneeId])
   @@index([doneById])
   @@map("follow_ups")
 }
 
-/// The ledger: every money record posted from its document (an order, a factory's part of it, money in and out,
+/// The ledger: every money record posted from its document (an order, a supplier's part of it, money in and out,
 /// a transfer, an expense, credit), never typed and never changed or deleted (a database trigger refuses it):
 /// a change is a correction (the old rows reversed, the new ones posted; or the difference, for an order and a
-/// factory's part), a removal a reversal. Rows of one posting share group_id and entry_no; their debits equal
+/// supplier's part), a removal a reversal. Rows of one posting share group_id and entry_no; their debits equal
 /// their credits in the company's main currency. See docs/ledger.md.
 model LedgerEntry {
   id             String        @id @default(uuid()) @db.Uuid
@@ -2950,7 +2952,7 @@ model LedgerEntry {
   date           DateTime      @db.Date
   /// @kebo/shared LEDGER_ENTRY_TYPES: order | purchase_order | money_in | money_out | transfer | expense | credit | correction | opening | fx
   type           String        @db.VarChar(20)
-  /// The document (@kebo/shared LEDGER_SOURCES) and its id (an order's factory part: "orderId:factoryId").
+  /// The document (@kebo/shared LEDGER_SOURCES) and its id (an order's supplier part: "orderId:supplierId").
   sourceType     String        @map("source_type") @db.VarChar(20)
   sourceId       String        @map("source_id") @db.VarChar(120)
   /// A document posting more than once on different days (an expense, and its repayment: "repaid").
@@ -2961,8 +2963,8 @@ model LedgerEntry {
   order          Order?        @relation(fields: [orderId], references: [id], onDelete: Restrict)
   customerId     String?       @map("customer_id") @db.Uuid
   customer       Party?        @relation("LedgerEntryCustomer", fields: [customerId], references: [id], onDelete: Restrict)
-  factoryId      String?       @map("factory_id") @db.Uuid
-  factory        Party?        @relation("LedgerEntryFactory", fields: [factoryId], references: [id], onDelete: Restrict)
+  supplierId     String?       @map("factory_id") @db.Uuid
+  factory        Party?        @relation("LedgerEntrySupplier", fields: [supplierId], references: [id], onDelete: Restrict)
   /// The person whose own money it was (staff, to repay).
   userId         String?       @map("user_id") @db.Uuid
   user           User?         @relation("LedgerStaff", fields: [userId], references: [id], onDelete: Restrict)
@@ -2997,7 +2999,7 @@ model LedgerEntry {
   @@index([groupId])
   @@index([orderId])
   @@index([customerId])
-  @@index([factoryId])
+  @@index([supplierId])
   @@index([userId])
   @@index([moneyAccountId])
   @@index([createdById])
@@ -3043,7 +3045,7 @@ model PurchaseOrder {
   sentEarlyReason String?   @map("sent_early_reason") @db.VarChar(300)
   /// The supplier's own number for our order ("their order no.").
   supplierRef     String?   @map("supplier_ref") @db.VarChar(60)
-  /// Agreed with the factory (design "terms that travel"): its own copy, taken from the offer when it was sent
+  /// Agreed with the supplier (design "terms that travel"): its own copy, taken from the offer when it was sent
   /// (false: not sent yet, or sent before it was kept — the offer's terms show).
   termsCopied     Boolean   @default(false) @map("terms_copied")
   basis           Incoterm?

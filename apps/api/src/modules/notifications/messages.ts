@@ -186,7 +186,7 @@ export function paymentIn(o: OrderFacts, amount: string, by: string | null, paid
   };
 }
 
-/* ---------------------------------------------------------------- orders and the factory */
+/* ---------------------------------------------------------------- orders and the supplier */
 
 export function purchaseOrderSent(
   o: OrderFacts,
@@ -247,7 +247,7 @@ export function shipped(
 
 const late = (n: number) => `${n} day${n === 1 ? "" : "s"} late`;
 
-/** An inquiry still new, or asking factories too long. */
+/** An inquiry still new, or asking suppliers too long. */
 export function inquiryWaiting(i: InquiryFacts, why: "new" | "sourcing", days: number, offers: { in: number; asked: number } | null): Message {
   const isNew = why === "new";
   return {
@@ -426,8 +426,8 @@ export function paymentDue(o: OrderFacts, part: { label: string; openMinor: numb
       };
 }
 
-/** What we owe a factory falls due today or soon, or is late. */
-export function factoryPayment(
+/** What we owe a supplier falls due today or soon, or is late. */
+export function supplierPayment(
   o: OrderFacts,
   f: { factory: string; contact: string | null; currency: string; owed: string; paid: string },
   row: { label: string; open: string; due: string | null; lateBy: number | null },

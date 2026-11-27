@@ -102,8 +102,8 @@ function NewQuotationsForm({
   const [margin, setMargin] = useState(String(defaults.margin));
   // Offers not quoted yet start ticked; own prices when there is no offer at all; "Quote this offer": that one.
   const [ticked, setTicked] = useState<string[]>(() => {
-    if (only && first?.offers.some((o) => o.factoryQuoteId === only)) return [only];
-    const fresh = (first?.offers ?? []).filter((o) => !usedIn[o.factoryQuoteId]?.length).map((o) => o.factoryQuoteId);
+    if (only && first?.offers.some((o) => o.supplierQuoteId === only)) return [only];
+    const fresh = (first?.offers ?? []).filter((o) => !usedIn[o.supplierQuoteId]?.length).map((o) => o.supplierQuoteId);
     return fresh.length ? fresh : first?.offers.length ? [] : ["own"];
   });
   const m = Number(margin);
@@ -117,7 +117,7 @@ function NewQuotationsForm({
     return out;
   }, [letters, ticked.length]);
   const totalOf = (id: string) => {
-    const o = offers?.offers.find((x) => x.factoryQuoteId === id);
+    const o = offers?.offers.find((x) => x.supplierQuoteId === id);
     if (!o || !marginOk) return null;
     if (o.lines.some((l) => l.unitCost === null)) return null;
     return o.lines.reduce((t, l) => t + Number(fromMinor(priceForMargin(toMinor(l.unitCost!), m))) * Number(l.quantity), 0);
@@ -127,7 +127,7 @@ function NewQuotationsForm({
     const more = await loadOffers(c);
     if (more) setOffers(more);
   };
-  const rows = [...(offers?.offers ?? []).map((o) => o.factoryQuoteId), "own"].filter((id) => ticked.includes(id));
+  const rows = [...(offers?.offers ?? []).map((o) => o.supplierQuoteId), "own"].filter((id) => ticked.includes(id));
   return (
     <PanelBody>
       <ActionForm
@@ -168,12 +168,12 @@ function NewQuotationsForm({
                   </THead>
                   <tbody>
                     {(offers?.offers ?? []).map((o) => {
-                      const on = ticked.includes(o.factoryQuoteId);
-                      const box = `offer-${o.factoryQuoteId}`;
+                      const on = ticked.includes(o.supplierQuoteId);
+                      const box = `offer-${o.supplierQuoteId}`;
                       return (
-                        <tr key={o.factoryQuoteId} className={cn(on && "bg-surface-2/60")}>
+                        <tr key={o.supplierQuoteId} className={cn(on && "bg-surface-2/60")}>
                           <td className="border-b border-line px-3 py-2.5 align-top max-sm:px-2.5">
-                            <input id={box} type="checkbox" checked={on} onChange={() => toggle(o.factoryQuoteId)} className="size-4 accent-[var(--color-primary)]" />
+                            <input id={box} type="checkbox" checked={on} onChange={() => toggle(o.supplierQuoteId)} className="size-4 accent-[var(--color-primary)]" />
                           </td>
                           <td className="border-b border-line px-3 py-2.5 max-sm:pr-1">
                             <label htmlFor={box} className="block cursor-pointer font-semibold [overflow-wrap:anywhere]">
@@ -182,13 +182,13 @@ function NewQuotationsForm({
                             <span className="block text-xs text-text-2">
                               {[date(o.receivedOn), o.basis ? `${o.basis}${o.basisPlace ? ` ${o.basisPlace}` : ""}` : null, o.leadTime].filter(Boolean).join(" · ")}
                             </span>
-                            {usedIn[o.factoryQuoteId]?.length ? <span className="mt-1 block text-xs font-semibold text-text-2 sm:hidden">In {usedIn[o.factoryQuoteId]!.join(" · ")}</span> : null}
+                            {usedIn[o.supplierQuoteId]?.length ? <span className="mt-1 block text-xs font-semibold text-text-2 sm:hidden">In {usedIn[o.supplierQuoteId]!.join(" · ")}</span> : null}
                           </td>
                           <td className="border-b border-line px-3 py-2.5 text-right align-top whitespace-nowrap tabular max-sm:pl-1">{o.totalCost === null ? "—" : money(o.totalCost, currency)}</td>
                           <td className="border-b border-line px-3 py-2.5 max-sm:hidden">
-                            {usedIn[o.factoryQuoteId]?.length ? (
+                            {usedIn[o.supplierQuoteId]?.length ? (
                               <span className="inline-flex rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-text-2">
-                                In {usedIn[o.factoryQuoteId]!.join(" · ")}
+                                In {usedIn[o.supplierQuoteId]!.join(" · ")}
                               </span>
                             ) : null}
                           </td>
@@ -249,7 +249,7 @@ function NewQuotationsForm({
                     </THead>
                     <tbody>
                       {rows.map((id, i) => {
-                        const o = offers?.offers.find((x) => x.factoryQuoteId === id);
+                        const o = offers?.offers.find((x) => x.supplierQuoteId === id);
                         const total = id === "own" ? 0 : totalOf(id);
                         return (
                           <tr key={id} className="last:[&>td]:border-b-0">

@@ -32,7 +32,7 @@ import {
   type DeliveryAllGoodInput,
   type DeliveryInput,
   type SatAllPassedInput,
-  type FactoryOrderInput,
+  type SupplierOrderInput,
   type OrderDocumentInput,
   type OrderDocumentKind,
   type OrderDocumentStatus,
@@ -44,7 +44,7 @@ import {
   type ShipmentInput,
   type ShipmentUpdateInput,
   type SendPurchaseOrderInput,
-  type FactoryTermsInput,
+  type SupplierTermsInput,
   leadWords,
   warrantyLine,
 } from "@kebo/shared";
@@ -61,12 +61,12 @@ import { OrdersService } from "../orders/orders.service";
 import type { DomainEvent } from "../../common/events/event-bus";
 import { SettingsService } from "../settings/settings.service";
 import { lcChecksOf, rebuildRoutePlan, termsOf } from "../billing/api";
-import { factoryPlansOf } from "../billing/api";
+import { supplierPlansOf } from "../billing/api";
 import { requireReason } from "../../common/audit/reason";
-import { advancePaidOn, copyOfOffer, factoryAgreed, offerTermsSelect, poTermsSelect, readyFromLead, type OfferTermsRow } from "./factory-terms";
+import { advancePaidOn, copyOfOffer, supplierAgreed, offerTermsSelect, poTermsSelect, readyFromLead, type OfferTermsRow } from "./supplier-terms";
 import { readyByOf, readyOnOf, readySelect } from "@kebo/database";
 import { chargedExpenses, fxOf, positionOf, type PositionFacts, type MoneyCtx } from "../billing/api";
-import { seedFactoryPlans } from "../billing/api";
+import { seedSupplierPlans } from "../billing/api";
 import { onPrimaryShipment, SHIPMENT_ORDER } from "../orders/shipment-facts";
 import { addDocument, changeDocument, removeDocument } from "../documents/api";
 import { ShipmentCosts } from "../money/shipment-costs.service";
@@ -76,8 +76,8 @@ const num = (d: Prisma.Decimal | null) => (d === null ? null : Number(d));
 type FlowAction =
   "route" | "bank_contract" | "factory_order" | "purchase_order" | "production" | "shipment" | "document" | "bank_step" | "delivery" | "sat" | "claim";
 
-/** The words an order's history says when what was agreed with a factory changes (and counts them by). */
-export const FACTORY_TERMS_CHANGED = "what was agreed with";
+/** The words an order's history says when what was agreed with a supplier changes (and counts them by). */
+export const SUPPLIER_TERMS_CHANGED = "what was agreed with";
 
 const warrantyLineOf = (t: { warrantyMonths: number | null; warrantyFrom: string | null; warranty: string | null }) => warrantyLine(t);
 
@@ -86,11 +86,11 @@ interface FlowRows {
   stage: OrderStage;
   status: string;
   paymentTerms: WithTerms["paymentTerms"];
-  factoryOrderedOn: Date | null;
-  /** Each factory's ready date, and the factories on the lines (the order's ready date is the latest). */
-  factories: { factoryId: string | null; readyOn: Date | null }[];
-  /** The lines: whose factory makes each, and (goods) how much of it came from the factory. */
-  lines: { factoryId: string | null; type: string; quantity: Prisma.Decimal; receivedQty: Prisma.Decimal | null }[];
+  supplierOrderedOn: Date | null;
+  /** Each supplier's ready date, and the suppliers on the lines (the order's ready date is the latest). */
+  factories: { supplierId: string | null; readyOn: Date | null }[];
+  /** The lines: whose supplier makes each, and (goods) how much of it came from the supplier. */
+  lines: { supplierId: string | null; type: string; quantity: Prisma.Decimal; receivedQty: Prisma.Decimal | null }[];
   proformaNo: string | null;
   packedAt: Date | null;
   delivery: { deliveredOn: Date | null; satDoneOn: Date | null } | null;
@@ -133,7 +133,7 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
     cancelled: o.status === "cancelled",
     route,
     depositIn,
-    factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn),
+    supplierOrderedOn: fromDbDateOrNull(o.supplierOrderedOn),
     production: { lines: goods.length, received: goods.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length },
     readyOn: readyOnOf(o),
     shipments: {
@@ -185,7 +185,7 @@ const SYSTEM_DOCUMENTS: Partial<Record<OrderDocumentKind, "proforma" | "packing-
 };
 
 /**
- * The order flow after the customer accepts: how the customer pays, the factory
+ * The order flow after the customer accepts: how the customer pays, the supplier
  * order, production, shipments, the document set and its trip through the banks,
  * delivery, the site acceptance test and claims.
  *
@@ -264,10 +264,10 @@ export class FlowService {
         claims: { orderBy: { openedOn: "desc" } },
         delivery: { include: { satEngineer: { select: { id: true, name: true } } } },
         paymentTerms: true,
-        // Their factories (ready dates) and, for the goods, what arrived (the delivery's condition is theirs).
+        // Their suppliers (ready dates) and, for the goods, what arrived (the delivery's condition is theirs).
         lines: {
           select: {
-            factoryId: true,
+            supplierId: true,
             factory: { select: { id: true, name: true } },
             type: true,
             quantity: true,
@@ -358,7 +358,7 @@ export class FlowService {
     }));
     const steps = flowSteps(factsOf(o, depositIn, settings.papers.off), features);
 
-    const factories = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
+    const suppliers = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
     const b = o.bankContract;
     const terms = termsOf(o);
     const checks = has("bank_contracts") ? lcChecksOf({ ...o, readyOn: readyOnOf(o) }, settings.reminders.lcCourierDays) : null;
@@ -407,12 +407,12 @@ export class FlowService {
             : null,
       },
       factory: {
-        orderedOn: fromDbDateOrNull(o.factoryOrderedOn),
-        orderNo: o.factoryOrderNo,
+        orderedOn: fromDbDateOrNull(o.supplierOrderedOn),
+        orderNo: o.supplierOrderNo,
         readyOn: readyOnOf(o),
-        /** Each factory's own ready date (the order's is the latest of them). */
-        readyBy: readyByOf(o).map((r) => ({ factoryId: r.factoryId, name: factories.find((f) => f.id === r.factoryId)?.name ?? null, readyOn: r.readyOn })),
-        factories,
+        /** Each supplier's own ready date (the order's is the latest of them). */
+        readyBy: readyByOf(o).map((r) => ({ supplierId: r.supplierId, name: suppliers.find((f) => f.id === r.supplierId)?.name ?? null, readyOn: r.readyOn })),
+        factories: suppliers,
       },
       shipping: has("shipping") ? { shipments } : null,
       documents: has("bank_documents") ? { set: documents, bankSteps } : null,
@@ -521,9 +521,9 @@ export class FlowService {
         stage: true,
         status: true,
         ...termsSelect,
-        factoryOrderedOn: true,
+        supplierOrderedOn: true,
         ...readySelect,
-        lines: { select: { factoryId: true, type: true, quantity: true, receivedQty: true } },
+        lines: { select: { supplierId: true, type: true, quantity: true, receivedQty: true } },
         proformaNo: true,
         packedAt: true,
         delivery: { select: { deliveredOn: true, satDoneOn: true } },
@@ -554,7 +554,7 @@ export class FlowService {
     };
   }
 
-  /* ---------------------------------------------------------------- payment route, bank contract, factory order */
+  /* ---------------------------------------------------------------- payment route, bank contract, supplier order */
 
   /**
    * The route and its terms build the plan: changing them rebuilds the
@@ -633,42 +633,42 @@ export class FlowService {
     return this.get(user, id);
   }
 
-  /** The day we ordered from the factory and their order number; only the fields sent change. */
-  async setFactoryOrder(user: SessionUser, id: string, input: FactoryOrderInput) {
+  /** The day we ordered from the supplier and their order number; only the fields sent change. */
+  async setSupplierOrder(user: SessionUser, id: string, input: SupplierOrderInput) {
     await this.must(user, "orders.update", null, "change orders");
-    if (input.factoryOrderedOn && input.factoryOrderedOn > this.clock.today())
+    if (input.supplierOrderedOn && input.supplierOrderedOn > this.clock.today())
       throw new DomainError("The purchase order date cannot be in the future.");
     const event = await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
-      const was = { factoryOrderedOn: fromDbDateOrNull(o.factoryOrderedOn), factoryOrderNo: o.factoryOrderNo };
+      const was = { supplierOrderedOn: fromDbDateOrNull(o.supplierOrderedOn), supplierOrderNo: o.supplierOrderNo };
       const data: Prisma.OrderUncheckedUpdateInput = {};
-      if (input.factoryOrderedOn !== undefined) data.factoryOrderedOn = toDbDateOrNull(input.factoryOrderedOn);
-      if (input.factoryOrderNo !== undefined) data.factoryOrderNo = input.factoryOrderNo;
+      if (input.supplierOrderedOn !== undefined) data.supplierOrderedOn = toDbDateOrNull(input.supplierOrderedOn);
+      if (input.supplierOrderNo !== undefined) data.supplierOrderNo = input.supplierOrderNo;
       if (!Object.keys(data).length) return null;
       await tx.order.update({ where: { id }, data });
-      const ordered = input.factoryOrderedOn !== undefined ? input.factoryOrderedOn : was.factoryOrderedOn;
-      // Ordered: each factory gets the payment plan (advance when we order, balance on the ready date), and what
+      const ordered = input.supplierOrderedOn !== undefined ? input.supplierOrderedOn : was.supplierOrderedOn;
+      // Ordered: each supplier gets the payment plan (advance when we order, balance on the ready date), and what
       // was agreed with it is its offer's, kept on its purchase order from now on (design "terms that travel").
-      if (input.factoryOrderedOn) {
-        await seedFactoryPlans(tx, id, (await this.settings.get()).sales.factoryAdvancePercent);
+      if (input.supplierOrderedOn) {
+        await seedSupplierPlans(tx, id, (await this.settings.get()).sales.supplierAdvancePercent);
         for (const po of await tx.purchaseOrder.findMany({ where: { orderId: id, termsCopied: false }, select: { id: true, supplierId: true } }))
           await tx.purchaseOrder.update({ where: { id: po.id }, data: copyOfOffer(await this.offerOf(tx, id, po.supplierId)) });
       }
       const parts = [
-        input.factoryOrderedOn !== undefined
-          ? input.factoryOrderedOn
-            ? `ordered from the supplier on ${input.factoryOrderedOn}`
+        input.supplierOrderedOn !== undefined
+          ? input.supplierOrderedOn
+            ? `ordered from the supplier on ${input.supplierOrderedOn}`
             : "purchase order date cleared"
           : null,
-        input.factoryOrderNo !== undefined && input.factoryOrderNo !== was.factoryOrderNo
-          ? input.factoryOrderNo
-            ? `their order no. ${input.factoryOrderNo}`
+        input.supplierOrderNo !== undefined && input.supplierOrderNo !== was.supplierOrderNo
+          ? input.supplierOrderNo
+            ? `their order no. ${input.supplierOrderNo}`
             : "their order no. cleared"
           : null,
       ].filter(Boolean);
       await this.log(tx, user, id, "factory_order", `${o.refNo}: ${parts.join(", ") || "purchase order saved"}`, was, input);
-      // Ordered from the factory: the order is in production.
-      return input.factoryOrderedOn && ordered ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the supplier") : null;
+      // Ordered from the supplier: the order is in production.
+      return input.supplierOrderedOn && ordered ? this.orders.followFlow(tx, user, id, "in_production", "ordered from the supplier") : null;
     });
     await this.orders.announce(event);
     return this.get(user, id);
@@ -678,7 +678,7 @@ export class FlowService {
 
   /**
    * The order's purchase orders (one per supplier on its lines, PO-2026-0044), each with its lines' total at the
-   * supplier's prices, the ready date, whether it was sent (or, before the step, the order's factory date), and
+   * supplier's prices, the ready date, whether it was sent (or, before the step, the order's supplier date), and
    * whether the customer's deposit is verified: recorded payments of kind deposit covering the deposit asked.
    */
   async purchaseOrders(user: SessionUser, id: string) {
@@ -688,8 +688,8 @@ export class FlowService {
         id: true,
         refNo: true,
         currency: true,
-        factoryOrderedOn: true,
-        factoryOrderNo: true,
+        supplierOrderedOn: true,
+        supplierOrderNo: true,
         purchaseOrders: {
           orderBy: { number: "asc" },
           select: {
@@ -705,12 +705,12 @@ export class FlowService {
         },
         lines: {
           select: {
-            factoryId: true,
+            supplierId: true,
             quantity: true,
-            factoryUnitPrice: true,
-            factoryCurrency: true,
+            supplierUnitPrice: true,
+            supplierCurrency: true,
             // The offer each line was bought on: the purchase order says which offer it was made from, and what it said.
-            quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: offerTermsSelect } } } } },
+            quoteLine: { select: { supplierQuoteLine: { select: { supplierQuote: { select: offerTermsSelect } } } } },
           },
         },
         ...readySelect,
@@ -718,71 +718,71 @@ export class FlowService {
     });
     if (!o) throw new NotFoundError("Order");
     const seeCosts = can(user, "sourcing.manage");
-    const ready = new Map(readyByOf(o).map((r) => [r.factoryId, r.readyOn] as const));
+    const ready = new Map(readyByOf(o).map((r) => [r.supplierId, r.readyOn] as const));
     const deposit = await this.depositState(this.prisma.db, id);
-    // When each factory's advance was paid in full (its plan's parts due when we order): the ready date counts from it.
+    // When each supplier's advance was paid in full (its plan's parts due when we order): the ready date counts from it.
     const s = await this.settings.get();
-    const plans = await factoryPlansOf(this.prisma.db, id, s.sales.factoryAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")));
+    const plans = await supplierPlansOf(this.prisma.db, id, s.sales.supplierAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")));
     const paymentIds = plans.flatMap((pl) => pl.rows.flatMap((r) => r.payments.map((x) => x.id)));
     const paidDays = new Map(
       (paymentIds.length ? await this.prisma.db.allocation.findMany({ where: { id: { in: paymentIds } }, select: { id: true, on: true } }) : []).map((a) => [a.id, a.on] as const),
     );
     const changes = await this.prisma.db.auditLog.findMany({
-      where: { entityType: "order", entityId: id, summary: { contains: FACTORY_TERMS_CHANGED } },
+      where: { entityType: "order", entityId: id, summary: { contains: SUPPLIER_TERMS_CHANGED } },
       select: { summary: true },
     });
     return {
       deposit,
       items: o.purchaseOrders.map((p) => {
-        const lines = o.lines.filter((l) => l.factoryId === p.supplier.id);
-        const totalMinor = lines.reduce((t, l) => t + Math.round(decimalToMinor(l.factoryUnitPrice ?? 0) * Number(l.quantity)), 0);
-        const sentOn = p.sentOn ? fromDbDate(p.sentOn) : o.factoryOrderedOn ? fromDbDate(o.factoryOrderedOn) : null;
-        const offer = lines.map((l) => l.quoteLine?.factoryQuoteLine?.factoryQuote).find((q) => !!q) ?? null;
-        const agreed = factoryAgreed(p, offer);
+        const lines = o.lines.filter((l) => l.supplierId === p.supplier.id);
+        const totalMinor = lines.reduce((t, l) => t + Math.round(decimalToMinor(l.supplierUnitPrice ?? 0) * Number(l.quantity)), 0);
+        const sentOn = p.sentOn ? fromDbDate(p.sentOn) : o.supplierOrderedOn ? fromDbDate(o.supplierOrderedOn) : null;
+        const offer = lines.map((l) => l.quoteLine?.supplierQuoteLine?.supplierQuote).find((q) => !!q) ?? null;
+        const agreed = supplierAgreed(p, offer);
         const plan = plans.find((pl) => pl.factory.id === p.supplier.id);
         return {
           id: p.id,
           number: p.number,
           supplier: p.supplier,
-          /** The factory's offer its lines were bought on (design "terms that travel": made from their offer). */
+          /** The supplier's offer its lines were bought on (design "terms that travel": made from their offer). */
           offer: offer && { id: offer.id, reference: offer.reference, receivedOn: fromDbDate(offer.receivedOn), basis: offer.basis, basisPlace: offer.basisPlace },
-          /** Agreed with the factory: its own copy once sent, else its offer's (design "terms that travel", step 3b). */
+          /** Agreed with the supplier: its own copy once sent, else its offer's (design "terms that travel", step 3b). */
           agreed: {
             ...agreed,
-            /** The ready date worked out from the lead time (the factory's own date, when it gives one, is on Production). */
+            /** The ready date worked out from the lead time (the supplier's own date, when it gives one, is on Production). */
             readyBy: readyFromLead(agreed, sentOn, plan ? advancePaidOn(plan.rows, paidDays) : null),
             changes: changes.filter((c) => c.summary?.startsWith(`${p.number}: `)).length,
           },
           lines: lines.length,
-          currency: lines.find((l) => l.factoryCurrency)?.factoryCurrency ?? null,
+          currency: lines.find((l) => l.supplierCurrency)?.supplierCurrency ?? null,
           total: seeCosts ? fromMinor(totalMinor) : null,
           readyOn: ready.get(p.supplier.id) ?? null,
           sentOn,
           sentBy: p.sentBy,
-          supplierRef: p.supplierRef ?? (sentOn ? o.factoryOrderNo : null),
+          supplierRef: p.supplierRef ?? (sentOn ? o.supplierOrderNo : null),
           sentEarlyReason: p.sentEarlyReason,
         };
       }),
     };
   }
 
-  /** The offer a factory's lines on this order were bought on (null: none of them came from an offer). */
+  /** The offer a supplier's lines on this order were bought on (null: none of them came from an offer). */
   private async offerOf(tx: Tx | PrismaService["db"], orderId: string, supplierId: string): Promise<OfferTermsRow | null> {
     const line = await tx.orderLine.findFirst({
-      where: { orderId, factoryId: supplierId, quoteLine: { factoryQuoteLine: { isNot: null } } },
+      where: { orderId, supplierId: supplierId, quoteLine: { supplierQuoteLine: { isNot: null } } },
       orderBy: { sortOrder: "asc" },
-      select: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: offerTermsSelect } } } } } },
+      select: { quoteLine: { select: { supplierQuoteLine: { select: { supplierQuote: { select: offerTermsSelect } } } } } },
     });
-    return line?.quoteLine?.factoryQuoteLine?.factoryQuote ?? null;
+    return line?.quoteLine?.supplierQuoteLine?.supplierQuote ?? null;
   }
 
   /**
-   * Changing what was agreed with a factory (design "terms that travel", step 3b): its delivery basis and place,
+   * Changing what was agreed with a supplier (design "terms that travel", step 3b): its delivery basis and place,
    * the lead time, the payment's note, the warranty, the minimum order and our notes (the payment's parts are its
    * plan's). A purchase order not sent yet takes its offer's first. Once sent, a change that leaves it other than
    * the offer said asks why; it is kept in the order's history.
    */
-  async setFactoryTerms(user: SessionUser, id: string, poId: string, input: FactoryTermsInput) {
+  async setSupplierTerms(user: SessionUser, id: string, poId: string, input: SupplierTermsInput) {
     await this.must(user, "orders.update", null, "change orders");
     await this.prisma.tx(async (tx) => {
       const o = await this.lockOrder(tx, user, id);
@@ -793,7 +793,7 @@ export class FlowService {
       });
       if (!po) throw new NotFoundError("Purchase order");
       const offer = await this.offerOf(tx, id, po.supplierId);
-      const was = factoryAgreed(po, offer);
+      const was = supplierAgreed(po, offer);
       const keep = <T>(v: T | undefined, old: T) => (v === undefined ? old : v);
       const next = {
         basis: keep(input.basis, was.basis),
@@ -827,8 +827,8 @@ export class FlowService {
       if (!same(next.notes, was.notes)) now.push({ what: "notes", fromOffer: !!next.notes?.trim() });
       if (!now.length) return;
       const differs = now.filter((c) => c.fromOffer).map((c) => c.what);
-      // Sent: the purchase order's own day, or (before it was kept) the day the order went to the factory.
-      const sent = po.sentOn ?? o.factoryOrderedOn;
+      // Sent: the purchase order's own day, or (before it was kept) the day the order went to the supplier.
+      const sent = po.sentOn ?? o.supplierOrderedOn;
       const reason = sent && differs.length ? requireReason(input.reason, "factory_terms", `what was agreed with ${po.supplier.name} changes from their offer`) : input.reason;
       await tx.purchaseOrder.update({
         where: { id: poId },
@@ -859,7 +859,7 @@ export class FlowService {
         action: "flow.factory_order",
         entityType: "order",
         entityId: id,
-        summary: `${po.number}: ${FACTORY_TERMS_CHANGED} ${po.supplier.name} changed (${now.map((c) => c.what).join(", ")})`,
+        summary: `${po.number}: ${SUPPLIER_TERMS_CHANGED} ${po.supplier.name} changed (${now.map((c) => c.what).join(", ")})`,
         oldValues: { ...snap(was), step: "factory" },
         newValues: { ...snap({ ...next, leadFrom, warrantyFrom }), step: "factory" },
         reason: reason ?? null,
@@ -882,7 +882,7 @@ export class FlowService {
   /**
    * Sends one purchase order: the day, the supplier's number, how. Before the customer's deposit is verified it
    * needs a written reason (decided 12 Nov), kept on the purchase order and in the history. The first one sent
-   * is also the order's "ordered from the factory" day (the factory step, payment plans, in production).
+   * is also the order's "ordered from the factory" day (the supplier step, payment plans, in production).
    */
   async sendPurchaseOrder(user: SessionUser, id: string, poId: string, input: SendPurchaseOrderInput) {
     await this.must(user, "orders.update", null, "change orders");
@@ -902,7 +902,7 @@ export class FlowService {
           sentById: user.id,
           supplierRef: input.supplierRef?.trim() || po.supplierRef,
           sentEarlyReason: deposit.verified ? null : reason,
-          // Sent: what was agreed with the factory is its offer's, kept on the purchase order from now on.
+          // Sent: what was agreed with the supplier is its offer's, kept on the purchase order from now on.
           ...(po.termsCopied ? {} : copyOfOffer(await this.offerOf(tx, id, po.supplierId))),
         },
       });
@@ -915,9 +915,9 @@ export class FlowService {
         { sentOn: po.sentOn, supplierRef: po.supplierRef },
         input,
       );
-      return !o.factoryOrderedOn;
+      return !o.supplierOrderedOn;
     });
-    if (first) await this.setFactoryOrder(user, id, { factoryOrderedOn: input.sentOn, ...(input.supplierRef ? { factoryOrderNo: input.supplierRef } : {}) });
+    if (first) await this.setSupplierOrder(user, id, { supplierOrderedOn: input.sentOn, ...(input.supplierRef ? { supplierOrderNo: input.supplierRef } : {}) });
     await this.orders.announce({ type: "purchaseOrder.sent", orderId: id, purchaseOrderId: poId, actorId: user.id });
     return this.purchaseOrders(user, id);
   }
@@ -1167,7 +1167,7 @@ export class FlowService {
     if (attachmentId) {
       const a = await tx.attachment.findFirst({ where: { id: attachmentId, inquiryId: order.inquiryId, deletedAt: null } });
       if (!a) throw new DomainError("That file is not on this deal. Upload it to the deal's files first.");
-      if (a.factoryQuoteId) throw new DomainError("That file is a supplier offer's evidence; upload the document itself.");
+      if (a.supplierQuoteId) throw new DomainError("That file is a supplier offer's evidence; upload the document itself.");
     }
   }
 
@@ -1567,9 +1567,9 @@ export class FlowService {
   /**
    * GET /orders/:id/defaults — what a step's row can fill in for the person
    * from earlier orders and the quote: the forwarder of the last order on the
-   * same route (same ports, else the same factory), the banks of this
+   * same route (same ports, else the same supplier), the banks of this
    * customer's last LC or bank contract, the lead time of the accepted quote
-   * (and the ready date it gives) and the factory's price basis. Only orders
+   * (and the ready date it gives) and the supplier's price basis. Only orders
    * the person may see are looked at; nothing is saved.
    */
   async defaults(user: SessionUser, id: string) {
@@ -1583,10 +1583,10 @@ export class FlowService {
         portOfDischarge: true,
         shipBy: true,
         inquiry: { select: { requiredBy: true, refNo: true } },
-        factoryOrderedOn: true,
+        supplierOrderedOn: true,
         revisionId: true,
         shipments: { orderBy: SHIPMENT_ORDER, take: 1, select: { portOfLoading: true, portOfDischarge: true } },
-        lines: { where: { factoryId: { not: null } }, select: { factoryId: true } },
+        lines: { where: { supplierId: { not: null } }, select: { supplierId: true } },
       },
     });
     if (!o) throw new NotFoundError("Order");
@@ -1595,7 +1595,7 @@ export class FlowService {
     const others = { id: { not: id }, ...orderAccess(user) };
     const ci = (v: string) => ({ equals: v.trim(), mode: "insensitive" as const });
 
-    // The forwarder: same port pair first, then the same factory.
+    // The forwarder: same port pair first, then the same supplier.
     let forwarder: { name: string; refNo: string; why: "route" | "factory" } | null = null;
     if (has("shipping")) {
       // Shipment 1's ports, else what the terms give (E/F terms load at the place, C/D terms discharge there).
@@ -1609,16 +1609,16 @@ export class FlowService {
               select: pick,
             })
           : null;
-      const factoryIds = [...new Set(o.lines.map((l) => l.factoryId!))];
-      const byFactory =
-        !byRoute && factoryIds.length
+      const supplierIds = [...new Set(o.lines.map((l) => l.supplierId!))];
+      const bySupplier =
+        !byRoute && supplierIds.length
           ? await this.prisma.db.shipment.findFirst({
-              where: { forwarder: { not: null }, order: { ...others, lines: { some: { factoryId: { in: factoryIds } } } } },
+              where: { forwarder: { not: null }, order: { ...others, lines: { some: { supplierId: { in: supplierIds } } } } },
               orderBy: { createdAt: "desc" },
               select: pick,
             })
           : null;
-      const hit = byRoute ?? byFactory;
+      const hit = byRoute ?? bySupplier;
       if (hit?.forwarder) forwarder = { name: hit.forwarder, refNo: hit.order.refNo, why: byRoute ? "route" : "factory" };
     }
 
@@ -1640,14 +1640,14 @@ export class FlowService {
         options: {
           where: { status: "accepted" },
           take: 1,
-          select: { leadTime: true, factoryBasis: true, factoryBasisPlace: true },
+          select: { leadTime: true, supplierBasis: true, supplierBasisPlace: true },
         },
       },
     });
     const option = rev?.options[0] ?? null;
     const text = option?.leadTime ?? null;
     const days = leadDays(text);
-    const from = fromDbDateOrNull(o.factoryOrderedOn) ?? this.clock.today();
+    const from = fromDbDateOrNull(o.supplierOrderedOn) ?? this.clock.today();
     return {
       forwarder,
       banks,
@@ -1656,7 +1656,7 @@ export class FlowService {
       /** Ship-by while empty: when the customer wanted it (the deal's "wanted by"). */
       shipBy: !o.shipBy && o.inquiry.requiredBy ? { on: fromDbDate(o.inquiry.requiredBy), from: o.inquiry.refNo } : null,
       leadTime: text ? { text, days, from, readyOn: days ? addDays(from, days) : null } : null,
-      priceBasis: can(user, "sourcing.manage") && option?.factoryBasis ? { basis: option.factoryBasis, place: option.factoryBasisPlace } : null,
+      priceBasis: can(user, "sourcing.manage") && option?.supplierBasis ? { basis: option.supplierBasis, place: option.supplierBasisPlace } : null,
     };
   }
 }

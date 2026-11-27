@@ -28,7 +28,7 @@ import { EntryBody } from "@/components/ledger/entry-body";
 import { StatementButtons } from "@/components/ledger/statement-buttons";
 import type { Recipient } from "@/components/send/send";
 import { optional } from "@/components/print/data";
-import type { CustomerDetail, FactoryDetail } from "@/lib/types-people";
+import type { CustomerDetail, SupplierDetail } from "@/lib/types-people";
 import { AgeingTiles, day, LedgerFilters, PARTY_PATH, periodOf, span, TypeBadge } from "@/components/ledger/ledger-parts";
 import type { LedgerEntry, LedgerParty } from "@/lib/types-ledger";
 import { UUID } from "@/lib/ids";
@@ -43,7 +43,7 @@ async function recipientOf(kind: LedgerPartyKind, id: string): Promise<Recipient
     return k ? { name: k.name, email: k.email, phone: k.whatsapp ?? k.phone } : null;
   }
   if (kind === "factory") {
-    const f = await optional(() => api.get<FactoryDetail>(`/factories/${id}`));
+    const f = await optional(() => api.get<SupplierDetail>(`/factories/${id}`));
     return f ? { name: f.contactPerson ?? f.name, email: f.email, phone: f.phone } : null;
   }
   return null;
@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ kind: str
 }
 
 /**
- * One customer's, factory's or person's ledger (approved page 34): what they owe us or we owe them, by how late,
+ * One customer's, supplier's or person's ledger (approved page 34): what they owe us or we owe them, by how late,
  * then every entry between two days with the balance after it, opening and closing. "Only open items" hides the
  * orders already settled. The statement prints and shares from here.
  */

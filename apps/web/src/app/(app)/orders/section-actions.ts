@@ -23,8 +23,8 @@ const ahead = (v: Record<string, string>) => ({
   ...(v.confirm === "true" ? { confirm: true, reason: v.reason?.trim() || undefined } : {}),
 });
 
-/** "Ready date": the date itself is the order's (its plans follow it); told on, how and the note are kept with the factory. */
-export async function readyDateAction(orderId: string, factoryId: string | null, was: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+/** "Ready date": the date itself is the order's (its plans follow it); told on, how and the note are kept with the supplier. */
+export async function readyDateAction(orderId: string, supplierId: string | null, was: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const r = await attempt(
     form,
@@ -32,12 +32,12 @@ export async function readyDateAction(orderId: string, factoryId: string | null,
       // The date only when it changed: the order's plans are built again from it.
       if ("readyOn" in v && (v.readyOn || null) !== was)
         await api.patch(`/orders/${orderId}/details`, {
-          ...(factoryId ? { readyBy: [{ factoryId, readyOn: v.readyOn || null }] } : { readyOn: v.readyOn || null }),
+          ...(supplierId ? { readyBy: [{ supplierId, readyOn: v.readyOn || null }] } : { readyOn: v.readyOn || null }),
           reason: reasonOf(form),
           ...ahead(v),
         });
       const facts = pick(v, ["readyToldOn", "readyToldVia", "readyNote"]);
-      if (Object.keys(facts).length) await api.put(`/orders/${orderId}/factory-facts`, { factoryId, ...facts });
+      if (Object.keys(facts).length) await api.put(`/orders/${orderId}/factory-facts`, { supplierId, ...facts });
       return null;
     },
     "Saved.",
@@ -47,11 +47,11 @@ export async function readyDateAction(orderId: string, factoryId: string | null,
 }
 
 /** "Factory test (FAT)": planned, who attends, done, how it went. */
-export async function factoryTestAction(orderId: string, factoryId: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function supplierTestAction(orderId: string, supplierId: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.put(`/orders/${orderId}/factory-facts`, { factoryId, ...pick(v, ["fatPlannedOn", "fatAttendedById", "fatDoneOn", "fatResult", "fatRemarks"]) }),
+    () => api.put(`/orders/${orderId}/factory-facts`, { supplierId, ...pick(v, ["fatPlannedOn", "fatAttendedById", "fatDoneOn", "fatResult", "fatRemarks"]) }),
     "Saved.",
   );
   if (r.ok) refresh(orderId);
@@ -62,7 +62,7 @@ export async function factoryTestAction(orderId: string, factoryId: string | nul
  * "All received": every goods line in full on the day given, and where they were received. With the
  * lines already in, only the place is kept.
  */
-export async function goodsReceivedAction(orderId: string, factoryId: string | null, all: boolean, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function goodsReceivedAction(orderId: string, supplierId: string | null, all: boolean, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const r = await attempt(
     form,
@@ -72,7 +72,7 @@ export async function goodsReceivedAction(orderId: string, factoryId: string | n
         const lines = o.lines.filter((l) => l.type === "goods").map((l) => ({ lineId: l.id, receivedQty: Number(l.quantity) }));
         await api.put(`/orders/${orderId}/receipt`, { on: v.receivedOn || null, lines });
       }
-      if ("goodsReceivedAt" in v) await api.put(`/orders/${orderId}/factory-facts`, { factoryId, goodsReceivedAt: v.goodsReceivedAt });
+      if ("goodsReceivedAt" in v) await api.put(`/orders/${orderId}/factory-facts`, { supplierId, goodsReceivedAt: v.goodsReceivedAt });
       return null;
     },
     all ? "All goods marked as received." : "Saved.",

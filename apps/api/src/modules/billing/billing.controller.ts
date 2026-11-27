@@ -14,7 +14,7 @@ import { BillingService } from "./billing.service";
 export class BillingController {
   constructor(private readonly billing: BillingService) {}
 
-  /** What we still owe each factory on orders not cancelled. ?mine=true: the factories I look after; ?factory=: one supplier. */
+  /** What we still owe each supplier on orders not cancelled. ?mine=true: the suppliers I look after; ?factory=: one supplier. */
   @SignedIn("checked inside: sourcing.manage")
   @Get("money/payables")
   payables(

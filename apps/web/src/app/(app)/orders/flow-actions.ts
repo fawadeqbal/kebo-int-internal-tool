@@ -28,7 +28,7 @@ const pick = (form: FormData, keys: string[]) => {
   return Object.fromEntries(keys.filter((k) => k in v).map((k) => [k, v[k]]));
 };
 
-/* ---------------------------------------------------------------- payment route, bank contract, factory order */
+/* ---------------------------------------------------------------- payment route, bank contract, supplier order */
 
 export async function routeAction(orderId: string, _prev: ActionState, form: FormData) {
   const v = formValues(form);

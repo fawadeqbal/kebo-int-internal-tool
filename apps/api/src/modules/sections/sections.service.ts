@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { can, FAT_RESULT_LABEL, ORDER_FLOW_STAGES, orderSteps, REQUEST_CHANNEL_LABEL, stageStands, type FactoryFactsInput, type FatResult, type RequestChannel, type SectionFacts } from "@kebo/shared";
+import { can, FAT_RESULT_LABEL, ORDER_FLOW_STAGES, orderSteps, REQUEST_CHANNEL_LABEL, stageStands, type SupplierFactsInput, type FatResult, type RequestChannel, type SectionFacts } from "@kebo/shared";
 import { fromDbDateOrNull, toDbDateOrNull } from "@kebo/database";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -29,8 +29,8 @@ export class SectionsService {
     private readonly audit: AuditService,
   ) {}
 
-  /** What the factories are owed and paid, for people who may see factory money (null otherwise). */
-  private async factoriesOf(user: SessionUser, orderId: string): Promise<SectionFacts["factories"]> {
+  /** What the suppliers are owed and paid, for people who may see supplier money (null otherwise). */
+  private async suppliersOf(user: SessionUser, orderId: string): Promise<SectionFacts["factories"]> {
     if (!can(user, "sourcing.manage")) return null;
     const m = await this.money.forOrder(user, orderId);
     return m.factories ? m.factories.rows.map((r) => ({ name: r.factory.name, currency: r.currency, owed: r.owed, paid: r.paid, toPay: r.toPay })) : [];
@@ -40,8 +40,8 @@ export class SectionsService {
   async facts(user: SessionUser, id: string): Promise<{ status: string; facts: SectionFacts }> {
     const o = await this.prisma.db.order.findFirst({ where: { id, ...orderAccess(user) }, include: factsInclude });
     if (!o) throw new NotFoundError("Order");
-    const [factories, settings, expenses] = await Promise.all([this.factoriesOf(user, o.id), this.settings.get(), this.limits.allows("expenses")]);
-    const facts = { ...orderFactsOf(o, factories, this.clock.timeZone, fxOf(settings, expenses), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
+    const [suppliers, settings, expenses] = await Promise.all([this.suppliersOf(user, o.id), this.settings.get(), this.limits.allows("expenses")]);
+    const facts = { ...orderFactsOf(o, suppliers, this.clock.timeZone, fxOf(settings, expenses), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
     return { status: o.status, facts };
   }
 
@@ -65,18 +65,18 @@ export class SectionsService {
   }
 
   /**
-   * Production, per factory of the order (one row, factory null, when the lines name none): its ready
+   * Production, per supplier of the order (one row, supplier null, when the lines name none): its ready
    * date with when and how it was told, its factory test, where its goods were received.
    */
   private async production(orderId: string) {
     const [rows, lines] = await Promise.all([
-      this.prisma.db.orderFactory.findMany({ where: { orderId }, include: { factory: { select: { id: true, name: true } }, fatAttendedBy: { select: { id: true, name: true } } } }),
-      this.prisma.db.orderLine.findMany({ where: { orderId, type: "goods" }, select: { factoryId: true, factory: { select: { id: true, name: true } } } }),
+      this.prisma.db.orderSupplier.findMany({ where: { orderId }, include: { factory: { select: { id: true, name: true } }, fatAttendedBy: { select: { id: true, name: true } } } }),
+      this.prisma.db.orderLine.findMany({ where: { orderId, type: "goods" }, select: { supplierId: true, factory: { select: { id: true, name: true } } } }),
     ]);
-    const factories = [...new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
-    const slots: ({ id: string; name: string } | null)[] = factories.length ? factories : [null];
+    const suppliers = [...new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
+    const slots: ({ id: string; name: string } | null)[] = suppliers.length ? suppliers : [null];
     return slots.map((f) => {
-      const r = rows.find((x) => x.factoryId === (f?.id ?? null));
+      const r = rows.find((x) => x.supplierId === (f?.id ?? null));
       return {
         factory: f,
         readyOn: fromDbDateOrNull(r?.readyOn ?? null),
@@ -96,23 +96,23 @@ export class SectionsService {
   }
 
   /**
-   * PUT /orders/:id/factory-facts — what Production's windows keep for one factory of the order (only the
+   * PUT /orders/:id/factory-facts — what Production's windows keep for one supplier of the order (only the
    * fields sent change). The ready date itself is the order's own (its plans follow it); this keeps when
    * and how it was told, the factory test, and where the goods were received.
    */
-  async saveFactoryFacts(user: SessionUser, id: string, input: FactoryFactsInput) {
+  async saveSupplierFacts(user: SessionUser, id: string, input: SupplierFactsInput) {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change this order.");
     const o = await this.prisma.db.order.findFirst({
       where: { id, ...orderAccess(user) },
-      select: { id: true, refNo: true, status: true, lines: { where: { type: "goods" }, select: { factoryId: true, factory: { select: { name: true } } } } },
+      select: { id: true, refNo: true, status: true, lines: { where: { type: "goods" }, select: { supplierId: true, factory: { select: { name: true } } } } },
     });
     if (!o) throw new NotFoundError("Order");
     if (o.status !== "open") throw new DomainError(o.status === "closed" ? "This order is closed." : "This order is cancelled.");
-    const ids = [...new Set(o.lines.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
-    const factoryId = input.factoryId ?? (ids.length === 1 ? ids[0]! : null);
-    if (factoryId ? !ids.includes(factoryId) : ids.length > 0) throw new DomainError("Choose a supplier of this order.");
+    const ids = [...new Set(o.lines.flatMap((l) => (l.supplierId ? [l.supplierId] : [])))];
+    const supplierId = input.supplierId ?? (ids.length === 1 ? ids[0]! : null);
+    if (supplierId ? !ids.includes(supplierId) : ids.length > 0) throw new DomainError("Choose a supplier of this order.");
     if (input.fatAttendedById && !(await this.prisma.db.user.findFirst({ where: { id: input.fatAttendedById }, select: { id: true } }))) throw new DomainError("Choose a person of the company.");
-    const name = o.lines.find((l) => l.factoryId === factoryId)?.factory?.name ?? null;
+    const name = o.lines.find((l) => l.supplierId === supplierId)?.factory?.name ?? null;
     // A test that has a result has been done: not on a day still to come (review 24 Nov: a future day was kept as Passed).
     if (input.fatDoneOn && input.fatDoneOn > this.clock.today())
       throw new DomainError("The factory test cannot be done on a day still to come: plan it with the planned day.");
@@ -123,9 +123,9 @@ export class SectionsService {
     if (!Object.keys(data).length) return this.view(user, id);
 
     await this.prisma.tx(async (tx) => {
-      const row = await tx.orderFactory.findFirst({ where: { orderId: id, factoryId } });
-      if (row) await tx.orderFactory.update({ where: { id: row.id }, data });
-      else await tx.orderFactory.create({ data: { orderId: id, factoryId, ...data } });
+      const row = await tx.orderSupplier.findFirst({ where: { orderId: id, supplierId } });
+      if (row) await tx.orderSupplier.update({ where: { id: row.id }, data });
+      else await tx.orderSupplier.create({ data: { orderId: id, supplierId, ...data } });
       // The history says what changed, in words.
       const said: string[] = [];
       if (input.fatDoneOn !== undefined || input.fatResult !== undefined) {
@@ -143,7 +143,7 @@ export class SectionsService {
         entityType: "order",
         entityId: id,
         summary: `${o.refNo}: ${said.join(", ")}${name ? ` (${name})` : ""}`,
-        newValues: { ...input, factoryId } as Record<string, unknown>,
+        newValues: { ...input, supplierId } as Record<string, unknown>,
       });
     });
     return this.view(user, id);

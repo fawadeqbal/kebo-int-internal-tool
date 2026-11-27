@@ -6,7 +6,7 @@ import { ORDER_SECTIONS } from "./order-sections";
 /**
  * Documents v3: every file of an order in one list (GET /orders/:id/files),
  * wherever it is kept — the deal's files (URS, drawings), a paper's file, a
- * section's file, a file added on a step, a payment's proof, a factory
+ * section's file, a file added on a step, a payment's proof, a supplier
  * payment's proof, an expense's receipt — with the same tools everywhere.
  */
 
@@ -36,7 +36,7 @@ export const STEP_FILE_GROUP: Record<FlowStep, OrderFileGroup> = {
   delivery: "customer",
 };
 
-/** What a file is attached to: a paper, a section of the order, a step, the deal (inquiry), a payment, a factory payment, an expense or a factory offer. */
+/** What a file is attached to: a paper, a section of the order, a step, the deal (inquiry), a payment, a supplier payment, an expense or a supplier offer. */
 export const ORDER_FILE_LINKS = ["paper", "section", "step", "inquiry", "payment", "factory_payment", "expense", "offer"] as const;
 export type OrderFileLink = (typeof ORDER_FILE_LINKS)[number];
 

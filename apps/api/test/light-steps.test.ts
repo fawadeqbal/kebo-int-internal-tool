@@ -9,7 +9,7 @@ import { leadDays } from "../src/modules/flow/flow.service";
 import { Clock } from "../src/common/time/clock.service";
 
 /**
- * Order v4, light rows: the few fields the rows ask for (the factory's
+ * Order v4, light rows: the few fields the rows ask for (the supplier's
  * order no., the container's seal, loaded on, VGM, who received the goods),
  * changed one at a time from the view's "+ Add"; what the rows fill in from
  * earlier orders and the quote (GET /orders/:id/defaults); the one-tap items
@@ -25,7 +25,7 @@ describe("order v4: light steps", () => {
   let password: string;
   let me: string;
   let customerId: string;
-  let factoryId: string;
+  let supplierId: string;
   let first: string;
   let second: string;
   const tag = Date.now().toString(36);
@@ -53,7 +53,7 @@ describe("order v4: light steps", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "DPP-260", quantity: 2, unitPrice: 90000 }],
@@ -78,7 +78,7 @@ describe("order v4: light steps", () => {
     customerId = (
       await api(app, sana).post("/customers", { name: `Light Pharma ${tag}`, country: "PK", contacts: [{ name: "Ali", email: `ali-${tag}@lt.test` }] }).expect(201)
     ).body.id;
-    factoryId = (await api(app, sana).post("/factories", { name: `Light Works ${tag}` }).expect(201)).body.id;
+    supplierId = (await api(app, sana).post("/factories", { name: `Light Works ${tag}` }).expect(201)).body.id;
     first = (await newOrder()).id;
   });
 
@@ -88,22 +88,22 @@ describe("order v4: light steps", () => {
   });
 
   it("their order no. and the day we ordered are changed one at a time", async () => {
-    let f = (await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderNo: "HP-2026-118" }).expect(200)).body;
+    let f = (await api(app, sana).patch(`/orders/${first}/factory-order`, { supplierOrderNo: "HP-2026-118" }).expect(200)).body;
     expect(f.factory).toMatchObject({ orderNo: "HP-2026-118", orderedOn: null });
     // Only the date: the number stays (the phone app sends the date alone).
-    f = (await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderedOn: today }).expect(200)).body;
+    f = (await api(app, sana).patch(`/orders/${first}/factory-order`, { supplierOrderedOn: today }).expect(200)).body;
     expect(f.factory).toMatchObject({ orderNo: "HP-2026-118", orderedOn: today });
     const ordered = await stand(first, "factory");
     expect(ordered.word).toBe("PO sent");
     expect(ordered.fact).toContain("their no. HP-2026-118");
-    await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderNo: "x".repeat(61) }).expect(422);
-    await api(app, sana).patch(`/orders/${first}/factory-order`, { factoryOrderedOn: day(3) }).expect(400);
-    // Not this person's deal: not found; the history says what changed, under Factory order.
-    await api(app, bilal).patch(`/orders/${first}/factory-order`, { factoryOrderNo: "B-1" }).expect(404);
+    await api(app, sana).patch(`/orders/${first}/factory-order`, { supplierOrderNo: "x".repeat(61) }).expect(422);
+    await api(app, sana).patch(`/orders/${first}/factory-order`, { supplierOrderedOn: day(3) }).expect(400);
+    // Not this person's deal: not found; the history says what changed, under Supplier order.
+    await api(app, bilal).patch(`/orders/${first}/factory-order`, { supplierOrderNo: "B-1" }).expect(404);
     const h = await history(first);
     expect(h.some((e) => e.action === "flow.factory_order" && /their order no\. HP-2026-118/.test(e.summary))).toBe(true);
-    const factorySteps = (await api(app, sana).get(`/history?type=order&id=${first}&step=factory`).expect(200)).body as { action: string }[];
-    expect(factorySteps.some((e) => e.action === "flow.factory_order")).toBe(true);
+    const supplierSteps = (await api(app, sana).get(`/history?type=order&id=${first}&step=factory`).expect(200)).body as { action: string }[];
+    expect(supplierSteps.some((e) => e.action === "flow.factory_order")).toBe(true);
   });
 
   it("a shipment keeps its seal, the day it was loaded and the VGM", async () => {
@@ -161,7 +161,7 @@ describe("order v4: light steps", () => {
     expect(d.leadTime).toMatchObject({ text: "8-10 weeks after the deposit", days: 70, from: today });
     expect(d.leadTime.readyOn).toBe(day(70));
 
-    // A third order with no shipment: the same factory gives the forwarder.
+    // A third order with no shipment: the same supplier gives the forwarder.
     const third = (await newOrder()).id;
     d = (await api(app, sana).get(`/orders/${third}/defaults`).expect(200)).body;
     expect(d.forwarder).toMatchObject({ name: "Sino Trans", why: "factory" });
@@ -223,7 +223,7 @@ describe("order v4: light steps", () => {
     const logistics = await signIn(app, email, password);
     await api(app, logistics).post(`/orders/${second}/delivery/all-good`, {}).expect(403);
     await api(app, logistics).post(`/orders/${second}/sat/all-passed`, {}).expect(403);
-    await api(app, logistics).patch(`/orders/${second}/factory-order`, { factoryOrderNo: "L-1" }).expect(403);
+    await api(app, logistics).patch(`/orders/${second}/factory-order`, { supplierOrderNo: "L-1" }).expect(403);
     // It may read the defaults of orders it sees.
     await api(app, logistics).get(`/orders/${second}/defaults`).expect(200);
     await modulesOff(["delivery_sat"]);
@@ -236,8 +236,8 @@ describe("order v4: light steps", () => {
     try {
       const db = prisma.company(other.id);
       expect(await db.shipment.count({ where: { sealNo: "0048812" } })).toBe(0);
-      expect(await db.order.count({ where: { factoryOrderNo: "HP-2026-118" } })).toBe(0);
-      expect((await db.order.updateMany({ where: { id: first }, data: { factoryOrderNo: "hacked" } })).count).toBe(0);
+      expect(await db.order.count({ where: { supplierOrderNo: "HP-2026-118" } })).toBe(0);
+      expect((await db.order.updateMany({ where: { id: first }, data: { supplierOrderNo: "hacked" } })).count).toBe(0);
     } finally {
       await prisma.platform.company.delete({ where: { id: other.id } });
     }
