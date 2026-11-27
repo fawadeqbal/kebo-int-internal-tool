@@ -27,9 +27,17 @@ export async function part<T>(what: string, read: () => Promise<T>): Promise<T |
   } catch (e) {
     unstable_rethrow(e);
     if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return null;
-    console.error(
-      `[part] could not load ${what}: ${e instanceof ApiError ? `${e.status}${e.code ? ` ${e.code}` : ""}` : e instanceof Error ? e.message : "unknown error"}`,
-    );
+    console.error(`[part] could not load ${what}: ${why(e)}`);
     return { failed: true, what };
   }
+}
+
+/** Why a read failed, in a few words for the log: the API's status and code, or the network's (ECONNREFUSED). */
+function why(e: unknown): string {
+  if (e instanceof ApiError) return `${e.status}${e.code ? ` ${e.code}` : ""}`;
+  if (e instanceof Error) {
+    const code = (e.cause as { code?: unknown } | undefined)?.code;
+    return typeof code === "string" ? `${e.message} (${code})` : e.message;
+  }
+  return "unknown error";
 }

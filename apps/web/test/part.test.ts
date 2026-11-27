@@ -40,6 +40,31 @@ describe("part", () => {
     });
   });
 
+  it("the API client: an empty answer is nothing, words that are not JSON are a failure, a refusal keeps its status", async () => {
+    const { api } = await import("@/lib/api");
+    const answer = (status: number, text: string) =>
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(text, { status })),
+      );
+    answer(200, "");
+    expect(await api.post("/x")).toBeNull();
+    answer(200, "<html>proxy page</html>");
+    await expect(api.get("/x")).rejects.toMatchObject({ status: 502 });
+    expect(await part("the figures", () => api.get("/x"))).toEqual({ failed: true, what: "the figures" });
+    answer(503, "<html>Service Unavailable</html>");
+    await expect(api.get("/x")).rejects.toMatchObject({ status: 503 });
+    answer(200, JSON.stringify({ n: 1 }));
+    expect(await api.get("/x")).toEqual({ n: 1 });
+    vi.unstubAllGlobals();
+  });
+
+  it("logs a network failure's code (ECONNREFUSED), not just 'fetch failed'", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await part("who owes", () => Promise.reject(new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } })));
+    expect(log.mock.calls[0]?.[0]).toBe("[part] could not load who owes: fetch failed (ECONNREFUSED)");
+  });
+
   it("dataOf: the data, or null for both 'left out' and 'could not load'", () => {
     expect(dataOf({ a: 1 })).toEqual({ a: 1 });
     expect(dataOf(null)).toBeNull();

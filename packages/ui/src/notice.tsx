@@ -24,7 +24,10 @@ export function Notice({
   children,
   action,
   className,
+  role,
 }: {
+  /** How a screen reader hears it: "alert" (at once) is the default for "bad"; "status" waits its turn. */
+  role?: "alert" | "status";
   tone?: NoticeTone;
   title?: ReactNode;
   children?: ReactNode;
@@ -35,7 +38,7 @@ export function Notice({
   const t = TONES[tone];
   return (
     <div
-      role={tone === "bad" ? "alert" : "status"}
+      role={role ?? (tone === "bad" ? "alert" : "status")}
       className={cn(
         "flex flex-wrap items-start gap-x-2.5 gap-y-2 rounded-xl border px-3.5 py-3 text-md text-text [&_a:not([data-variant])]:font-bold [&_a:not([data-variant])]:underline [&_a:not([data-variant])]:underline-offset-2 [&_strong]:font-bold",
         t.box,

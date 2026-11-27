@@ -25,7 +25,8 @@ export function CouldNotLoad({ what, compact, className }: { what: string; compa
       </span>
     );
   return (
-    <Notice tone="bad" title={`Could not load ${what}`} action={again} className={className}>
+    // "status", not "alert": parts stream in, and each would interrupt the reader (review of #444).
+    <Notice tone="bad" role="status" title={`Could not load ${what}`} action={again} className={className}>
       Could not reach the server, or something went wrong. The rest of the page works; nothing you saved is lost.
     </Notice>
   );

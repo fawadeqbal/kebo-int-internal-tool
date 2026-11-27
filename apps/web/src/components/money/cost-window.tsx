@@ -154,7 +154,7 @@ type Mode =
   | { kind: "change"; expense: CostToChange }
   | { kind: "confirm"; month: CostToConfirm }
   /** Staff: sent for a manager to approve, on the company or one of these orders. */
-  | { kind: "send"; orders: { id: string; refNo: string; customer: string }[] };
+  | { kind: "send"; orders: { id: string; refNo: string; customer: string }[]; ordersFailed?: boolean };
 
 /**
  * The fields of a cost and its buttons. In a window of its own (AddCost, ChangeCost) or inside Record payment.
@@ -431,7 +431,12 @@ export function CostForm({
                     </Field>
                   )}
                   {place === "order" && (
-                    <Field label="Order" htmlFor="cost-order" error={st.errors?.orderId} hint={choices && orders.length === 0 ? "No order to choose" : undefined}>
+                    <Field
+                      label="Order"
+                      htmlFor="cost-order"
+                      error={st.errors?.orderId}
+                      hint={send?.ordersFailed ? "Could not load your open orders: try again later (The company works)" : choices && orders.length === 0 ? "No order to choose" : undefined}
+                    >
                       <Select
                         id="cost-order"
                         value={orderId}
@@ -802,7 +807,16 @@ export function ConfirmCost({ setup, month, sub }: { setup: CostSetup; month: Co
 }
 
 /** Staff: "Add a cost" sent for a manager to approve (on the company or one of their orders). */
-export function SendCost({ setup, orders }: { setup: CostSetup; orders: { id: string; refNo: string; customer: string }[] }) {
+export function SendCost({
+  setup,
+  orders,
+  ordersFailed = false,
+}: {
+  setup: CostSetup;
+  orders: { id: string; refNo: string; customer: string }[];
+  /** Their open orders could not be read: a cost on the company still goes; the Order field says so. */
+  ordersFailed?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   return (
@@ -811,7 +825,7 @@ export function SendCost({ setup, orders }: { setup: CostSetup; orders: { id: st
         Add a cost
       </Button>
       {notice && <Notice tone="bad">{notice}</Notice>}
-      {open && <CostPanel title="New cost" sub="A manager approves it before it counts" setup={setup} mode={{ kind: "send", orders }} onClose={() => setOpen(false)} onFileError={setNotice} />}
+      {open && <CostPanel title="New cost" sub="A manager approves it before it counts" setup={setup} mode={{ kind: "send", orders, ordersFailed }} onClose={() => setOpen(false)} onFileError={setNotice} />}
     </>
   );
 }

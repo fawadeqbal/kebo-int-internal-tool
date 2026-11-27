@@ -105,11 +105,12 @@ export default async function DashboardPage() {
 async function SendCost({ today }: { today: string }) {
   const [orders, settings] = await Promise.all([part("your open orders", () => api.get<Paged<OrderRow>>("/orders/page", { status: "open", page: 1, pageSize: 100 })), getSettings()]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  if (isFailed(orders)) return <CouldNotLoad compact what="your open orders" />;
+  // Their open orders could not be read: the button still sends a cost on the company; the Order field says so.
   return (
     <SendCostButton
       setup={{ mainCurrency: fx.main, fx, today, people: [], for: null }}
-      orders={(orders?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))}
+      orders={(dataOf(orders)?.rows ?? []).map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name }))}
+      ordersFailed={isFailed(orders)}
     />
   );
 }

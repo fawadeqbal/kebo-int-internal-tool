@@ -80,7 +80,17 @@ export async function apiFetch(path: string, init: RequestInit & { query?: Query
 }
 
 async function parse<T>(res: Response, platform = false): Promise<T> {
-  const body = res.status === 204 ? null : await res.json().catch(() => null);
+  // Empty (204, or a save that returns nothing): null. Words that are not JSON: an OK answer that cannot be read is
+  // a failure (a part says "Could not load"), not "nothing" (review of #444); a refusal keeps its status.
+  const text = res.status === 204 ? "" : await res.text().catch(() => "");
+  let body = null;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      if (res.ok) throw new ApiError(502, "The server's answer could not be read");
+    }
+  }
   // Their role needs two-step sign-in and they have not set it up: off to the setup, wherever they were.
   if (res.status === 403 && body?.code === "two_step_setup") redirect(platform ? "/platform/set-up-two-step" : "/login/set-up-two-step");
   // The platform session ended: sign in again.
