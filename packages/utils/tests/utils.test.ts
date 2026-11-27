@@ -93,6 +93,10 @@ describe("dates", () => {
     expect(monthsBetween("2025-11-15", "2026-02-03")).toEqual(["2025-11", "2025-12", "2026-01", "2026-02"]);
     expect(monthsBetween("2026-11-01", "2026-11-30")).toEqual(["2026-11"]);
     expect(monthsBetween("2026-12-01", "2026-11-30")).toEqual([]); // the end is before the start
+    expect(monthsBetween("2026-11-30", "2026-11-01")).toEqual(["2026-11"]); // an earlier day of the same month
+    // The last month a date can name: it ends there (a typed "to" of 9999-12-31 reaches the spending report).
+    const last = monthsBetween("9999-01-01", "9999-12-31");
+    expect([last.length, last[0], last[11]]).toEqual([12, "9999-01", "9999-12"]);
   });
   it("refuses what is not a day or a month", () => {
     expect(() => monthStart("2026-13")).toThrow(RangeError);

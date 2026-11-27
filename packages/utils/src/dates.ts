@@ -92,11 +92,16 @@ export const monthOf = (date: ISODate, months = 0): string => monthStart(date, m
 /** The `count` months ending with `to`'s, oldest first: ["2025-12", …, "2026-11"]. */
 export const lastMonths = (to: ISODate, count = 12): string[] => Array.from({ length: count }, (_, i) => monthOf(to, i - (count - 1)));
 
-/** The months from `from`'s to `to`'s, both in, oldest first: ["2026-09", "2026-10", "2026-11"]. None when `to` is in an earlier month. */
+/**
+ * The months from `from`'s to `to`'s, both in, oldest first: ["2026-09", "2026-10", "2026-11"]. None when `to` is
+ * in an earlier month. Counted first, then listed: stepping until the month passes `to` never ends at the last
+ * month a date can name (December 9999 has no month after it to compare with).
+ */
 export function monthsBetween(from: ISODate, to: ISODate): string[] {
-  const out: string[] = [];
-  for (let m = monthOf(from); m <= monthOf(to); m = monthOf(m, 1)) out.push(m);
-  return out;
+  const first = monthOf(from);
+  const last = monthOf(to);
+  const count = (Number(last.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + Number(last.slice(5, 7)) - Number(first.slice(5, 7)) + 1;
+  return count > 0 ? Array.from({ length: count }, (_, i) => monthOf(first, i)) : [];
 }
 
 /** Whole days from `from` to `to` (negative when `to` is earlier). */
