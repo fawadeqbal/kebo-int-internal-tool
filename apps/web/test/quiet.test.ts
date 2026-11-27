@@ -89,7 +89,7 @@ describe("editNotes", () => {
     expect(toast).toHaveBeenCalledWith({
       kind: "part",
       message: "Saved, but the note of what changed was not kept",
-      detail: "Request failed (500) The history may not show this change.",
+      detail: "Request failed (500). The history may not show this change.",
     });
   });
 });

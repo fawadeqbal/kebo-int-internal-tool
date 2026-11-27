@@ -115,7 +115,7 @@ export async function load<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * The company's brand on its documents (Settings → Company: logo, title, the line under it); null when this person
  * may not read it. Any other failure is the document's error page (Try again): a paper for a customer is not made
- * without its company's name.
+ * without its logo, mark and line (its name would still come from the paper's own copy of the company).
  */
 export const docBrand = cache(async (): Promise<{ logo: string | null; mark: string; tagline: string | null } | null> => {
   const b = await optional(() => api.get<{ logo: string | null; mark: string; tagline: string | null }>("/company/brand"));

@@ -245,16 +245,8 @@ async function Body({
         </>
       );
     }
-    case "factories": {
-      const d = await loadSuppliers(p);
-      const failed = failedWhat(...d.failedParts);
-      return (
-        <>
-          {failed && <CouldNotLoad what={failed} />}
-          <SuppliersSection d={d} p={p} page={page} base={path} params={keep} />
-        </>
-      );
-    }
+    case "factories":
+      return <SuppliersSection d={await loadSuppliers(p)} p={p} page={page} base={path} params={keep} />;
     case "people": {
       const [d, sPart] = await Promise.all([loadPeople(p, today), seeMoney ? spendingOf(p) : null]);
       const s = dataOf(sPart);

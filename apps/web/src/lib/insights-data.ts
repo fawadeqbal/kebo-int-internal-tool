@@ -465,11 +465,10 @@ export async function loadCustomers(p: Period, today: string) {
 
 export async function loadSuppliers(p: Period) {
   const span = { from: p.from, to: p.to };
-  const [period, ever, orders, count] = await Promise.all([
+  const [period, ever, orders] = await Promise.all([
     facts<SupplierGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
     facts<SupplierGroups>("factories/groups", { period: "all", by: "factory" }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
-    part("how many suppliers there are", () => api.get<{ total: number }>("/factories", { pageSize: 1 })),
   ]);
   const c = period.currency;
   const keys = new Set([
@@ -495,7 +494,7 @@ export async function loadSuppliers(p: Period) {
     })
     .sort((x, y) => n(y.spend) - n(x.spend) || y.orders - x.orders || n(y.toPay) - n(x.toPay) || x.name.localeCompare(y.name));
   const t = totalOf(orders);
-  const data = { currency: c, seeMoney: period.seeMoney, total: dataOf(count)?.total ?? null, rows, shipped: t?.shipped ?? null };
+  const data = { currency: c, seeMoney: period.seeMoney, rows, shipped: t?.shipped ?? null };
   const sheets: SheetSpec[] = [
     {
       name: `Insights suppliers ${p.from} to ${p.to}`,
@@ -524,7 +523,7 @@ export async function loadSuppliers(p: Period) {
       ]),
     },
   ];
-  return { ...data, sheets, failedParts: [count].filter(isFailed) };
+  return { ...data, sheets };
 }
 
 /* ------------------------------------------------------------------------------------------- People */
@@ -768,9 +767,10 @@ export async function insightsSheets(q: Record<string, string | undefined>): Pro
       return allOrNothing(d);
     }
     case "customers":
-      return allOrNothing(await loadCustomers(p, today));
+      // The count of all customers is on the page only, not in the file: it does not stop the export.
+      return (await loadCustomers(p, today)).sheets;
     case "factories":
-      return allOrNothing(await loadSuppliers(p));
+      return (await loadSuppliers(p)).sheets;
     case "people":
       return allOrNothing(await loadPeople(p, today));
     case "funnel":

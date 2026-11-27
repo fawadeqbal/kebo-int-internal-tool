@@ -21,7 +21,8 @@ export function editNotes() {
     /** After the notes: says, once, that some were not kept. */
     tell(): void {
       if (!missed.length) return;
-      const why = missed.find(Boolean);
+      // The API's words as a sentence ("Request failed (500)."), then what it means.
+      const why = missed.find(Boolean)?.replace(/([^.!?])$/, "$1.");
       toast({
         kind: "part",
         message: "Saved, but the note of what changed was not kept",

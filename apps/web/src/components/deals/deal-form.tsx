@@ -230,7 +230,6 @@ export function DealForm({
           keys: list.map((c) => c.key),
         });
       }
-    notes.tell();
     const list = stagedNow.current;
     if (list.length) {
       setUploading(true);
@@ -244,10 +243,13 @@ export function DealForm({
       setUploading(false);
       if (failed.length) {
         setCreated({ id, failed });
+        notes.tell();
         return { ok: true };
       }
     }
     onSaved({ id, refNo, title: v.title.trim() || undefined, customer: v.customer?.name, files: list.length });
+    // After onSaved's own "Request saved" (one note at a time, the newest shown): a note not kept is said last.
+    notes.tell();
     return { ok: true };
   };
 
