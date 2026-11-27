@@ -1817,7 +1817,7 @@ model OrderClaim {
   openedOn   DateTime    @map("opened_on") @db.Date
   resolvedOn DateTime?   @map("resolved_on") @db.Date
   resolution String?
-  /// What the claim is worth, and who bears it: supplier | us | customer.
+  /// What the claim is worth, and who bears it: factory (the supplier) | us | customer.
   amount     Decimal?    @db.Decimal(14, 2)
   currency   String?     @db.Char(3)
   bearer     String?     @db.VarChar(10)
@@ -1920,9 +1920,9 @@ model Expense {
   /// Which of our accounts the money moved through (cash, a bank, a wallet).
   accountId       String?       @map("account_id") @db.Uuid
   account         MoneyAccount? @relation(fields: [accountId], references: [id])
-  /// On an order: the step it belongs to (FlowStep: payment, supplier, production, shipping, documents, delivery).
+  /// On an order: the step it belongs to (FlowStep: payment, factory, production, shipping, documents, delivery).
   step            String?       @db.VarChar(20)
-  /// Who bears it: us (cuts the order's profit), customer (added to what they owe), supplier (taken off what we owe it).
+  /// Who bears it: us (cuts the order's profit), customer (added to what they owe), factory (the supplier: taken off what we owe it).
   borneBy         String        @default("us") @map("borne_by") @db.VarChar(10)
   /// Paid by `paidBy` from their own money: we owe it back until `repaidOn`.
   ownMoney        Boolean       @default(false) @map("own_money")

@@ -7,7 +7,7 @@ import type { PrismaService, Tx } from "../../database/prisma.service";
 type Db = PrismaService["db"] | Tx;
 
 export interface LedgerDifference {
-  /** order: what the customer still owes on it; supplier: what we still owe a supplier on an order (one currency);
+  /** order: what the customer still owes on it; factory: what we still owe a supplier on an order (one currency);
    *  account: a money account's balance; staff: what we owe a person back; credit: a customer's credit; group: a posting
    *  whose debits and credits differ in the main currency. */
   kind: "order" | "factory" | "account" | "staff" | "credit" | "group";
