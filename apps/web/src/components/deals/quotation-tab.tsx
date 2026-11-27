@@ -264,7 +264,7 @@ function NewQuotationsForm({
                             <td className="border-b border-line px-3 py-2 font-semibold">{next[i]}</td>
                             <td className="border-b border-line px-3 py-2">{o ? shortName(o.factory.name) : "Own prices"}</td>
                             <td className="border-b border-line px-3 py-2 text-right whitespace-nowrap tabular">
-                              {id === "own" ? "To price" : total === null ? "—" : money(total, currency)}
+                              {id === "own" ? "To price" : total === null ? "—" : money(total, offers?.currency ?? currency)}
                             </td>
                           </tr>
                         );

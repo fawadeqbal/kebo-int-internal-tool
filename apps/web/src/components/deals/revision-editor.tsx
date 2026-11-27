@@ -599,7 +599,11 @@ export function RevisionEditor({
       // Not read: the costs shown are still in the old currency, and the note says so.
       if (isFailed(next))
         setConverted((c) => ({ ok: false, text: `${c ? `${c.text} ` : ""}Could not load ${next.what}: the costs shown are still in ${offers.currency}.` }));
-      else if (next) setOffers(next);
+      else if (next) {
+        setOffers(next);
+        // A margin refused while they were loading (priceEveryOffer): the note no longer holds.
+        setConverted((c) => (c && !c.ok && c.text.startsWith("The offers' costs are still in") ? null : c));
+      }
     }
   };
 
