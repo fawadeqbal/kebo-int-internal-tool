@@ -1,4 +1,4 @@
-import type { FlowStep, OrderStepFacts } from "@kebo/shared";
+import { shipmentIn, shipmentLeft, type FlowStep, type OrderStepFacts } from "@kebo/shared";
 import { date } from "@/lib/format";
 import type { OrderFlow } from "@/lib/types-flow";
 import type { OrderView } from "@/lib/types-orders";
@@ -88,8 +88,9 @@ export function orderStepFacts(
   const ship = flow?.shipping?.shipments[0] ?? null;
   const dv = flow?.delivery ?? null;
   const gone = ["Shipped", "Arrived", "Delivered", "Done"].includes(o.word);
-  const sailed = gone || !!ship?.departedOn || !!o.shippedOn || (!!ship && ["departed", "arrived", "cleared"].includes(ship.status));
-  const arrived = ["Arrived", "Delivered", "Done"].includes(o.word) || !!ship?.arrivedOn || (!!ship && ["arrived", "cleared"].includes(ship.status));
+  // Gone and in as the order's word says (the shipment's status: shipmentLeft, shipmentIn), not a day on its own.
+  const sailed = gone || (!!ship && shipmentLeft(ship.status));
+  const arrived = ["Arrived", "Delivered", "Done"].includes(o.word) || (!!ship && shipmentIn(ship.status));
   const delivered = ["Delivered", "Done"].includes(o.word) || !!dv?.deliveredOn;
   const depositDue = Number(o.money.depositDue);
   const balanceDue = Math.max(0, Number(o.money.due) - Math.max(0, depositDue));

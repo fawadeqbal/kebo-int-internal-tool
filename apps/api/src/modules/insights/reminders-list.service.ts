@@ -11,6 +11,7 @@ import {
   documentsInUse,
   ORDER_TAB_LABEL,
   sectionReminders,
+  LEFT_STATUSES,
 } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -469,7 +470,7 @@ export class RemindersListService {
     if ((await on("bank_documents")) && (await on("shipping"))) {
       const papersOff = (await this.settings.get()).papers.off;
       const sailed = await this.prisma.db.order.findMany({
-        where: { ...orders, shipments: { some: { status: { in: ["departed", "arrived", "cleared"] } } } },
+        where: { ...orders, shipments: { some: { status: { in: [...LEFT_STATUSES] } } } },
         select: {
           id: true,
           refNo: true,

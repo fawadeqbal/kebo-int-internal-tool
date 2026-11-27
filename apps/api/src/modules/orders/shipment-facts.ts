@@ -1,5 +1,5 @@
 import { fromDbDateOrNull, toDbDateOrNull, type Prisma } from "@kebo/database";
-import { portsOf, shipmentsInOrder, shippedOnOf, type PortsOrder, type ShipmentStatus } from "@kebo/shared";
+import { portsOf, shipmentLeft, shipmentsInOrder, shippedOnOf, type PortsOrder } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
 
@@ -46,8 +46,6 @@ export function shipFacts<T extends Row>(shipments: readonly T[]) {
   };
 }
 
-const LEFT: ShipmentStatus[] = ["departed", "arrived", "cleared"];
-
 /**
  * Writes shipping facts typed on the order (the Details card without the shipping module, the move to
  * Shipped, the packing form, a paper's fix) where they belong: on Shipment 1, made when the order has none
@@ -65,7 +63,7 @@ export async function onPrimaryShipment(
   if (facts.containerNo !== undefined) data.containerNo = facts.containerNo;
   if (facts.departedOn !== undefined) {
     data.departedOn = toDbDateOrNull(facts.departedOn);
-    if (facts.departedOn && !LEFT.includes(first?.status ?? "planned")) data.status = "departed";
+    if (facts.departedOn && !shipmentLeft(first?.status ?? "planned")) data.status = "departed";
   }
   const before = {
     departedOn: fromDbDateOrNull(first?.departedOn ?? null),

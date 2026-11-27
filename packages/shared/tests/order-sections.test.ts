@@ -273,6 +273,17 @@ describe("what the sections say is late", () => {
     }
   });
 
+  it("and on whether they are in: an arrival day on a shipment still departed is not 'Arrived'; two shipments, one at sea", () => {
+    const words = (ships: { status: string; arrivedOn: string | null }[]) => ({
+      word: orderWord({ status: "open", ordered: true, shipments: ships.map((x) => ({ status: x.status, left: true })), delivered: false }, null),
+      tab: stageWords(fresh({ shipments: ships.map((x) => ship({ status: x.status as never, departedOn: "2026-11-10", arrivedOn: x.arrivedOn })) }), TODAY).shipping.tab,
+    });
+    expect(words([{ status: "arrived", arrivedOn: "2026-11-20" }])).toEqual({ word: "Arrived", tab: "arrived" });
+    expect(words([{ status: "departed", arrivedOn: "2026-11-20" }])).toEqual({ word: "Shipped", tab: "sailed" });
+    expect(words([{ status: "arrived", arrivedOn: "2026-11-20" }, { status: "departed", arrivedOn: null }])).toEqual({ word: "Shipped", tab: "sailed" });
+    expect(words([{ status: "arrived", arrivedOn: "2026-11-20" }, { status: "cleared", arrivedOn: "2026-11-21" }])).toEqual({ word: "Arrived", tab: "arrived" });
+  });
+
   it("a closed order reminds of nothing", () => {
     expect(sectionReminders(fresh({ readyOn: "2026-11-20", shipBy: "2026-11-24", closedOn: "2026-11-24" }), TODAY)).toEqual([]);
   });

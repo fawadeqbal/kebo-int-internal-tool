@@ -1,3 +1,5 @@
+import type { ShipmentStatus } from "../enums";
+
 /**
  * The one word for where an order stands, the same on its own page, in the lists, on the board and on Home:
  * Confirmed → In production → Shipped → Arrived → Delivered → Done (or Cancelled). It is worked out from what
@@ -28,16 +30,17 @@ export interface OrderWordFacts {
   delivered: boolean;
 }
 
-const LEFT_PORT = ["departed", "arrived", "cleared"];
-const IN_PORT = ["arrived", "cleared"];
+/** The statuses of a shipment that has left, and of one that is in (the lists the API asks the database with too). */
+export const LEFT_STATUSES = ["departed", "arrived", "cleared"] as const satisfies readonly ShipmentStatus[];
+export const IN_STATUSES = ["arrived", "cleared"] as const satisfies readonly ShipmentStatus[];
 
 /**
  * A shipment has left, or is in, by its status: the one rule the order's word, the Shipping tab's line and the
  * reminders read (review 27 Nov: three rules). The status is the authority: setting it to departed fills in the
  * day it left, and setting it back keeps the day, so a day on its own does not say the goods are gone.
  */
-export const shipmentLeft = (status: string): boolean => LEFT_PORT.includes(status);
-export const shipmentIn = (status: string): boolean => IN_PORT.includes(status);
+export const shipmentLeft = (status: string): boolean => (LEFT_STATUSES as readonly string[]).includes(status);
+export const shipmentIn = (status: string): boolean => (IN_STATUSES as readonly string[]).includes(status);
 
 /** `features`: the company's modules (null: all on); a switched-off module's facts are not read, as in the to-do list. */
 export function orderWord(f: OrderWordFacts, features: readonly string[] | null): OrderWord {
