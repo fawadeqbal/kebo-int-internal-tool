@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import known from "./size.known.json";
+import { SRC, tsFiles } from "./source-files";
 
 /**
  * Long files (review 27 Nov 2026: one class that reads the database, applies the rules and shapes a screen).
@@ -9,18 +10,10 @@ import known from "./size.known.json";
  * module boundaries. A new long file means a service took on another job: give that job its own file (a read
  * for one screen, a change of state, a rule) instead.
  */
-const SRC = resolve(__dirname, "../src");
 const LONG = 1000;
 
-function files(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    return statSync(path).isDirectory() ? files(path) : path.endsWith(".ts") ? [path] : [];
-  });
-}
-
 describe("long files", () => {
-  const long = files(SRC)
+  const long = tsFiles(SRC)
     .filter((f) => readFileSync(f, "utf8").split("\n").length > LONG)
     .map((f) => relative(SRC, f))
     .sort();
