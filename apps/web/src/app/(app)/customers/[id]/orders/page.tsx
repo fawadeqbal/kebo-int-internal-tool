@@ -12,6 +12,8 @@ import { FilterCard } from "@/components/common/filter-card";
 import { late } from "../shared";
 import { customerTitle } from "@/lib/titles";
 import { TabList } from "@/components/lists/tab-list";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = customerTitle("Orders");
 
@@ -43,11 +45,14 @@ export default async function CustomerOrders({
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   await requireUser();
-  const [c, pay, deals] = await Promise.all([
+  const [c, payPart, dealsPart] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
-    api.get<Paged<DealRow>>("/inquiries", { customerId: id, stage: "won", pageSize: 100 }).catch(() => null),
+    part("the inquiries the orders came from", () => api.get<Paged<DealRow>>("/inquiries", { customerId: id, stage: "won", pageSize: 100 })),
   ]);
+  const pay = dataOf(payPart);
+  const deals = dataOf(dealsPart);
+  const failed = failedWhat(payPart, dealsPart);
   const today = companyToday();
   const byOrder = new Map((deals?.rows ?? []).filter((d) => d.order).map((d) => [d.order!.id, d]));
   // Without the payments (people who may not see them): the orders alone, money columns blank.
@@ -87,6 +92,7 @@ export default async function CustomerOrders({
 
   return (
     <>
+      {failed && <CouldNotLoad what={failed} />}
       <FilterCard
         search="Search order no…"
         value={sp.q}

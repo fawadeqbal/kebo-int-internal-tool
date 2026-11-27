@@ -9,7 +9,7 @@ import { allPages } from "@/lib/exports";
 import { requireUser } from "@/lib/session";
 import { countOf, date } from "@/lib/format";
 import { FilterCard } from "@/components/common/filter-card";
-import type { DealRow, Person } from "@/lib/types";
+import type { DealRow } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
 import type { FollowUp, FollowUpList } from "@/lib/types-notes";
 import { PanelButton } from "@/components/orders/step-view";
@@ -19,6 +19,8 @@ import { DataTable } from "@/components/common/data-table";
 import { NewFollowUpBody } from "@/components/notes/new-follow-up";
 import { addFollowUpAction, editFollowUpAction, followUpDoneAction, followUpReopenAction, removeFollowUpAction } from "./actions";
 import { getPeople } from "@/lib/loaders";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Follow-ups" };
 
@@ -85,7 +87,7 @@ export default async function FollowUpsPage({
   const about = ABOUT.find((a) => a.value === sp.about)?.value;
   const q = sp.q?.trim() || undefined;
   const filters = { ...dueRange(due, today), q, who: viewAll ? sp.who || undefined : undefined, about };
-  const [list, people, orders, inquiries, customers, suppliers, other] = await Promise.all([
+  const [list, peoplePart, ordersPart, inquiriesPart, customersPart, suppliersPart, otherPart] = await Promise.all([
     api.get<FollowUpList>("/follow-ups", {
       mine: viewAll && !everyone ? "true" : undefined,
       open: status === "done" ? "false" : "true",
@@ -94,19 +96,27 @@ export default async function FollowUpsPage({
       page,
       pageSize: toPageSize(sp.size),
     }),
-    getPeople().catch(() => [] as Person[]),
-    api.get<OrderRow[]>("/orders", { status: "open" }).catch(() => [] as OrderRow[]),
+    part("the people to choose from", () => getPeople()),
+    part("the open orders", () => api.get<OrderRow[]>("/orders", { status: "open" })),
     // Every open inquiry, customer and supplier too (review 24 Nov: 100 inquiries, and no customers or suppliers).
-    allPages<DealRow>("/inquiries", { stage: "open" }).catch(() => [] as DealRow[]),
-    api.get<{ id: string; name: string }[]>("/customers/names").catch(() => [] as { id: string; name: string }[]),
-    allPages<{ id: string; name: string }>("/factories", {}).catch(() => [] as { id: string; name: string }[]),
+    part("the open inquiries", () => allPages<DealRow>("/inquiries", { stage: "open" })),
+    part("the customers", () => api.get<{ id: string; name: string }[]>("/customers/names")),
+    part("the suppliers", () => allPages<{ id: string; name: string }>("/factories", {})),
     // The other of Mine / Everyone, for its tab's count (the same search).
     viewAll
-      ? api
-          .get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 })
-          .catch(() => null)
+      ? part("the other tab's count", () =>
+          api.get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 }),
+        )
       : null,
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  const orders = dataOf(ordersPart) ?? [];
+  const inquiries = dataOf(inquiriesPart) ?? [];
+  const customers = dataOf(customersPart) ?? [];
+  const suppliers = dataOf(suppliersPart) ?? [];
+  const other = dataOf(otherPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(peoplePart, ordersPart, inquiriesPart, customersPart, suppliersPart, otherPart);
   const who = viewAll ? people.find((p) => p.id === sp.who)?.id : undefined;
   const keep = { view: everyone ? "everyone" : undefined, status: status === "open" ? undefined : status, q, due, who, about };
   const href = (patch: Record<string, string | undefined>) => {
@@ -188,6 +198,7 @@ export default async function FollowUpsPage({
         }
         views={whose && <span className="max-md:hidden">{whose}</span>}
       />
+      {failed && <CouldNotLoad what={failed} />}
       {/* A list's header switch is not on a phone (the header folds away): there it sits over the tabs. */}
       {whose && <div className="md:hidden">{whose}</div>}
       <LinkTabs

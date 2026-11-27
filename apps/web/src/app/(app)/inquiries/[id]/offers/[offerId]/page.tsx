@@ -26,6 +26,8 @@ import {
   saveSupplierQuoteAction,
   searchSuppliersAction,
 } from "../../sourcing/actions";
+import { dataOf, isFailed } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = inquiryTitle("Supplier offer");
 
@@ -37,7 +39,8 @@ export const generateMetadata = inquiryTitle("Supplier offer");
 export default async function OfferOwnPage({ params, searchParams }: { params: Promise<{ id: string; offerId: string }>; searchParams: Promise<{ panel?: string }> }) {
   const [{ id, offerId }, sp] = await Promise.all([params, searchParams]);
   await requirePermission("sourcing.manage");
-  const [d, s, settings, q, requests] = await Promise.all([dealOf(id), sourcingOf(id), getSettings(), optional(() => quotationOf(id)), requestsOf(id)]);
+  const [d, s, settings, q, requestsPart] = await Promise.all([dealOf(id), sourcingOf(id), getSettings(), optional(() => quotationOf(id)), requestsOf(id)]);
+  const requests = dataOf(requestsPart);
   const at = s.quotes.findIndex((x) => x.id === offerId);
   const x = s.quotes[at];
   if (!x) notFound();
@@ -157,6 +160,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
         ],
       }}
     >
+      {isFailed(requestsPart) && <CouldNotLoad what={requestsPart.what} />}
       {/* The same boxes as its steps (design 18 Nov), each with its history and Edit. */}
       <OfferBoxes q={x} kit={kit} canEdit={canEdit} edits={edits ?? undefined} mainCurrency={s.currency} historyHref={`${base}/history`} />
       {canEdit && sp.panel === "edit-offer" && <OfferUrlWindow kit={kit} q={x} />}

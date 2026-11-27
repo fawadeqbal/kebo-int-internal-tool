@@ -15,6 +15,8 @@ import { holdAction, moveStageAction } from "../actions";
 import { offerFactsOf } from "./facts";
 import { DecisionWindows } from "./panels";
 import { inquiryNext, quotationStatus, statusWords } from "./steps";
+import { dataOf, isFailed } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const TONE = { action: "text-action", ok: "text-ok", bad: "text-bad", mute: "text-text-2" } as const;
 
@@ -29,12 +31,14 @@ export default async function DealLayout({ children, params }: { children: React
   const me = await requireUser();
   const d = await dealOf(id);
   const sourcing = can(me, "sourcing.manage");
-  const facts = sourcing ? await offerFactsOf(id) : null;
+  const factsPart = sourcing ? await offerFactsOf(id) : null;
+  const facts = dataOf(factsPart);
   const order = d.orders.find((o) => o.status !== "cancelled");
   const base = `/inquiries/${d.id}`;
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const status = statusWords(d, facts, companyToday());
-  const next = inquiryNext(d, facts);
+  // The offers could not be read: no next step on a guess (the frame says what it could not load).
+  const next = isFailed(factsPart) ? null : inquiryNext(d, facts);
   const meta = [
     <span key="st" className={cn("font-semibold sm:whitespace-nowrap", TONE[status.tone])}>
       {status.text}
@@ -45,11 +49,13 @@ export default async function DealLayout({ children, params }: { children: React
     // Each fact once (design rules 18 Nov): the category is in the Details box; the country says where they are.
     d.customer.country !== "ZZ" && <span key="country">{countryName(d.customer.country)}</span>,
     d.priority !== "normal" && <PriorityBadge key="p" priority={d.priority} />,
+    isFailed(factsPart) && <CouldNotLoad key="failed" compact what={factsPart.what} />,
     // (The number is in the path above and the phone's top bar; who handles it, beside: each said once.)
   ].filter(Boolean);
   const tabs: InquiryTab[] = [
     { href: base, label: "Overview" },
-    ...(facts ? [{ href: `${base}/sourcing`, label: "Supplier offers", tag: facts.offers || facts.asked ? String(Math.max(facts.offers, facts.asked)) : undefined }] : []),
+    // The tab is there for whoever sees supplier prices, read or not (its own page says what could not be read).
+    ...(sourcing ? [{ href: `${base}/sourcing`, label: "Supplier offers", tag: facts && (facts.offers || facts.asked) ? String(Math.max(facts.offers, facts.asked)) : undefined }] : []),
     { href: `${base}/quotation`, label: "Quotations", tag: d.quotation?.revisions.length ? quotationStatus(d) : undefined },
     ...(managers ? [{ href: `${base}/costs`, label: "Costs" }] : []),
     { href: `${base}/history`, label: "History" },

@@ -12,6 +12,8 @@ import { hasFeature, requireUser } from "@/lib/session";
 import { api } from "@/lib/api";
 import type { CustomerAccount } from "@/lib/types-money";
 import { EmailText } from "@/components/common/email-text";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 
@@ -22,20 +24,25 @@ const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 export async function CustomerSide({ id }: { id: string }) {
   const me = await requireUser();
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, pay, notes, account, people] = await Promise.all([
+  const [c, payPart, notes, accountPart, peoplePart] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
     partyNotesOf("customers", id),
-    seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
+    seesCosts ? part("where their money went", () => api.get<CustomerAccount>(`/customers/${id}/account`)) : null,
     // For "@" in a note: who can be told.
-    getPeople().catch(() => []),
+    part("the people to tell", () => getPeople()),
   ]);
+  const pay = dataOf(payPart);
+  const account = dataOf(accountPart);
+  const people = dataOf(peoplePart) ?? [];
+  const failed = failedWhat(payPart, accountPart, peoplePart);
   const totals = pay?.totals ?? [];
   const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
   const today = companyToday();
   const canNote = can(me, "customers.manage");
   return (
     <>
+          {failed && <CouldNotLoad what={failed} />}
           {/* Money (board): sold, received, they owe, credit, per currency. */}
           <Card>
             <CardHeader

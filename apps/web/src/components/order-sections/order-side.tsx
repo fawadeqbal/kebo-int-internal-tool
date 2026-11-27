@@ -15,6 +15,8 @@ import { QuickNote } from "@/components/notes/note-forms";
 import { AssignSelect } from "@/app/(app)/inquiries/[id]/panels";
 import { addNoteAction } from "@/app/(app)/follow-ups/actions";
 import { assignOrderAction } from "@/app/(app)/orders/actions";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /**
  * Beside every tab of an order, drawn once by its layout (canvas board "One side panel for every record"): who
@@ -25,13 +27,16 @@ export async function OrderSide({ id }: { id: string }) {
   const me = await requireUser();
   const o = await orderOf(id);
   const mayAssign = can(me, "inquiries.assign") && o.status !== "cancelled";
-  const [flow, m, notes, followUps, people] = await Promise.all([
+  const [flow, m, notes, followUps, peoplePart] = await Promise.all([
     optional(() => orderFlowOf(id)),
     can(me, "sourcing.manage") ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
     optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
     optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id, open: "true" })),
-    getPeople().catch(() => []),
+    part("the people to tell", () => getPeople()),
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(peoplePart);
   const base = `/orders/${o.id}`;
   const paid = (m?.factories?.rows ?? []).filter((r) => Number(r.owed) > 0 || Number(r.paid) > 0);
   // Exact, as the order's own pages show them (whole units are for headline tiles only).
@@ -54,6 +59,7 @@ export async function OrderSide({ id }: { id: string }) {
   const form: ReactNode = o.status !== "cancelled" ? <QuickNote action={addNoteAction.bind(null, { key: "orderId", id: o.id })} people={people} /> : undefined;
   return (
     <PanelCard title="Order" bar={bar}>
+      {failed && <CouldNotLoad what={failed} />}
       <PanelWho
         title="Order"
         responsible={o.inquiry.assignee?.name ?? null}

@@ -6,6 +6,7 @@ import type { CustomerDetail, SupplierDetail } from "./types-people";
 import type { CustomerPayments, Payable } from "./types-money";
 
 import type { Note } from "./types-notes";
+import { part } from "@/lib/part";
 
 /**
  * A customer's or supplier's data, fetched once per request: the record's layout (header, figures, tab
@@ -13,7 +14,8 @@ import type { Note } from "./types-notes";
  */
 export const customerOf = cache((id: string) => load(() => api.get<CustomerDetail>(`/customers/${id}`)));
 /** What the customer paid and still owes, order by order (null when it cannot be read). */
-export const customerPaymentsOf = cache((id: string) => api.get<CustomerPayments>("/payments", { customerId: id }).catch(() => null));
+/** Their orders' money (null: this person may not see it; a Failed: it could not be read, and the parts using it say so). */
+export const customerPaymentsOf = cache((id: string) => part("their payments", () => api.get<CustomerPayments>("/payments", { customerId: id })));
 
 export const supplierOf = cache((id: string) => load(() => api.get<SupplierDetail>(`/factories/${id}`)));
 /** What we still owe this supplier (Finance › Payables, one row per supplier and currency). */

@@ -14,6 +14,8 @@ import { FilterCard } from "@/components/common/filter-card";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Paged } from "@/lib/types";
 import type { OrderRow } from "@/lib/types-orders";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /** Orders is one page with two views: the list and the board. The same switch on both (one item in the menu). */
 function ViewSwitch({ view, mine }: { view: "list" | "board"; mine: boolean }) {
@@ -90,7 +92,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
       <Th className={className}>{label}</Th>
     );
   const year = new Date().getFullYear();
-  const [data, owed, facts, shipments, customers, people, settings] = await Promise.all([
+  const [data, owed, facts, shipments, customersPart, peoplePart, settings] = await Promise.all([
     api.get<Paged<OrderRow & { purchaseOrders?: string[] }> & { counts: Record<Status | OrderStage | "lateInProduction", number> }>("/orders/page", {
       status,
       stage,
@@ -107,10 +109,14 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
     optional(() => api.get<{ currency: string; rows: { sales: string; profitExpected: string | null; margin: number | null }[] }>("/insights/facts/orders/groups", { from: `${year}-01-01`, to: `${year}-12-31`, period: "all" })),
     optional(() => api.get<{ status: string; eta: string | null; arrivedOn: string | null }[]>("/operations/shipments", {})),
     // Every customer with an order (the first 100 left most of them out of the filter: review 24 Nov).
-    api.get<{ id: string; name: string }[]>("/customers/names", { with: "orders" }).catch(() => null),
-    getPeople().catch(() => []),
+    part("the customers to choose from", () => api.get<{ id: string; name: string }[]>("/customers/names", { with: "orders" })),
+    part("the people to choose from", () => getPeople()),
     getSettings(),
   ]);
+  const customers = dataOf(customersPart);
+  const people = dataOf(peoplePart) ?? [];
+  // The parts that could not be read, said once under the header (the list works).
+  const failed = failedWhat(customersPart, peoplePart);
   const c = data.counts;
   const narrowed = !!(sp.q || mine || sp.customer || sp.assignee || stage);
   const main = owed?.currency ?? settings.sales.currency;
@@ -154,6 +160,7 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
         views={<ViewSwitch view="list" mine={mine} />}
         more={<ExportCsv what="orders" query={{ status, stage, customer: sp.customer, assignee: mine ? undefined : sp.assignee, mine: keep.mine, q: sp.q }} />}
       />
+      {failed && <CouldNotLoad what={failed} />}
 
       <StatRow facts>
         <StatTile icon={Package} iconColor={1} label="Open orders" value={c.open} href={href({ status: undefined, stage: undefined })} />
@@ -344,13 +351,15 @@ export async function List({ sp, mine }: { sp: Params; mine: boolean }) {
 export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
   const q = { mine: mine ? "true" : undefined, q: sp.q || undefined, customer: sp.customer || undefined };
   // Done: only the latest few (a company has thousands over the years).
-  const [openRows, recentDone, customers, flow] = await Promise.all([
+  const [openRows, recentDone, boardCustomersPart, flow] = await Promise.all([
     api.get<OrderRow[]>("/orders", { ...q, status: "open" }),
     api.get<OrderRow[]>("/orders", { ...q, status: "closed", recent: "true", limit: String(RECENT_DONE) }),
     // Every customer with an order (the first 100 left most of them out of the filter: review 24 Nov).
-    api.get<{ id: string; name: string }[]>("/customers/names", { with: "orders" }).catch(() => null),
+    part("the customers to choose from", () => api.get<{ id: string; name: string }[]>("/customers/names", { with: "orders" })),
     optional(() => api.get<{ items: { id: string; current: { key: FlowStep; label: string; sub: string } | null }[] }>("/order-board", { mine: q.mine })),
   ]);
+  const customers = dataOf(boardCustomersPart);
+  const failed = failedWhat(boardCustomersPart);
   const at = new Map((flow?.items ?? []).map((i) => [i.id, i.current]));
   const cols = STAGE_FLOW.map((stage) => ({ stage, rows: stage === "done" ? recentDone : openRows.filter((r) => orderWordColumn(r.word) === stage) }));
   // Every column's total, in each currency it holds ("USD 1.2M + CNY 300K"), not none when they mix (review 24
@@ -386,6 +395,7 @@ export async function Board({ sp, mine }: { sp: Params; mine: boolean }) {
         title="Sales orders"
         views={<ViewSwitch view="board" mine={mine} />}
       />
+      {failed && <CouldNotLoad what={failed} />}
       <FilterCard
         search="Search…"
         value={sp.q}

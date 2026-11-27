@@ -10,6 +10,8 @@ import { DataTable } from "@/components/common/data-table";
 import { FilterCard } from "@/components/common/filter-card";
 import { customerTitle } from "@/lib/titles";
 import { TabList } from "@/components/lists/tab-list";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = customerTitle("Inquiries");
 
@@ -38,10 +40,13 @@ export default async function CustomerInquiries({
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const me = await requireUser();
   const status = STAGES.find((x) => x === sp.status);
-  const [c, list] = await Promise.all([
+  const [c, listPart] = await Promise.all([
     customerOf(id),
-    api.get<Paged<DealRow>>("/inquiries", { customerId: id, q: sp.q?.trim() || undefined, stage: status, page: toPage(sp.page), pageSize: toPageSize(sp.size, 10) }).catch(() => null),
+    part("their inquiries", () =>
+      api.get<Paged<DealRow>>("/inquiries", { customerId: id, q: sp.q?.trim() || undefined, stage: status, page: toPage(sp.page), pageSize: toPageSize(sp.size, 10) }),
+    ),
   ]);
+  const list = dataOf(listPart);
   const rows = list?.rows ?? [];
   const filtered = !!(sp.q || status);
   const base = `/customers/${c.id}/inquiries`;
@@ -59,7 +64,10 @@ export default async function CustomerInquiries({
         ]}
       />
       <TabList title="Inquiries" summary={countOf(list?.total ?? 0, "inquiry", "inquiries")}>
-        {rows.length === 0 ? (
+        {isFailed(listPart) ? (
+          // Not "No inquiries yet": they could not be read.
+          <CouldNotLoad what={listPart.what} className="m-4" />
+        ) : rows.length === 0 ? (
           <EmptyState
             title={filtered ? "No inquiries match" : "No inquiries yet"}
             description={

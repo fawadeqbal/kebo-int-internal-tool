@@ -14,6 +14,8 @@ import { ItemsBox } from "@/components/records/items-box";
 import { SheetPart } from "@/components/records/phone-items";
 import type { LineColumn, LineRow } from "@/components/lines/line-table";
 import { itemsLine } from "./steps";
+import { dataOf, isFailed, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 const price = (v: string) => (v ? Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "");
 
@@ -26,7 +28,9 @@ const price = (v: string) => (v ? Number(v).toLocaleString("en-US", { minimumFra
 export async function ItemsCard({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
-  const sourcing = can(me, "sourcing.manage") ? await sourcingOf(id).catch(() => null) : null;
+  const sourcingPart = can(me, "sourcing.manage") ? await part("the offers for each item", () => sourcingOf(id)) : null;
+  // Not read: the items are there without their offers' column, and it says so above them.
+  const sourcing = dataOf(sourcingPart);
   // How many offers price each item.
   const offers = new Map<string, number>();
   for (const q of sourcing?.quotes ?? []) for (const item of new Set(q.lines.map((l) => l.requestedItemId).filter((x): x is string => !!x))) offers.set(item, (offers.get(item) ?? 0) + 1);
@@ -69,6 +73,7 @@ export async function ItemsCard({ id }: { id: string }) {
 
   return (
     <div id="items" className="scroll-mt-24">
+      {isFailed(sourcingPart) && <CouldNotLoad what={sourcingPart.what} className="mb-3" />}
       <ItemsBox
         title="Items"
         count={itemsLine(d)}

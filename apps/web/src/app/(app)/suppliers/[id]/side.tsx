@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import type { SupplierGroups, SupplierOrders } from "@/lib/types-facts";
 import { supplierOf, supplierPayablesOf } from "@/lib/party-data";
 import { plural, whole } from "@/lib/format";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /**
  * The supplier's side panel, the same on every tab (live audit 20 Nov: it showed on Overview only): Money and how
@@ -14,12 +16,15 @@ import { plural, whole } from "@/lib/format";
 export async function SupplierSide({ id }: { id: string }) {
   const me = await requireUser();
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
-  const [f, payables, pos, groups] = await Promise.all([
+  const [f, payables, posPart, groupsPart] = await Promise.all([
     supplierOf(id),
     supplierPayablesOf(id),
-    money ? api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id }).catch(() => null) : null,
-    money ? api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory", supplierId: id }).catch(() => null) : null,
+    money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
+    money ? part("what we bought from it", () => api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory", supplierId: id })) : null,
   ]);
+  const pos = dataOf(posPart);
+  const groups = dataOf(groupsPart);
+  const failed = failedWhat(posPart, groupsPart);
   const r = f.record;
   const toPay = payables.filter((p) => Number(p.toPay) > 0.005);
   const perf = groups?.rows[0] ?? null;
@@ -31,6 +36,7 @@ export async function SupplierSide({ id }: { id: string }) {
   });
   return (
     <>
+          {failed && <CouldNotLoad what={failed} />}
           {/* Money (board): bought, paid, what we owe. */}
           <Card>
             <CardHeader

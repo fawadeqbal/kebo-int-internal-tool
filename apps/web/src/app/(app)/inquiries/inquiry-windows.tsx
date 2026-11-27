@@ -10,6 +10,7 @@ import { editsOf } from "@/lib/edit-data";
 import type { RequestStep } from "@/components/deals/deal-form";
 import { InquiryPanel } from "./inquiry-panel";
 import { createDealAction, customerContactsAction, quickCustomerAction, recentCustomersAction, removeRequestFileAction, saveRequestAction, searchCustomersAction } from "./actions";
+import { dataOf, isFailed, part } from "@/lib/part";
 
 /** The link that opens "New inquiry" over the Inquiries list (from anywhere), for a customer when one is given. */
 export const newInquiryHref = (customerId?: string) => `/inquiries?panel=new-inquiry${customerId ? `&for=${customerId}` : ""}`;
@@ -18,13 +19,15 @@ export const newInquiryHref = (customerId?: string) => `/inquiries?panel=new-inq
 export async function NewInquiryWindow({ customerId }: { customerId?: string }) {
   const me = await requireUser();
   if (!can(me, "inquiries.create")) return null;
-  const [settings, people, preset] = await Promise.all([
+  const [settings, people, presetPart] = await Promise.all([
     getSettings(),
     getPeople(),
     customerId && /^[0-9a-f-]{36}$/i.test(customerId)
-      ? api.get<{ id: string; name: string; country: string; contacts: ContactOption[] }>(`/customers/${customerId}`).catch(() => null)
+      ? part("the customer it was opened for", () => api.get<{ id: string; name: string; country: string; contacts: ContactOption[] }>(`/customers/${customerId}`))
       : Promise.resolve(null),
   ]);
+  // Not read: the window opens without them (the customer can be chosen in it) and says so.
+  const preset = dataOf(presetPart);
   const primary = preset?.contacts.find((c) => c.isPrimary) ?? preset?.contacts[0] ?? null;
   const customer: CustomerOption | null = preset
     ? { id: preset.id, name: preset.name, country: preset.country, primaryContact: primary && { id: primary.id, name: primary.name, detail: primary.email ?? primary.whatsapp ?? primary.phone } }
@@ -32,6 +35,7 @@ export async function NewInquiryWindow({ customerId }: { customerId?: string }) 
   return (
     <InquiryPanel
       mode="create"
+      failed={isFailed(presetPart) ? presetPart.what : null}
       numberHint={counterKey("inquiry", new Date().getFullYear())}
       action={createDealAction}
       // The one making it is the responsible person until someone else is chosen (design rules 18 Nov: sensible defaults).
