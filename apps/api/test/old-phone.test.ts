@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 import { CompaniesService } from "../src/common/company/companies.service";
 import { CompanyContext } from "../src/common/company/company-context";
-import { isOldPhone, oldPhoneNames } from "../src/common/names/old-names";
+import { isOldPhone, oldNames } from "../src/common/names/old-names";
 import { PrismaService } from "../src/database/prisma.service";
 
 /**
@@ -99,10 +99,17 @@ describe("a phone app from before the rename keeps working", () => {
     expect(asked.factoryQuoteId).toBe(made.id);
   });
 
-  it("is told apart from the web: without Dart's user agent the old name is not a field", async () => {
-    const res = await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [ruian] });
-    expect(res.status).toBe(422);
-    // And the web's answers carry the new names only.
+  it("the web's old names are read too (an old web beside the new API, during a deploy); its answers carry the new names only", async () => {
+    const extra = (
+      await api(app, sana)
+        .post("/factories", { name: `Deploy Window ${tag}` })
+        .expect(201)
+    ).body.id as string;
+    await api(app, sana)
+      .post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [extra] })
+      .expect(201);
+    const list = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
+    expect((list.items as { factory: { id: string } }[]).some((r) => r.factory.id === extra)).toBe(true);
     const sourcing = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body;
     const offer = (sourcing.quotes as Record<string, unknown>[])[0]!;
     expect(offer.supplierTotal).toBe("42000.00");
@@ -155,7 +162,7 @@ describe("a phone app from before the rename keeps working", () => {
     expect(row!.fingerprint).toBe(createHash("sha256").update(JSON.stringify(body)).digest("hex"));
   });
 
-  it("the layer itself: who is an old phone app, and what it changes", () => {
+  it("the layer itself: who is an old phone app, and what it changes for it and for the others", () => {
     expect(isOldPhone({ "user-agent": DART })).toBe(true);
     expect(isOldPhone({ "user-agent": "okhttp/4.12.0" })).toBe(true);
     expect(isOldPhone({ "user-agent": DART, "x-names": "supplier" })).toBe(false);
@@ -165,7 +172,7 @@ describe("a phone app from before the rename keeps working", () => {
       const req: { headers: Record<string, string>; url: string; body?: unknown; bodyAsSent?: unknown } = { headers, url, body };
       let sent: unknown;
       const res = { json: (b: unknown) => (sent = b) };
-      oldPhoneNames()(req, res, () => undefined);
+      oldNames()(req, res, () => undefined);
       res.json({ supplierId: "f1" });
       return { url: req.url, body: req.body, asSent: req.bodyAsSent, sent };
     };
@@ -181,10 +188,17 @@ describe("a phone app from before the rename keeps working", () => {
       asSent: { factoryIds: ["f1"], supplierQuoteId: "as it got it", factoryQuoteId: "edited" },
       sent: { supplierId: "f1", factoryId: "f1" },
     });
-    expect(run({ "user-agent": "Mozilla/5.0" }, "/api/expenses?factoryId=f1", { factoryIds: ["f1"] })).toEqual({
-      url: "/api/expenses?factoryId=f1",
-      body: { factoryIds: ["f1"] },
-      asSent: undefined,
+    // Anyone else: old names in are read (new wins when both are there); the answer is left alone.
+    expect(
+      run({ "user-agent": "Mozilla/5.0" }, "/api/expenses?factoryId=f1", {
+        factoryIds: ["f1"],
+        supplierQuoteId: "new",
+        factoryQuoteId: "old",
+      }),
+    ).toEqual({
+      url: "/api/expenses?supplierId=f1",
+      body: { supplierIds: ["f1"], supplierQuoteId: "new" },
+      asSent: { factoryIds: ["f1"], supplierQuoteId: "new", factoryQuoteId: "old" },
       sent: { supplierId: "f1" },
     });
   });

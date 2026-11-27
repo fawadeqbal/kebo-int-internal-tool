@@ -3,30 +3,22 @@
  * these functions are how they are read:
  *  - JSON saved before the change (settings, a submission's body, the history's snapshots, a remembered answer);
  *  - phone apps installed before it (they send `factoryId` and read `factoryTotal`).
- * Only compound names changed (`factoryId` → `supplierId`). The bare word (`factory`, `factories`) and
- * snake_case names (database names and stored values) are as they were, so they pass through untouched.
+ * Only compound names changed (`factoryId` → `supplierId`): the 225 of them are listed in old-names.renamed.ts.
+ * The bare word (`factory`, `factories`), snake_case names (database names and stored values) and names that
+ * always said supplier (`supplierCode`) are not in the list, so they pass through untouched.
  * Goes away when the stored data is renamed and the old phone apps are gone.
  */
+import { RENAMED } from "./old-names.renamed";
 
-/**
- * The word as one part of a camelCase name: at the start before a capital (`factoryId`), or capitalised after
- * a small letter (`newFactoryName`). Not the bare word, not snake_case, not a word that only holds it ("satisfactory").
- */
-const swap = (key: string, start: RegExp, inside: RegExp, one: string, many: string) => {
-  if (key.includes("_")) return key;
-  const cap = (w: string) => w[0]!.toUpperCase() + w.slice(1);
-  return key
-    .replace(start, (m, plural: string | undefined) => (m[0] === m[0]!.toUpperCase() ? cap(plural ? many : one) : plural ? many : one))
-    .replace(inside, (_m, plural: string | undefined) => cap(plural ? many : one));
-};
+/** The names that changed, both ways. A Map: a key such as "constructor" is not a name that changed. */
+const NEW_OF = new Map(Object.entries(RENAMED));
+const OLD_OF = new Map(Object.entries(RENAMED).map(([old, now]) => [now, old]));
 
-/** `factoryId` → `supplierId`. Anything else comes back as it is. */
-export const newName = (key: string): string =>
-  swap(key, /^[fF]actor(?:y|(ies))(?=[A-Z0-9])/, /(?<=[a-z0-9])Factor(?:y|(ies))(?![a-z])/g, "supplier", "suppliers");
+/** `factoryId` → `supplierId`. A name that did not change comes back as it is. */
+export const newName = (key: string): string => NEW_OF.get(key) ?? key;
 
-/** `supplierId` → `factoryId`: what a phone app from before the change calls it. */
-export const oldName = (key: string): string =>
-  swap(key, /^[sS]upplier(s)?(?=[A-Z0-9])/, /(?<=[a-z0-9])Supplier(s)?(?![a-z])/g, "factory", "factories");
+/** `supplierId` → `factoryId`: what a phone app from before the change calls it. `supplierCode` stays: it was always that. */
+export const oldName = (key: string): string => OLD_OF.get(key) ?? key;
 
 /** A list of field names saved before the change (the history's "what changed"). */
 export const newNames = (keys: readonly string[]): string[] => keys.map(newName);
