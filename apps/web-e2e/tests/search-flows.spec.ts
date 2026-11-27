@@ -44,8 +44,8 @@ test("the top bar finds every kind as you type; ↓ and Enter open one; a number
 test("Search: every result with a tab per kind, kept in the address", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/dashboard");
-  await page.keyboard.press("/");
   const box = page.getByRole("combobox", { name: "Search everything" });
+  await pressUntil(page, "/", () => expect(box).toBeFocused({ timeout: 1000 }));
   await box.fill("pharma");
   await page.getByRole("option", { name: /^See all results for/ }).click();
   await expect(page).toHaveURL(/\/search\?q=pharma$/);
