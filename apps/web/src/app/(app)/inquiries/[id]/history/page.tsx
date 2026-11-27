@@ -10,6 +10,8 @@ import { HistoryTable } from "@/components/common/history-list";
 import { FollowUpsCard } from "@/components/notes/cards";
 import { inquiryTitle } from "@/lib/titles";
 import { WithSide } from "../side";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = inquiryTitle("History");
 
@@ -19,17 +21,22 @@ export default async function DealHistory({ params, searchParams }: { params: Pr
   const sp = await searchParams;
   const me = await requireUser();
   const page = toPage(sp.page);
-  const [list, d, followUps, staff] = await Promise.all([
+  const [list, d, followUpsPart, staffPart] = await Promise.all([
     historyPage("deal", id, { page, pageSize: toPageSize(sp.size), q: sp.q?.trim() || undefined, who: sp.who }),
     dealOf(id),
-    api.get<FollowUpList>("/follow-ups", { inquiryId: id }).catch(() => null),
-    getPeople().catch(() => []),
+    part("its follow-ups", () => api.get<FollowUpList>("/follow-ups", { inquiryId: id })),
+    part("the people to choose from", () => getPeople()),
   ]);
+  const followUps = dataOf(followUpsPart);
+  const staff = dataOf(staffPart) ?? [];
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(followUpsPart, staffPart);
   const people = whoOptions(staff);
   const q = sp.q?.trim() ?? "";
   return (
     // The same panel as every tab of the inquiry, beside its history.
     <WithSide id={id}>
+      {failed && <CouldNotLoad what={failed} />}
       <Stack>
       <FilterCard search="Search history…" value={sp.q} clearHref={sp.who ? `?who=${sp.who}` : "?"} selects={[{ name: "who", label: "Who", value: sp.who, options: people }]} />
       <Card>

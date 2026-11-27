@@ -7,6 +7,7 @@ import { numberOnSave } from "@/lib/format";
 import { toast } from "@kebo/ui/client";
 import { SidePanel, useSidePanel } from "@/components/common/panel";
 import { DealForm, type RequestStep } from "@/components/deals/deal-form";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 type FormProps = Omit<ComponentProps<typeof DealForm>, "onSaved" | "onAllSteps">;
 
@@ -18,7 +19,21 @@ const PART_TITLE: Record<RequestStep, string> = { customer: "customer", items: "
  * (?panel=new-inquiry) and, the same window filled, "Edit the request" (?panel=edit-request).
  * A new one saved opens the inquiry; an edit closes it.
  */
-export function InquiryPanel({ refNo, customerName, inquiryTitle, numberHint, ...form }: FormProps & { refNo?: string; customerName?: string; inquiryTitle?: string; numberHint?: string }) {
+export function InquiryPanel({
+  refNo,
+  customerName,
+  inquiryTitle,
+  numberHint,
+  failed,
+  ...form
+}: FormProps & {
+  refNo?: string;
+  customerName?: string;
+  inquiryTitle?: string;
+  numberHint?: string;
+  /** A part it starts from could not be read (the customer it was opened for): it says so above the form. */
+  failed?: string | null;
+}) {
   const router = useRouter();
   const edit = form.mode === "edit";
   const panel = useSidePanel(edit ? "edit-request" : "new-inquiry");
@@ -32,6 +47,7 @@ export function InquiryPanel({ refNo, customerName, inquiryTitle, numberHint, ..
       onClose={() => panel.close()}
       className={one && form.startStep !== "items" ? RULES.window.part : RULES.window.items}
     >
+      {failed && <CouldNotLoad compact what={failed} className="mb-3" />}
       <DealForm
         {...form}
         only={one}

@@ -12,6 +12,8 @@ import { companyToday, countOf, soonDay } from "@/lib/format";
 import type { DealRow, Paged } from "@/lib/types";
 import type { Funnel } from "@/lib/types-facts";
 import { inquiryFacts, inquiryFilters, InquiriesHeader, readFilters, whereItStands } from "../list-shared";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Inquiries · Board" };
 
@@ -54,13 +56,17 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   const f = readFilters(sp);
   const year = new Date().getFullYear();
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const [settings, people, excel, funnel, ...lists] = await Promise.all([
+  const [settings, peoplePart, excel, funnelPart, ...lists] = await Promise.all([
     getSettings(),
-    getPeople().catch(() => []),
+    part("the people to choose from", () => getPeople()),
     hasFeature("excel"),
-    insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null) : null,
+    insights ? part("this year's inquiries", () => api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` })) : null,
     ...COLUMNS.map((c) => api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { stage: c.key, held: c.key === "on_hold" ? undefined : "no", ...f, sort: "newest", pageSize: SHOWN })),
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  const funnel = dataOf(funnelPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(peoplePart, funnelPart);
   const counts = lists[0]!.counts;
   // On hold has its own column: the open stages' columns hold only the ones going on (held=no).
   const cols = COLUMNS.map((c, i) => ({ ...c, rows: lists[i]!.rows, total: lists[i]!.total }));
@@ -87,6 +93,7 @@ export default async function InquiryBoardPage({ searchParams }: { searchParams:
   return (
     <Stack>
       <InquiriesHeader me={me} view="board" excel={excel} query={keep} />
+      {failed && <CouldNotLoad what={failed} />}
       <FactLine facts={inquiryFacts(funnel, counts.late_follow_ups ?? 0, settings.sales.currency)} />
       <FilterCard
         search="Search number, title, customer…"

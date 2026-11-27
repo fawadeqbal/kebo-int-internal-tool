@@ -16,6 +16,8 @@ import { getPeople, getSettings } from "@/lib/loaders";
 import type { DealRow, Paged } from "@/lib/types";
 import type { Funnel } from "@/lib/types-facts";
 import { inquiryFacts, inquiryFilters, InquiriesHeader, readFilters, StagePill, whereItStands } from "../list-shared";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Inquiries" };
 
@@ -43,12 +45,16 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
   const excel = await hasFeature("excel");
   const query = { stage: tab, ...f };
-  const [data, settings, people, yearFunnel] = await Promise.all([
+  const [data, settings, peoplePart, yearFunnelPart] = await Promise.all([
     api.get<Paged<DealRow> & { counts: Record<string, number> }>("/inquiries", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     getSettings(),
-    getPeople().catch(() => []),
-    insights ? api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` }).catch(() => null) : null,
+    part("the people to choose from", () => getPeople()),
+    insights ? part("this year's inquiries", () => api.get<Funnel>("/insights/facts/funnel", { from: `${year}-01-01`, to: `${year}-12-31` })) : null,
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  const yearFunnel = dataOf(yearFunnelPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(peoplePart, yearFunnelPart);
   const c = data.counts;
   const count = (t: Tab) =>
     // The stages' tabs count the ones going on; Open and All count those on hold too, once.
@@ -67,6 +73,8 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   return (
     <Stack>
       <InquiriesHeader me={me} view="list" excel={excel} query={{ stage: keep.stage, q: sp.q, assignee, customer: sp.customer, priority, channel, category: sp.category }} />
+
+      {failed && <CouldNotLoad what={failed} />}
 
       <FactLine facts={inquiryFacts(yearFunnel, c.late_follow_ups ?? 0, currency)} />
 

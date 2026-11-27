@@ -86,3 +86,24 @@ test.describe("customers and suppliers with their money reads failing", () => {
     await expect(page.getByText("This page could not load")).toHaveCount(0);
   });
 });
+
+test.describe("an inquiry and the orders with their side reads failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:~/sourcing,~/factory-requests,/customers/names,/follow-ups" });
+
+  test("the inquiry keeps its Supplier offers tab and says the offers could not be read; its items are there", async ({ page }) => {
+    const inquiry = foundPages()["/inquiries/[id]"];
+    test.skip(!inquiry, "no inquiry in the demo data");
+    await page.goto(inquiry!);
+    await expect(page.getByText("Could not load the supplier offers")).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Supplier offers/ })).toBeVisible();
+    await expect(page.getByText("Could not load the offers for each item")).toBeVisible();
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
+    expect(await accessibilityProblems(page), "the inquiry with failed parts meets WCAG 2.2 AA").toEqual([]);
+  });
+
+  test("the orders list and board say the customers to choose from could not be read, and list the orders", async ({ page }) => {
+    await page.goto("/orders");
+    await expect(page.getByText("Could not load the customers to choose from")).toBeVisible();
+    await expect(page.locator("tr[data-href]").first()).toBeVisible();
+  });
+});

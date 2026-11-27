@@ -20,6 +20,8 @@ import { addOfferLinesAction, copyOfferLinesAction, editOfferLineAction, moveOff
 import { removeFileAction } from "../../actions";
 import { getSettings } from "@/lib/loaders";
 import { inquiryTitle } from "@/lib/titles";
+import { dataOf, isFailed } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = inquiryTitle("Supplier offers");
 
@@ -62,7 +64,8 @@ export default async function SourcingPage({
     for (const o of c?.options ?? []) if (o.supplierQuoteId) usedIn.set(o.supplierQuoteId, [...(usedIn.get(o.supplierQuoteId) ?? []), y.letter]);
   }
   // The suppliers asked for this inquiry come first in the new offer's picker (design 18 Nov).
-  const requests = await requestsOf(d.id);
+  const requestsPart = await requestsOf(d.id);
+  const requests = dataOf(requestsPart);
   const askedSuppliers = (requests?.items ?? []).flatMap((r) =>
     r.factory
       ? [{ id: r.factory.id, name: r.factory.name, contactPerson: null, note: [r.sentOn ? `asked ${dayMonth(r.sentOn)}` : "asked", r.supplierQuoteId ? "offer in" : "no offer yet"].join(" · ") }]
@@ -169,6 +172,7 @@ export default async function SourcingPage({
   return (
     <WithSide id={id}>
       {notice}
+      {isFailed(requestsPart) && <CouldNotLoad what={requestsPart.what} />}
       <TabList
         title="Supplier offers"
         summary={summary}

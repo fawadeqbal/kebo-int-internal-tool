@@ -26,6 +26,8 @@ import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPrices
 import { ActionForm } from "@/components/common/action-form";
 import { SubmitButton } from "@kebo/ui/client";
 import { inquiryTitle } from "@/lib/titles";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = inquiryTitle("Quotation");
 
@@ -70,10 +72,14 @@ export default async function QuotationOwnPage({
 
   // What the windows need: the draft's values (its Edit buttons), the next revision's starting values (New
   // revision), and the offers costed in the quotation's currency (also for "From the offer").
-  const [draftValues, startValues] = await Promise.all([
-    manage && draft ? api.get<RevisionDraft>(`/revisions/${draft.id}/values`).catch(() => null) : null,
-    manage && x.canStartRevision ? api.get<RevisionDraft>(`/quotations/${x.id}/draft`).catch(() => null) : null,
+  const [draftValuesPart, startValuesPart] = await Promise.all([
+    manage && draft ? part("the draft's values", () => api.get<RevisionDraft>(`/revisions/${draft.id}/values`)) : null,
+    manage && x.canStartRevision ? part("the next revision's starting values", () => api.get<RevisionDraft>(`/quotations/${x.id}/draft`)) : null,
   ]);
+  const draftValues = dataOf(draftValuesPart);
+  const startValues = dataOf(startValuesPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(draftValuesPart, startValuesPart);
   const loadOffers = offersAction.bind(null, d.id);
   const offers: QuoteOffers | null = manage || showCosts ? await loadOffers(draftValues?.currency ?? startValues?.currency ?? r.currency) : null;
   const edit = isDraft && manage && !!draftValues && !!offers;
@@ -286,6 +292,7 @@ export default async function QuotationOwnPage({
         sections: quoteSide({ x, r, here, base, offers: showCosts ? offers : null }),
       }}
     >
+      {failed && <CouldNotLoad what={failed} />}
       {changed.map(({ opt, lines }) => (
         <Notice
           key={opt.id}

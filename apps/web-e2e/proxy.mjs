@@ -5,8 +5,8 @@
 // gives it as API_URL). It passes everything on unchanged and counts the calls of a page that asks to be counted:
 // a request whose user-agent ends with "page-cost/<tag>" (the web app passes the browser's user-agent on to the
 // API). GET /__page-cost/<tag> on that port answers what the page asked for (page-cost-flows.spec.ts).
-// It also makes a read fail on purpose, for one browser only: a user-agent with "fail-api:/a,/b" gets a 500 for
-// every API path starting with /a or /b (failed-parts-flows.spec.ts: the part says "Could not load").
+// It also makes a read fail on purpose, for one browser only: a user-agent with "fail-api:/a,~/b" gets a 500 for
+// every API path starting with /a, or with /b in it (failed-parts-flows.spec.ts: the part says "Could not load").
 import http from "node:http";
 
 const PORT = Number(process.env.E2E_PROXY_PORT ?? 8080);
@@ -49,7 +49,8 @@ http
     }
     const fail = FAIL.exec(String(req.headers["user-agent"] ?? ""))?.[1];
     const path = (req.url ?? "").replace(/^\/api/, "").split("?")[0];
-    if (fail && fail.split(",").some((p) => p && path.startsWith(p))) {
+    // "/a": paths starting with /a; "~/b": paths with /b anywhere in them (an id before it: /inquiries/<id>/sourcing).
+    if (fail && fail.split(",").some((p) => p && (p.startsWith("~") ? path.includes(p.slice(1)) : path.startsWith(p)))) {
       res.writeHead(500, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "Made to fail for a browser check" }));
       return;

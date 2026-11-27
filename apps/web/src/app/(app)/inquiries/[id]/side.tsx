@@ -11,6 +11,8 @@ import { PanelButton } from "@/components/orders/step-view";
 import { PanelCard, PanelNotes, PanelWho } from "@/components/records/panel-pieces";
 import { assignAction, noteAction } from "../actions";
 import { AssignForm, AssignSelect, NoteForm } from "./panels";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 /**
  * The one panel beside every tab of an inquiry (design "the record page", 17 Nov): the work around it — who
@@ -21,10 +23,14 @@ import { AssignForm, AssignSelect, NoteForm } from "./panels";
 export async function InquirySide({ id }: { id: string }) {
   const me = await requireUser();
   const d = await dealOf(id);
-  const [people, followUps] = await Promise.all([
-    getPeople().catch(() => []),
-    api.get<FollowUpList>("/follow-ups", { inquiryId: id, open: "true" }).catch(() => null),
+  const [peoplePart, followUpsPart] = await Promise.all([
+    part("the people to tell", () => getPeople()),
+    part("its follow-ups", () => api.get<FollowUpList>("/follow-ups", { inquiryId: id, open: "true" })),
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  const followUps = dataOf(followUpsPart);
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(peoplePart, followUpsPart);
   // The next follow-up: the earliest one still open. An open inquiry is never meant to be without one.
   const nextUp = [...(followUps?.rows ?? [])].sort((a, b) => `${a.dueOn}${a.dueAt ?? ""}`.localeCompare(`${b.dueOn}${b.dueAt ?? ""}`))[0];
   const base = `/inquiries/${d.id}`;
@@ -41,6 +47,7 @@ export async function InquirySide({ id }: { id: string }) {
 
   return (
     <PanelCard title="Inquiry" bar={[summary]}>
+      {failed && <CouldNotLoad what={failed} />}
       <PanelWho
         title="Inquiry"
         responsible={d.assignee?.name ?? null}
