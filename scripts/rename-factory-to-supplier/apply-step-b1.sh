@@ -2,7 +2,7 @@
 # Step B, phase 1, on a fresh checkout of main (run from the repo root): the Prisma relation fields named
 # factory/factories become supplier/suppliers, and every use the type checker links to them follows.
 set -euo pipefail
-T=/home/claude/review-tools/rename
+T="$(cd "$(dirname "$0")" && pwd)"
 python3 - <<'PY'
 import re
 p="packages/database/prisma/schema.prisma"; lines=open(p).read().split("\n"); n=0

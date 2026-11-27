@@ -3,7 +3,7 @@
 // queries silently select nothing and their results become `never`. This renames a key factory / factories when
 // its value is a query argument ({ select … }, { include … }, { where … }, { some … }, …) or `true` beside other
 // `true`s (a select). Usage: node select-keys.cjs <dir…> [--write]
-const ts = require("/tmp/stepb/node_modules/typescript");
+const ts = require(require.resolve("typescript", { paths: [process.cwd()] }));
 const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");

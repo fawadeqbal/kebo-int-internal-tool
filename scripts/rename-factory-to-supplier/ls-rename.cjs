@@ -2,7 +2,7 @@
 // editor's "Rename symbol"), within one project. Usage:
 //   node ls-rename.cjs <project dir> <file>:<line>:<name>=<new> … [--write]
 // Locals keep their names: a shorthand { factory } becomes { supplier: factory }.
-const ts = require("/tmp/stepb/node_modules/typescript");
+const ts = require(require.resolve("typescript", { paths: [process.cwd()] }));
 const fs = require("fs");
 const path = require("path");
 const dir = path.resolve(process.argv[2]);

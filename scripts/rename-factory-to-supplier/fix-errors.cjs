@@ -6,7 +6,7 @@
 //   const { factory } = x → const { supplier: factory } = x (destructuring: the local keeps its name)
 //   X["factory"]         → X["supplier"]       (indexed access type / element access with a string)
 // Usage: node fix-errors.cjs <project dir> [--write]   (runs tsc --noEmit -p tsconfig.json there, repeatedly)
-const ts = require("/tmp/stepb/node_modules/typescript");
+const ts = require(require.resolve("typescript", { paths: [process.cwd()] }));
 const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");
