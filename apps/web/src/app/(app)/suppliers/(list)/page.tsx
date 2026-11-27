@@ -17,6 +17,8 @@ import type { SupplierDetail, SupplierRow, Owed } from "@/lib/types-people";
 import { crumbsFor, labelFor } from "@/lib/nav";
 import { plural, short, whole, countOf } from "@/lib/format";
 import { getPeople } from "@/lib/loaders";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Suppliers" };
 
@@ -46,36 +48,44 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
   const panel = sp.panel === "new-factory" || (sp.panel === "edit-factory" && sp.id) ? sp.panel : undefined;
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
   const year = new Date().getFullYear();
-  const [data, all, mine, people, editing, owed, groups, thisYear, lastYear] = await Promise.all([
+  const [data, all, mine, peoplePart, editingPart, owedPart, groupsPart, yearPart, lastYearPart] = await Promise.all([
     api.get<List>("/factories", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     api.get<List>("/factories", { pageSize: 1 }),
     api.get<List>("/factories", { pageSize: 1, mine: "true" }),
-    getPeople().catch(() => []),
-    panel === "edit-factory" ? api.get<SupplierDetail>(`/factories/${sp.id}`).catch(() => null) : null,
+    part("the people to choose from", () => getPeople()),
+    panel === "edit-factory" ? part("the supplier to edit", () => api.get<SupplierDetail>(`/factories/${sp.id}`)) : null,
     // What we owe each supplier and what we bought from it (people who see money, with Insights).
-    money ? api.get<Owed>("/insights/facts/owed", { side: "payable" }).catch(() => null) : null,
-    money ? api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory" }).catch(() => null) : null,
+    money ? part("what we owe suppliers", () => api.get<Owed>("/insights/facts/owed", { side: "payable" })) : null,
+    money ? part("what we bought from each supplier", () => api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory" })) : null,
     money
-      ? api
-          .get<SupplierGroups>("/insights/facts/factories/groups", {
+      ? part("this year's buying", () =>
+          api.get<SupplierGroups>("/insights/facts/factories/groups", {
             period: "all",
             by: "factory",
             from: `${year}-01-01`,
             to: `${year}-12-31`,
-          })
-          .catch(() => null)
+          }),
+        )
       : null,
     money
-      ? api
-          .get<SupplierGroups>("/insights/facts/factories/groups", {
+      ? part("this year's buying", () =>
+          api.get<SupplierGroups>("/insights/facts/factories/groups", {
             period: "all",
             by: "factory",
             from: `${year - 1}-01-01`,
             to: `${year - 1}-12-31`,
-          })
-          .catch(() => null)
+          }),
+        )
       : null,
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  const editing = dataOf(editingPart);
+  const owed = dataOf(owedPart);
+  const groups = dataOf(groupsPart);
+  const thisYear = dataOf(yearPart);
+  const lastYear = dataOf(lastYearPart);
+  // The parts that could not be read, said once at the top (the rest of the page works).
+  const failed = failedWhat(peoplePart, editingPart, owedPart, groupsPart, yearPart, lastYearPart);
   const owes = new Map((owed?.rows ?? []).map((r) => [r.partyId, r]));
   const bought = new Map((groups?.rows ?? []).map((r) => [r.key, r]));
   const owedTotal = (owed?.rows ?? []).reduce((t, r) => t + Number(r.total), 0);
@@ -115,6 +125,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
         }
       />
 
+      {failed && <CouldNotLoad what={failed} />}
       <StatRow facts>
         <StatTile
           icon={Factory}

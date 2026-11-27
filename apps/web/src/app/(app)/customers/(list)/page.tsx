@@ -20,6 +20,8 @@ import { currenciesFrom } from "../currencies";
 import { crumbsFor } from "@/lib/nav";
 import { plural, short, whole, countOf } from "@/lib/format";
 import { getSettings } from "@/lib/loaders";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const metadata = { title: "Customers" };
 
@@ -66,11 +68,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const panel = canAdd ? sp.panel : undefined;
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
   const year = new Date().getFullYear();
-  const [owed, settings] = await Promise.all([
+  const [owedPart, settings] = await Promise.all([
     // What each customer owes (managers with Insights): the "They owe" column, the figure and the Owe money chip.
-    insights ? api.get<Owed>("/insights/facts/owed", { side: "receivable" }).catch(() => null) : null,
+    insights ? part("what customers owe", () => api.get<Owed>("/insights/facts/owed", { side: "receivable" })) : null,
     getSettings(),
   ]);
+  const owed = dataOf(owedPart);
   const owes = new Map((owed?.rows ?? []).map((r) => [r.partyId, r]));
   // The Owe money chip and the Pays late / Owes money statuses: only those customers (from what they owe).
   const lateIds = (owed?.rows ?? []).filter((r) => Number(r.overdue) > 0.005).map((r) => r.partyId);
@@ -88,34 +91,44 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   type CustomerPage = Paged<CustomerRow> & { counts?: { all: number; company: number; individual: number; archived: number } };
   const empty: CustomerPage = { rows: [], total: 0, page: 1, pageSize: 25 };
   const owingIds = [...owes.keys()];
-  const [data, all, openInquiries, askingCustomers, editing, sold, soldYear, soldLastYear, owingCount] = await Promise.all([
+  const [data, all, inquiriesPart, askingCustomers, editingPart, soldPart, yearPart, lastYearPart, owingPart] = await Promise.all([
     none ? empty : api.get<CustomerPage>("/customers", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
     api.get<CustomerPage & { newThisYear?: number }>("/customers", { pageSize: 1 }),
-    api.get<Paged<unknown>>("/inquiries", { stage: "open", pageSize: 1 }).catch(() => null),
+    part("the open inquiries", () => api.get<Paged<unknown>>("/inquiries", { stage: "open", pageSize: 1 })),
     api.get<Paged<CustomerRow>>("/customers", { status: "inquiry", pageSize: 1 }),
-    panel === "edit-customer" && sp.id ? api.get<CustomerDetail>(`/customers/${sp.id}`).catch(() => null) : null,
+    panel === "edit-customer" && sp.id ? part("the customer to edit", () => api.get<CustomerDetail>(`/customers/${sp.id}`)) : null,
     // What each customer bought (all time) and this year's sales against last year's (Insights).
-    insights ? api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "customer" }).catch(() => null) : null,
+    insights ? part("what each customer bought", () => api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "customer" })) : null,
     insights
-      ? api
-          .get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", from: `${year}-01-01`, to: `${year}-12-31` })
-          .catch(() => null)
+      ? part("this year's sales", () =>
+          api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", from: `${year}-01-01`, to: `${year}-12-31` }),
+        )
       : null,
     insights
-      ? api
-          .get<OrderGroups>("/insights/facts/orders/groups", {
+      ? part("this year's sales", () =>
+          api.get<OrderGroups>("/insights/facts/orders/groups", {
             period: "all",
             by: "company",
             from: `${year - 1}-01-01`,
             to: `${year - 1}-12-31`,
-          })
-          .catch(() => null)
+          }),
+        )
       : null,
     // The Owe money tab's count, for the same search.
     owingIds.length
-      ? api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, currency, status: query.status, ids: owingIds.join(","), pageSize: 1 }).then((r) => r.total).catch(() => null)
+      ? part("the Owe money count", () =>
+          api.get<Paged<CustomerRow>>("/customers", { q: sp.q, country, currency, status: query.status, ids: owingIds.join(","), pageSize: 1 }).then((r) => r.total),
+        )
       : 0,
   ]);
+  const openInquiries = dataOf(inquiriesPart);
+  const editing = dataOf(editingPart);
+  const sold = dataOf(soldPart);
+  const soldYear = dataOf(yearPart);
+  const soldLastYear = dataOf(lastYearPart);
+  const owingCount = dataOf(owingPart);
+  // The parts that could not be read, said once at the top (the rest of the page works).
+  const failed = failedWhat(owedPart, inquiriesPart, editingPart, soldPart, yearPart, lastYearPart, owingPart);
   // Each tab's count, for the same search (with no customer owing, the list itself is not asked for).
   const tabCounts = data.counts ?? all.counts;
   const soldBy = new Map((sold?.rows ?? []).map((r) => [r.key, r]));
@@ -148,6 +161,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         }
       />
 
+      {failed && <CouldNotLoad what={failed} />}
       <StatRow facts>
         <StatTile
           icon={Users}

@@ -11,6 +11,8 @@ import { date, companyToday } from "@/lib/format";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { customerTitle } from "@/lib/titles";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = customerTitle("Finance");
 
@@ -42,15 +44,20 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
   const today = companyToday();
   // Where their money went and what was spent on them: managers with expenses.
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, pay, ledger, account, spent, people, settings] = await Promise.all([
+  const [c, pay, ledgerPart, accountPart, spentPart, people, settings] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
-    ledgerOn ? api.get<LedgerParty>(`/ledger/parties/customer/${id}`, { from: "2000-01-01", to: today }).catch(() => null) : null,
-    seesCosts ? api.get<CustomerAccount>(`/customers/${id}/account`).catch(() => null) : null,
-    seesCosts ? api.get<ExpenseList>("/expenses", { customerId: id, pageSize: 100 }).catch(() => null) : null,
+    ledgerOn ? part("the statement from the books", () => api.get<LedgerParty>(`/ledger/parties/customer/${id}`, { from: "2000-01-01", to: today })) : null,
+    seesCosts ? part("where their money went", () => api.get<CustomerAccount>(`/customers/${id}/account`)) : null,
+    seesCosts ? part("what was spent on them", () => api.get<ExpenseList>("/expenses", { customerId: id, pageSize: 100 })) : null,
     seesCosts ? getPeople() : null,
     seesCosts ? getSettings() : null,
   ]);
+  const ledger = dataOf(ledgerPart);
+  const account = dataOf(accountPart);
+  const spent = dataOf(spentPart);
+  // Without the books' statement the one worked out from their orders and payments is shown, and it says so.
+  const failed = failedWhat(ledgerPart, accountPart, spentPart);
   const totals = pay?.totals ?? [];
   const main = totals[0]?.currency ?? c.defaultCurrency;
 
@@ -109,6 +116,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
 
   return (
     <div className="flex flex-col gap-4">
+      {failed && <CouldNotLoad what={failed} />}
       {account && <WhereMoneyWent a={account} />}
 
       <Card className="overflow-clip">

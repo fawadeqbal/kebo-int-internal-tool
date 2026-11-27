@@ -7,7 +7,7 @@ vi.mock("next/navigation", async (real) => await real());
 
 import { redirect } from "next/navigation";
 import { ApiError } from "@/lib/api";
-import { dataOf, isFailed, part } from "@/lib/part";
+import { dataOf, failedWhat, isFailed, part } from "@/lib/part";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -63,6 +63,13 @@ describe("part", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     await part("who owes", () => Promise.reject(new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } })));
     expect(log.mock.calls[0]?.[0]).toBe("[part] could not load who owes: fetch failed (ECONNREFUSED)");
+  });
+
+  it("failedWhat: the failed parts' names said once, or null", () => {
+    const f = (what: string) => ({ failed: true as const, what });
+    expect(failedWhat(null, { a: 1 })).toBeNull();
+    expect(failedWhat(f("who owes"), null)).toBe("who owes");
+    expect(failedWhat(f("who owes"), f("the sales"), f("who owes"), f("open inquiries"))).toBe("who owes, the sales and open inquiries");
   });
 
   it("dataOf: the data, or null for both 'left out' and 'could not load'", () => {

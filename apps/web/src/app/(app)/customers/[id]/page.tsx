@@ -21,6 +21,8 @@ import { CustomerPanel } from "../customer-panel";
 import { currenciesFrom } from "../currencies";
 import { customerTitle } from "@/lib/titles";
 import { BoxNote } from "@/components/common/record-box";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = customerTitle();
 
@@ -55,14 +57,16 @@ export default async function CustomerOverview({
   const canEdit = can(me, "customers.manage");
   const editing = canEdit && sp.panel === "edit-customer";
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const [c, settings, pay, groups] = await Promise.all([
+  const [c, settings, pay, groupsPart] = await Promise.all([
     customerOf(id),
     editing ? getSettings() : null,
     customerPaymentsOf(id),
     insights
-      ? api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", customerId: id }).catch(() => null)
+      ? part("what they bought", () => api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", customerId: id }))
       : null,
   ]);
+  const groups = dataOf(groupsPart);
+  const failed = failedWhat(groupsPart);
   const facts = groups?.rows[0];
   const latest = [...(pay?.orders ?? [])].sort((a, b) => b.orderedOn.localeCompare(a.orderedOn)).slice(0, 5);
   const openOrders = c.orders.filter((o) => o.status === "open").length;
@@ -73,6 +77,7 @@ export default async function CustomerOverview({
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
+      {failed && <CouldNotLoad what={failed} />}
       <StatRow facts>
         <StatTile label="Orders" value={c.orders.filter((o) => o.status !== "cancelled").length} sub={`${openOrders} open`} />
         <StatTile

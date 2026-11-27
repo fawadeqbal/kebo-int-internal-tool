@@ -41,3 +41,10 @@ function why(e: unknown): string {
   }
   return "unknown error";
 }
+
+/** The failed parts' names, said once ("who owes, the sales and the open inquiries"); null when none failed. */
+export function failedWhat(...parts: unknown[]): string | null {
+  const names = [...new Set(parts.filter(isFailed).map((p) => p.what))];
+  if (!names.length) return null;
+  return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
