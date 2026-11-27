@@ -67,7 +67,7 @@ export default async function SupplierOverview({
   const [f, peoplePart, posPart] = await Promise.all([
     supplierOf(id),
     editing ? part("the people to choose from", () => getPeople()) : ([] as Person[]),
-    money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
+    money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/supplier-orders", { supplierId: id })) : null,
   ]);
   const people = dataOf(peoplePart) ?? [];
   const pos = dataOf(posPart);

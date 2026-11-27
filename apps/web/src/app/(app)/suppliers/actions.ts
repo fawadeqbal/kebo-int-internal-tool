@@ -11,7 +11,7 @@ import { attempt, formValues, type ActionState } from "@/lib/actions";
 export async function saveSupplierAction(id: string | null, version: string | null, _prev: ActionState, form: FormData): Promise<ActionState> {
   const body = formValues(form);
   const r = await attempt(form, () =>
-    id ? api.put<{ id: string }>(`/factories/${id}`, body, { version }) : api.post<{ id: string }>("/factories", body),
+    id ? api.put<{ id: string }>(`/suppliers/${id}`, body, { version }) : api.post<{ id: string }>("/suppliers", body),
   );
   if (!r.ok) return r;
   const savedId = id ?? (r.data as { id: string }).id;
@@ -21,7 +21,7 @@ export async function saveSupplierAction(id: string | null, version: string | nu
 }
 
 export async function removeSupplierAction(id: string, _prev: ActionState, _form: FormData): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/factories/${id}`));
+  const r = await attempt(null, () => api.delete(`/suppliers/${id}`));
   if (!r.ok) return r;
   revalidatePath("/suppliers");
   redirect(`/suppliers?toast=${encodeURIComponent("Supplier removed.")}`);
@@ -33,7 +33,7 @@ export async function importSuppliersAction(
   fileName: string,
 ): Promise<{ ok: true; result: ImportResult } | { ok: false; message: string }> {
   try {
-    const result = await api.post<ImportResult>("/factories/import", { factories: items, fileName });
+    const result = await api.post<ImportResult>("/suppliers/import", { factories: items, fileName });
     revalidatePath("/suppliers");
     return { ok: true, result };
   } catch (e) {

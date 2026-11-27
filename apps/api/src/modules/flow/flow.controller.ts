@@ -91,7 +91,7 @@ export class OrderFlowController {
   }
 
   /** { supplierOrderedOn } — when we ordered from the supplier (empty: not yet). */
-  @Patch(":id/factory-order")
+  @Patch(":id/supplier-order")
   @RequirePermissions("orders.update")
   supplierOrder(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(supplierOrderInput)) body: SupplierOrderInput) {
     return this.flow.setSupplierOrder(user, id, body);
@@ -269,7 +269,7 @@ export class SupplierRequestsController {
   constructor(private readonly requests: SupplierRequestsService) {}
 
   /** The suppliers asked for a price on this inquiry, and who answered. */
-  @Get("inquiries/:id/factory-requests")
+  @Get("inquiries/:id/supplier-requests")
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")
   list(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string) {
@@ -277,21 +277,21 @@ export class SupplierRequestsController {
   }
 
   /** { supplierIds, sentOn?, replyBy?, note? } — send the spec to these suppliers. */
-  @Post("inquiries/:id/factory-requests")
+  @Post("inquiries/:id/supplier-requests")
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")
   ask(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(supplierRequestsInput)) body: SupplierRequestsInput) {
     return this.requests.ask(user, id, body);
   }
 
-  @Patch("factory-requests/:id")
+  @Patch("supplier-requests/:id")
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")
   update(@CurrentUser() user: SessionUser, @Param("id", uuid) id: string, @Body(Validate(supplierRequestUpdateInput)) body: SupplierRequestUpdateInput) {
     return this.requests.update(user, id, body);
   }
 
-  @Delete("factory-requests/:id")
+  @Delete("supplier-requests/:id")
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")
   @RequireFeature("factory_requests")

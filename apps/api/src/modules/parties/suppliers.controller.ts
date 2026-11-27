@@ -21,7 +21,7 @@ const supplierList = listQuery.extend({
 });
 
 @ApiTags("factories")
-@Controller("factories")
+@Controller("suppliers")
 export class SuppliersController {
   constructor(private readonly factories: SuppliersService) {}
 

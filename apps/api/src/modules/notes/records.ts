@@ -22,7 +22,7 @@ export interface RecordRef {
 }
 
 export const recordLink = (type: RecordType, id: string) =>
-  ({ inquiry: `/inquiries/${id}`, order: `/orders/${id}`, customer: `/customers/${id}`, factory: `/factories/${id}` })[type];
+  ({ inquiry: `/inquiries/${id}`, order: `/orders/${id}`, customer: `/customers/${id}`, factory: `/suppliers/${id}` })[type];
 
 const NAMES: Record<RecordType, string> = { inquiry: "Inquiry", order: "Order", customer: "Customer", factory: "Supplier" };
 

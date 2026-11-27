@@ -107,7 +107,7 @@ describe("the groups", () => {
         "/reports/cash",
         "/reports/spending",
         "/reports/customers",
-        "/reports/factories",
+        "/reports/suppliers",
         "/reports/people",
         "/reports/funnel",
         "/audit",

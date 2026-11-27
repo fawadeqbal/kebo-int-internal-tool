@@ -19,7 +19,7 @@ export async function voidPaymentAction(path: string, _prev: ActionState, form: 
 /** Where each kind keeps its file: the endpoint that removes it (customer: the payment on the order; supplier; expense). */
 const FILE_PATH: Record<"customer" | "supplier" | "expense", (id: string) => string> = {
   customer: (id) => `/payments/${id}/file`,
-  supplier: (id) => `/factory-payments/${id}/file`,
+  supplier: (id) => `/supplier-payments/${id}/file`,
   expense: (id) => `/expenses/${id}/receipt`,
 };
 

@@ -39,7 +39,7 @@ describe("the order's tabs", () => {
       "Costs",
       "History",
     ]);
-    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/orders/o1", ...["payment", "factory", "production", "shipping", "delivery", "documents", "costs", "history"].map((t) => `/orders/o1/${t}`)]);
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/orders/o1", ...["payment", "supplier", "production", "shipping", "delivery", "documents", "costs", "history"].map((t) => `/orders/o1/${t}`)]);
     expect(screen.getByRole("link", { current: "page" }).textContent).toBe("Overview");
     expect(screen.queryByText(/^\d$/)).toBeNull();
   });

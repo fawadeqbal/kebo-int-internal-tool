@@ -174,7 +174,7 @@ export class NotesService {
       return asked.some((a) => a === full || a === first || a.split(/\s+/)[0] === first);
     });
     if (!named.length) return;
-    const link = type === "inquiry" ? `/inquiries/${id}` : type === "order" ? `/orders/${id}/history` : type === "customer" ? `/customers/${id}/notes` : `/factories/${id}/notes`;
+    const link = type === "inquiry" ? `/inquiries/${id}` : type === "order" ? `/orders/${id}/history` : type === "customer" ? `/customers/${id}/notes` : `/suppliers/${id}/notes`;
     const [ref, ...rest] = label.split(" · ");
     const what = { inquiry: "inquiry", order: "order", customer: "customer", factory: "supplier" }[type];
     await this.notifications.send(

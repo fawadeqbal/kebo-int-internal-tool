@@ -14,7 +14,7 @@ export const paths = {
   quotation: (id: string) => `/inquiries/${id}/quotation`,
   order: (id: string) => `/orders/${id}`,
   orderMoney: (id: string) => `/orders/${id}/payment`,
-  factory: (id: string) => `/orders/${id}/factory`,
+  factory: (id: string) => `/orders/${id}/supplier`,
   production: (id: string) => `/orders/${id}/production`,
   shipping: (id: string) => `/orders/${id}/shipping`,
 };

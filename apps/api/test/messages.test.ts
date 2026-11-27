@@ -173,7 +173,7 @@ describe("messages", () => {
     expect(lateMoney.sentence).toBe("The balance of SO-2026-0412 was due on 05 Dec 2026. It is 4 days late.");
     expect(paymentDue(o, { label: "Balance", openMinor: 8365000, dueOn: "2026-12-05" }, null).subject).toBe("Lagos Water owes USD 83,650 (balance, SO-2026-0412) by 05 Dec 2026");
     const pay = supplierPayment(o, { factory: "Jiangsu Filling", contact: "Mr Wang · WeChat wang88", currency: "CNY", owed: "760000.00", paid: "0.00" }, { label: "Deposit", open: "304000.00", due: "2026-11-14", lateBy: null });
-    expect(pay).toMatchObject({ tag: "Pay the supplier", subject: "Pay Jiangsu Filling: CNY 304,000 deposit (SO-2026-0412) — due 14 Nov 2026", button: "Pay the supplier", link: "/orders/o1/factory" });
+    expect(pay).toMatchObject({ tag: "Pay the supplier", subject: "Pay Jiangsu Filling: CNY 304,000 deposit (SO-2026-0412) — due 14 Nov 2026", button: "Pay the supplier", link: "/orders/o1/supplier" });
     expect(pay.money).toContainEqual({ label: "Paid to the supplier", value: "CNY 0 of CNY 760,000" });
     const ready = orderWaiting(o, { title: "Ask the supplier for the ready date", due: "2026-11-10", lateBy: 4 });
     expect(ready).toMatchObject({ tag: "Ready date missing", next: "Ask the supplier when the goods will be ready and enter the date.", link: "/orders/o1/production", urgent: true });

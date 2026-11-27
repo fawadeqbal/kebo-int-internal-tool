@@ -90,7 +90,7 @@ for (const viewport of [
     "/access/sign-ins",
     "/access/roles/manager",
     "/account",
-    ...orders.flatMap((o) => ["", "/payment", "/factory", "/production", "/shipping", "/documents", "/delivery", "/costs", "/history"].map((p) => o + p)),
+    ...orders.flatMap((o) => ["", "/payment", "/supplier", "/production", "/shipping", "/documents", "/delivery", "/costs", "/history"].map((p) => o + p)),
     ...inquiries.flatMap((d) => ["", "/needs", "/sourcing", "/quotation", "/costs", "/history"].map((p) => d + p)),
   ];
   // ONLY=regex: just the pages that match (e.g. a few for screenshots).

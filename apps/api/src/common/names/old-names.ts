@@ -32,6 +32,30 @@ const namesOf = (headers: NamedRequest["headers"]) => String(headers["x-names"] 
 const knowsNewNames = (headers: NamedRequest["headers"]): boolean => ["supplier", "supplier.2"].includes(namesOf(headers));
 const knowsBareNames = (headers: NamedRequest["headers"]): boolean => namesOf(headers) === "supplier.2";
 
+/**
+ * Step R1b (28 Nov 2026): the API's addresses say supplier. The old ones are read as the new, from anyone: a phone
+ * app installed before, an address the API gave out before (`voidPath`), the web of the day before during a deploy.
+ * Whole path segments only: `factory` alone is a stored kind in an address (`/ledger/parties/factory/:id`).
+ */
+const OLD_SEGMENTS: Readonly<Record<string, string>> = {
+  factories: "suppliers",
+  "factory-facts": "supplier-facts",
+  "factory-lines": "supplier-lines",
+  "factory-order": "supplier-order",
+  "factory-orders": "supplier-orders",
+  "factory-payments": "supplier-payments",
+  "factory-plan": "supplier-plan",
+  "factory-quotes": "supplier-quotes",
+  "factory-requests": "supplier-requests",
+};
+
+/** `/api/factory-quotes/q1/lines` → `/api/supplier-quotes/q1/lines`. Any other address comes back as it is. */
+export const newPath = (path: string): string =>
+  path
+    .split("/")
+    .map((s) => (Object.hasOwn(OLD_SEGMENTS, s) ? OLD_SEGMENTS[s]! : s))
+    .join("/");
+
 /** A phone app from before the change: the phone app's user agent, and no word that it knows the new names. */
 export const isOldPhone = (headers: NamedRequest["headers"]): boolean =>
   isMobileApp(String(headers["user-agent"] ?? "")) && !knowsNewNames(headers);
@@ -50,6 +74,9 @@ export function oldNames() {
       // An old phone app sets the name it knows and sends the other back as it got it: its own name is the one meant.
       req.body = withNewNames(req.body, isOldPhone(req.headers) ? "old" : "new");
     }
+    const atQuery = req.url.indexOf("?");
+    const path = atQuery >= 0 ? req.url.slice(0, atQuery) : req.url;
+    if (/factor(?:y|ies)/i.test(path)) req.url = newPath(path) + (atQuery >= 0 ? req.url.slice(atQuery) : "");
     const at = req.url.indexOf("?");
     if (at >= 0 && /factor(?:y|ies)/i.test(req.url.slice(at))) {
       const query = new URLSearchParams(req.url.slice(at + 1));

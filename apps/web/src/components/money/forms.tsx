@@ -324,7 +324,7 @@ export function SupplierPaymentForm({
   const save = useSaveThenSend(
     action,
     file,
-    (id) => `/files/factory-payments/${id}`,
+    (id) => `/files/supplier-payments/${id}`,
     "The payment is recorded",
     onFileError,
     (d) => (d as { createdId?: string } | undefined)?.createdId ?? payment?.id,

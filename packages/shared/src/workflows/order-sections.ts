@@ -574,7 +574,7 @@ export function STEP_OF_ACTION(action: string, newValues?: unknown): FlowStep | 
 /** Each step's page under /orders/:id. */
 export const STEP_PATH: Record<FlowStep, string> = {
   payment: "payment",
-  factory: "factory",
+  factory: "supplier",
   production: "production",
   shipping: "shipping",
   documents: "documents",

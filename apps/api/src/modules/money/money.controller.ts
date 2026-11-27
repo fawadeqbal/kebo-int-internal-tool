@@ -163,7 +163,7 @@ export class MoneyController {
   /* The order's payments to its suppliers: Treasury records them; the answer is the order's money view. */
 
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
-  @Post("orders/:id/factory-payments")
+  @Post("orders/:id/supplier-payments")
   @Once()
   async paySupplier(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierPaymentInput)) body: SupplierPaymentInput) {
     const { createdId } = await this.supplierPayments.recordSupplierPayment(user, id, body);
@@ -172,7 +172,7 @@ export class MoneyController {
 
   /** Same body as recording, plus reason (always asked). */
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
-  @Patch("factory-payments/:id")
+  @Patch("supplier-payments/:id")
   @Versioned("payments")
   async editSupplierPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierPaymentInput)) body: SupplierPaymentInput) {
     const { orderId } = await this.supplierPayments.editSupplierPayment(user, id, body);
@@ -180,7 +180,7 @@ export class MoneyController {
   }
 
   @SignedIn("checked inside: documents.manage, expenses.manage, orders.update, payments.record, sourcing.manage")
-  @Post("factory-payments/:id/void")
+  @Post("supplier-payments/:id/void")
   @HttpCode(200)
   async voidSupplierPayment(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(voidInput)) body: z.infer<typeof voidInput>) {
     const { orderId } = await this.supplierPayments.voidSupplierPayment(user, id, body.reason);
@@ -196,7 +196,7 @@ export class MoneyController {
   }
 
   /** { supplierId, items: [{ label, percent?, amount, dueRule: on_order | on_ready | fixed, dueOn? }] } — they add up to what we owe it. */
-  @Put("orders/:id/factory-plan")
+  @Put("orders/:id/supplier-plan")
   @RequirePermissions("sourcing.manage")
   async supplierPlan(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierPlanInput)) body: SupplierPlanInput) {
     await this.billing.setSupplierPlan(user, id, body);

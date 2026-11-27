@@ -10,13 +10,13 @@ const refresh = (dealId: string) => revalidatePath(`/inquiries/${dealId}`, "layo
 
 /** status (declined | no_reply | sent) */
 export async function supplierRequestStatusAction(dealId: string, requestId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.patch(`/factory-requests/${requestId}`, { status: formValues(form).status }), "Saved.");
+  const r = await attempt(form, () => api.patch(`/supplier-requests/${requestId}`, { status: formValues(form).status }), "Saved.");
   if (r.ok) refresh(dealId);
   return r;
 }
 
 export async function removeSupplierRequestAction(dealId: string, requestId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.delete(`/factory-requests/${requestId}`), "Removed.");
+  const r = await attempt(form, () => api.delete(`/supplier-requests/${requestId}`), "Removed.");
   if (r.ok) refresh(dealId);
   return r;
 }

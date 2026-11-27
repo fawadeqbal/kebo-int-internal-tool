@@ -468,7 +468,7 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
   const payOf = (r: Owed) =>
     r.part ? (
       !parts.canPay ? (
-        <Link href={`/orders/${r.part.order.id}/factory`} className={cn(linkClass, "text-md")}>
+        <Link href={`/orders/${r.part.order.id}/supplier`} className={cn(linkClass, "text-md")}>
           Open
         </Link>
       ) : sp.pay === r.key ? (
@@ -551,7 +551,7 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
               {shown.map((r) => (
                 <PhoneRow
                   key={r.key}
-                  href={r.order ? `/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}` : undefined}
+                  href={r.order ? `/orders/${r.order.id}/${r.kind === "factory" ? "supplier" : "costs"}` : undefined}
                   title={r.who}
                   figure={money(r.open, r.currency)}
                   line={[r.what, r.order?.refNo ?? "Company"].join(" · ")}
@@ -585,7 +585,7 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                     <Tr
                       key={r.key}
                       id={r.key}
-                      href={r.order ? `/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}` : undefined}
+                      href={r.order ? `/orders/${r.order.id}/${r.kind === "factory" ? "supplier" : "costs"}` : undefined}
                     >
                       <Td className="font-semibold">
                         {r.who}
@@ -603,7 +603,7 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
                       </Td>
                       <Td className="max-sm:hidden">
                         {r.order ? (
-                          <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "factory" : "costs"}`} className={linkClass}>
+                          <Link href={`/orders/${r.order.id}/${r.kind === "factory" ? "supplier" : "costs"}`} className={linkClass}>
                             {r.order.refNo}
                           </Link>
                         ) : (

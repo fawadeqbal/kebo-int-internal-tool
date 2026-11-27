@@ -183,7 +183,7 @@ export class SearchService {
           ref: null,
           sub: line(countryName(r.country), r.contacts[0]?.name, r.owner ? `looked after by ${r.owner.name}` : null),
           badge: null,
-          href: `/factories/${r.id}`,
+          href: `/suppliers/${r.id}`,
         })),
     };
   }

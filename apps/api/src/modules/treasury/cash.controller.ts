@@ -155,7 +155,7 @@ class CashController {
   }
 
   @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
-  @Post("factory-payments/:id/file")
+  @Post("supplier-payments/:id/file")
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_UPLOAD, files: 1 } }))
   attachSupplierPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File | undefined) {
     return this.attachFile(user, "out", id, file);
@@ -168,7 +168,7 @@ class CashController {
   }
 
   @SignedIn("checked inside: ledger.view, payments.record, sourcing.manage")
-  @Delete("factory-payments/:id/file")
+  @Delete("supplier-payments/:id/file")
   removeSupplierPaymentFile(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.paymentFiles.remove(user, "out", id);
   }

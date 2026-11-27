@@ -20,7 +20,7 @@ export class SectionsController {
   }
 
   /** { supplierId?, readyToldOn?, readyToldVia?, readyNote?, fatPlannedOn?, fatAttendedById?, fatDoneOn?, fatResult?, fatRemarks?, goodsReceivedAt? } — Production's windows, for one supplier. */
-  @Put("orders/:id/factory-facts")
+  @Put("orders/:id/supplier-facts")
   @RequirePermissions("orders.update")
   supplierFacts(@CurrentUser() user: SessionUser, @Param("id", new ParseUUIDPipe()) id: string, @Body(Validate(supplierFactsInput)) input: SupplierFactsInput) {
     return this.sections.saveSupplierFacts(user, id, input);

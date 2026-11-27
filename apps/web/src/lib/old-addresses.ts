@@ -73,7 +73,7 @@ export const SECTION_PATH = {
   overview: "/reports",
   money: "/reports/profit",
   customers: "/reports/customers",
-  factories: "/reports/factories",
+  factories: "/reports/suppliers",
   cash: "/reports/cash",
   people: "/reports/people",
   funnel: "/reports/funnel",

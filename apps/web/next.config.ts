@@ -42,6 +42,12 @@ const config: NextConfig = {
       // Suppliers are called suppliers (Words, 18 Nov 2026): old links and bookmarks still open.
       { source: "/factories", destination: "/suppliers", permanent: true },
       { source: "/factories/:path*", destination: "/suppliers/:path*", permanent: true },
+      // The supplier's addresses say supplier (rename R1b, 28 Nov 2026): links in notifications, emails and bookmarks still open.
+      { source: "/orders/:id/factory", destination: "/orders/:id/supplier", permanent: true },
+      { source: "/orders/:id/factory/:path*", destination: "/orders/:id/supplier/:path*", permanent: true },
+      { source: "/reports/factories", destination: "/reports/suppliers", permanent: true },
+      // A file's address keeps its method (308): an upload from a page opened before the change still lands.
+      { source: "/files/factory-payments/:path*", destination: "/files/supplier-payments/:path*", permanent: true },
       // Security's tabs are pages under People & access (design page 33); the query (?panel=, ?person=…) goes along.
       { source: "/security", destination: "/access/roles", permanent: false },
       { source: "/security/:path*", destination: "/access/:path*", permanent: false },

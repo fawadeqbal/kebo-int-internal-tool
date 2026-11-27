@@ -11,7 +11,7 @@ export const generateMetadata = supplierTitle("Notes");
 export default async function SupplierNotes({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requirePermission("sourcing.manage");
-  const [f, notesPart] = await Promise.all([supplierOf(id), partyNotesOf("factories", id)]);
+  const [f, notesPart] = await Promise.all([supplierOf(id), partyNotesOf("suppliers", id)]);
   return (
     <NotesTab
       notes={dataOf(notesPart) ?? []}

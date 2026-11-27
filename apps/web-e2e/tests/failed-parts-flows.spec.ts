@@ -53,7 +53,7 @@ test.describe("staff's dashboard with their orders failing", () => {
 });
 
 test.describe("customers and suppliers with their money reads failing", () => {
-  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/insights/facts/owed,/payments,/insights/facts/factory-orders" });
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/insights/facts/owed,/payments,/insights/facts/supplier-orders" });
 
   test("the lists say which parts could not be read, and still list everyone", async ({ page }) => {
     await page.goto("/customers");
@@ -88,7 +88,7 @@ test.describe("customers and suppliers with their money reads failing", () => {
 });
 
 test.describe("an inquiry and the orders with their side reads failing", () => {
-  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:~/sourcing,~/factory-requests,/customers/names,/follow-ups" });
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:~/sourcing,~/supplier-requests,/customers/names,/follow-ups" });
 
   test("the inquiry keeps its Supplier offers tab and says the offers could not be read; its items are there", async ({ page }) => {
     const inquiry = foundPages()["/inquiries/[id]"];

@@ -37,7 +37,7 @@ export async function readyDateAction(orderId: string, supplierId: string | null
           ...ahead(v),
         });
       const facts = pick(v, ["readyToldOn", "readyToldVia", "readyNote"]);
-      if (Object.keys(facts).length) await api.put(`/orders/${orderId}/factory-facts`, { supplierId, ...facts });
+      if (Object.keys(facts).length) await api.put(`/orders/${orderId}/supplier-facts`, { supplierId, ...facts });
       return null;
     },
     "Saved.",
@@ -51,7 +51,7 @@ export async function supplierTestAction(orderId: string, supplierId: string | n
   const v = formValues(form);
   const r = await attempt(
     form,
-    () => api.put(`/orders/${orderId}/factory-facts`, { supplierId, ...pick(v, ["fatPlannedOn", "fatAttendedById", "fatDoneOn", "fatResult", "fatRemarks"]) }),
+    () => api.put(`/orders/${orderId}/supplier-facts`, { supplierId, ...pick(v, ["fatPlannedOn", "fatAttendedById", "fatDoneOn", "fatResult", "fatRemarks"]) }),
     "Saved.",
   );
   if (r.ok) refresh(orderId);
@@ -72,7 +72,7 @@ export async function goodsReceivedAction(orderId: string, supplierId: string | 
         const lines = o.lines.filter((l) => l.type === "goods").map((l) => ({ lineId: l.id, receivedQty: Number(l.quantity) }));
         await api.put(`/orders/${orderId}/receipt`, { on: v.receivedOn || null, lines });
       }
-      if ("goodsReceivedAt" in v) await api.put(`/orders/${orderId}/factory-facts`, { supplierId, goodsReceivedAt: v.goodsReceivedAt });
+      if ("goodsReceivedAt" in v) await api.put(`/orders/${orderId}/supplier-facts`, { supplierId, goodsReceivedAt: v.goodsReceivedAt });
       return null;
     },
     all ? "All goods marked as received." : "Saved.",

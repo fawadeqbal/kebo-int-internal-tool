@@ -74,7 +74,7 @@ const amount = (currency: string, d: Prisma.Decimal) =>
   `${currency} ${Number(d).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const statusOf = (voidedAt: Date | null): PaymentStatus => (voidedAt ? "void" : "recorded");
 const customerLink = (c: { id: string; name: string } | null) => (c ? { label: c.name, href: `/customers/${c.id}` } : null);
-const supplierLink = (f: { id: string; name: string }) => ({ label: f.name, href: `/factories/${f.id}` });
+const supplierLink = (f: { id: string; name: string }) => ({ label: f.name, href: `/suppliers/${f.id}` });
 const orderLink = (o: { id: string; refNo: string }) => ({ label: o.refNo, href: `/orders/${o.id}` });
 /** A record's file as its page shows and changes it. */
 const fileOf = (f: { id: string; fileName: string; mimeType: string; size: number } | undefined) =>
@@ -589,7 +589,7 @@ export class TreasuryService {
     if (kind !== "supplier" && kind !== "expense") throw new NotFoundError("Voucher");
     const v = await this.one(user, kind, id);
     const s = await this.settings.get();
-    const partyId = v.party?.href?.match(/^\/factories\/([0-9a-f-]{36})$/)?.[1];
+    const partyId = v.party?.href?.match(/^\/(?:suppliers|factories)\/([0-9a-f-]{36})$/)?.[1];
     const details = partyId ? await this.prisma.db.party.findUnique({ where: { id: partyId }, select: { name: true, address: true, country: true } }) : null;
     const title = kind === "supplier" ? "PAYMENT VOUCHER" : "EXPENSE VOUCHER";
     const number = v.number ?? "Not numbered";
@@ -751,7 +751,7 @@ export class TreasuryService {
           parts: [
             {
               order: p.order.refNo,
-              href: `/orders/${p.order.id}/factory`,
+              href: `/orders/${p.order.id}/supplier`,
               part: PAYMENT_KIND_LABEL[p.kind as PaymentKind],
               amount: money(a.share),
               currency: p.currency,
@@ -763,7 +763,7 @@ export class TreasuryService {
           recordedAt: p.createdAt.toISOString(),
           voided: voidOf(p.voidedAt, p.voidReason),
           orderId: p.orderId,
-          voidPath: !p.voidedAt && can(user, "payments.record") ? `/factory-payments/${p.id}/void` : null,
+          voidPath: !p.voidedAt && can(user, "payments.record") ? `/supplier-payments/${p.id}/void` : null,
         };
       }
       case "expense": {

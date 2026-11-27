@@ -51,7 +51,7 @@ const PATH_OF: Record<ReportKind, string> = {
   overview: "/reports",
   profit: "/reports/profit",
   customers: "/reports/customers",
-  factories: "/reports/factories",
+  factories: "/reports/suppliers",
   cash: "/reports/cash",
   people: "/reports/people",
   targets: "/reports/people/targets",

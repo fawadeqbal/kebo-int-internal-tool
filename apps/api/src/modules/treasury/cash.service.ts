@@ -327,7 +327,7 @@ export class CashService {
           kind: "factory",
           minor: -decimalToMinor(m.amount),
           what: p?.purchaseOrder ? `${PAYMENT_KIND_LABEL[p.kind]} to the supplier for ${p.purchaseOrder.refNo}` : "Paid to the supplier",
-          party: { name: m.party!.name, href: `/factories/${m.party!.id}` },
+          party: { name: m.party!.name, href: `/suppliers/${m.party!.id}` },
           reference: m.reference,
           href: p?.purchaseOrder ? `/orders/${p.purchaseOrder.id}/payment` : null,
         });

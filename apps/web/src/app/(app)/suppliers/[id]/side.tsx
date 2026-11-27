@@ -19,8 +19,8 @@ export async function SupplierSide({ id }: { id: string }) {
   const [f, payablesPart, posPart, groupsPart] = await Promise.all([
     supplierOf(id),
     supplierPayablesOf(id),
-    money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
-    money ? part("what we bought from it", () => api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory", supplierId: id })) : null,
+    money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/supplier-orders", { supplierId: id })) : null,
+    money ? part("what we bought from it", () => api.get<SupplierGroups>("/insights/facts/suppliers/groups", { period: "all", by: "factory", supplierId: id })) : null,
   ]);
   const pos = dataOf(posPart);
   const groups = dataOf(groupsPart);

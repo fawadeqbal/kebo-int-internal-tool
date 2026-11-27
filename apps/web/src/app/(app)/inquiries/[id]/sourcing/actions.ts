@@ -32,7 +32,7 @@ export async function quickSupplierAction(v: QuickSupplier): Promise<QuickSuppli
   const me = await requireUser();
   const blank = (x: string) => x.trim() || null;
   const r = await attempt(null, () =>
-    api.post<{ id: string; name: string; contactPerson: string | null }>("/factories", {
+    api.post<{ id: string; name: string; contactPerson: string | null }>("/suppliers", {
       name: v.name.trim(),
       contactPerson: blank(v.contactPerson),
       phone: blank(v.phone),
@@ -53,7 +53,7 @@ export async function quickSupplierAction(v: QuickSupplier): Promise<QuickSuppli
 /** Supplier picker: search the supplier list by name or contact person. */
 export async function searchSuppliersAction(q: string): Promise<SupplierOption[] | Failed> {
   // Not read (logged): a Failed, and the picker says it could not search, never "none found".
-  const res = await part("the suppliers", () => api.get<Paged<SupplierOption>>("/factories", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 }));
+  const res = await part("the suppliers", () => api.get<Paged<SupplierOption>>("/suppliers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 }));
   return isFailed(res) ? res : (res?.rows ?? []).map((f) => ({ id: f.id, name: f.name, contactPerson: f.contactPerson }));
 }
 
@@ -87,7 +87,7 @@ export async function saveSupplierQuoteAction(
     body,
     await attempt(
       form,
-      () => (quoteId ? api.put(`/factory-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/factory-quotes`, body)),
+      () => (quoteId ? api.put(`/supplier-quotes/${quoteId}`, body) : api.post(`/inquiries/${dealId}/supplier-quotes`, body)),
       quoteId ? "Supplier prices saved." : "Supplier prices added.",
     ),
   );
@@ -108,7 +108,7 @@ export async function removeSupplierQuoteAction(dealId: string, quoteId: string,
   const reason = reasonOf(form);
   const r = await attempt(
     form,
-    () => api.delete(`/factory-quotes/${quoteId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
+    () => api.delete(`/supplier-quotes/${quoteId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
     "Supplier prices removed.",
   );
   if (r.ok) refresh(dealId);
@@ -137,21 +137,21 @@ async function lineCall(dealId: string, fn: () => Promise<SupplierQuoteView>): P
 }
 
 export async function addOfferLinesAction(dealId: string, quoteId: string, body: object) {
-  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/factory-quotes/${quoteId}/lines`, body));
+  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/supplier-quotes/${quoteId}/lines`, body));
 }
 
 export async function editOfferLineAction(dealId: string, lineId: string, body: object) {
-  return lineCall(dealId, () => api.patch<SupplierQuoteView>(`/factory-lines/${lineId}`, body));
+  return lineCall(dealId, () => api.patch<SupplierQuoteView>(`/supplier-lines/${lineId}`, body));
 }
 
 export async function moveOfferLineAction(dealId: string, lineId: string, body: object) {
-  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/factory-lines/${lineId}/move`, body));
+  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/supplier-lines/${lineId}/move`, body));
 }
 
 export async function removeOfferLineAction(dealId: string, lineId: string, reason?: string) {
-  return lineCall(dealId, () => api.delete<SupplierQuoteView>(`/factory-lines/${lineId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`));
+  return lineCall(dealId, () => api.delete<SupplierQuoteView>(`/supplier-lines/${lineId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`));
 }
 
 export async function copyOfferLinesAction(dealId: string, quoteId: string, fromQuoteId: string) {
-  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/factory-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
+  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/supplier-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
 }

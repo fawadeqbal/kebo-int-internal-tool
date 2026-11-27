@@ -35,7 +35,6 @@ import { BoxNote } from "@/components/common/record-box";
 
 export const generateMetadata = orderTitle("Purchase order");
 
-
 /**
  * Supplier order (design "the order, final"): the purchase order to each supplier, the lines we ordered at
  * the supplier's prices, the plan for paying it and the payments made. Money to a supplier is recorded
@@ -341,11 +340,7 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
             ]}
             actions={
               <>
-                <ButtonLink
-                  href={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`}
-                  size="sm"
-                  variant="secondary"
-                >
+                <ButtonLink href={`/orders/${o.id}/papers/purchase-order?ref=${po.supplier.id}`} size="sm" variant="secondary">
                   <Printer aria-hidden /> View / print
                 </ButtonLink>
                 {canEdit && n === 0 && (
@@ -434,12 +429,17 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
                 plan={plan}
                 payments={byId}
                 pay={(r) =>
-                  pay("Pay", true, {
-                    supplierId: plan.supplier.id,
-                    amount: r.open,
-                    kind: r.dueRule === "on_order" ? "deposit" : "balance",
-                    reference: r.supplierRef,
-                  }, n === 0 ? "pay-supplier" : undefined)
+                  pay(
+                    "Pay",
+                    true,
+                    {
+                      supplierId: plan.supplier.id,
+                      amount: r.open,
+                      kind: r.dueRule === "on_order" ? "deposit" : "balance",
+                      reference: r.supplierRef,
+                    },
+                    n === 0 ? "pay-supplier" : undefined,
+                  )
                 }
                 orderCurrency={o.currency}
                 paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}

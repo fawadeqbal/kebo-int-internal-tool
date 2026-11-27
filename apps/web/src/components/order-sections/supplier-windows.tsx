@@ -112,7 +112,7 @@ export function ChangeSupplierPaymentWindow({
           <SupplierPaymentForm {...p} action={save} payment={payment} bare onClose={close} />
           <div className="flex flex-col gap-2 border-t border-line pt-4">
             <p className="text-md font-semibold">Bank slip</p>
-            <AttachedFile src={`/files/factory-payments/${payment.id}`} file={payment.file} what="Bank slip" canChange remove={removeFile} empty="No bank slip" />
+            <AttachedFile src={`/files/supplier-payments/${payment.id}`} file={payment.file} what="Bank slip" canChange remove={removeFile} empty="No bank slip" />
           </div>
           <div className="border-t border-line pt-4">
             <VoidForm action={remove} label="this payment" button="Remove this payment" />
