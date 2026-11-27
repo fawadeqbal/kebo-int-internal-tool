@@ -57,7 +57,7 @@ export default async function CustomerOverview({
   const canEdit = can(me, "customers.manage");
   const editing = canEdit && sp.panel === "edit-customer";
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const [c, settings, pay, groupsPart] = await Promise.all([
+  const [c, settings, payPart, groupsPart] = await Promise.all([
     customerOf(id),
     editing ? getSettings() : null,
     customerPaymentsOf(id),
@@ -65,8 +65,9 @@ export default async function CustomerOverview({
       ? part("what they bought", () => api.get<OrderGroups>("/insights/facts/orders/groups", { period: "all", by: "company", customerId: id }))
       : null,
   ]);
+  const pay = dataOf(payPart);
   const groups = dataOf(groupsPart);
-  const failed = failedWhat(groupsPart);
+  const failed = failedWhat(payPart, groupsPart);
   const facts = groups?.rows[0];
   const latest = [...(pay?.orders ?? [])].sort((a, b) => b.orderedOn.localeCompare(a.orderedOn)).slice(0, 5);
   const openOrders = c.orders.filter((o) => o.status === "open").length;

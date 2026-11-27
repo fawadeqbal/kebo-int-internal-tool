@@ -30,6 +30,8 @@ import { RecordLanding } from "@/components/common/record-nav";
 import { saveSupplierAction } from "../actions";
 import { SupplierPanel } from "../supplier-form";
 import { supplierTitle } from "@/lib/titles";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = supplierTitle();
 
@@ -62,17 +64,21 @@ export default async function SupplierOverview({
   const me = await requirePermission("sourcing.manage");
   const editing = sp.panel === "edit-factory";
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
-  const [f, people, pos] = await Promise.all([
+  const [f, peoplePart, posPart] = await Promise.all([
     supplierOf(id),
-    editing ? getPeople().catch(() => [] as Person[]) : ([] as Person[]),
-    money ? api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id }).catch(() => null) : null,
+    editing ? part("the people to choose from", () => getPeople()) : ([] as Person[]),
+    money ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
   ]);
+  const people = dataOf(peoplePart) ?? [];
+  const pos = dataOf(posPart);
+  const failed = failedWhat(peoplePart, posPart);
   const r = f.record;
   const today = companyToday();
 
   return (
     <div className="flex flex-col gap-4">
       <RecordLanding />
+      {failed && <CouldNotLoad what={failed} />}
       <DetailsCard
         flash={sp.saved === f.id}
         edit={{ panel: "edit-factory", id: f.id, label: `Edit ${f.name}` }}

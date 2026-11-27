@@ -24,7 +24,7 @@ const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, "")}`;
 export async function CustomerSide({ id }: { id: string }) {
   const me = await requireUser();
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, pay, notes, accountPart, peoplePart] = await Promise.all([
+  const [c, payPart, notes, accountPart, peoplePart] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
     partyNotesOf("customers", id),
@@ -32,9 +32,10 @@ export async function CustomerSide({ id }: { id: string }) {
     // For "@" in a note: who can be told.
     part("the people to tell", () => getPeople()),
   ]);
+  const pay = dataOf(payPart);
   const account = dataOf(accountPart);
   const people = dataOf(peoplePart) ?? [];
-  const failed = failedWhat(accountPart, peoplePart);
+  const failed = failedWhat(payPart, accountPart, peoplePart);
   const totals = pay?.totals ?? [];
   const primary = c.contacts.find((p) => p.isPrimary) ?? c.contacts[0] ?? null;
   const today = companyToday();

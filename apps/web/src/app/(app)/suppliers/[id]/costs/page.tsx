@@ -11,6 +11,8 @@ import type { SupplierOrders } from "@/lib/types-facts";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { supplierTitle } from "@/lib/titles";
+import { dataOf, failedWhat, part } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = supplierTitle("Finance");
 
@@ -41,13 +43,17 @@ export default async function SupplierCosts({ params }: { params: Promise<{ id: 
   const today = companyToday();
   const ledgerOn = can(me, "ledger.view");
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const [f, costs, payables, pos, ledger] = await Promise.all([
+  const [f, costsPart, payables, posPart, ledgerPart] = await Promise.all([
     supplierOf(id),
-    api.get<ExpenseList>("/expenses", { supplierId: id }).catch(() => null),
+    part("its other costs", () => api.get<ExpenseList>("/expenses", { supplierId: id })),
     supplierPayablesOf(id),
-    insights ? api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id }).catch(() => null) : null,
-    ledgerOn ? api.get<LedgerParty>(`/ledger/parties/factory/${id}`, { from: "2000-01-01", to: today }).catch(() => null) : null,
+    insights ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
+    ledgerOn ? part("the statement from the books", () => api.get<LedgerParty>(`/ledger/parties/factory/${id}`, { from: "2000-01-01", to: today })) : null,
   ]);
+  const costs = dataOf(costsPart);
+  const pos = dataOf(posPart);
+  const ledger = dataOf(ledgerPart);
+  const failed = failedWhat(costsPart, posPart, ledgerPart);
   const orders = (pos?.rows ?? []).filter((o) => o.status !== "cancelled");
   const cur = orders[0]?.currency ?? payables[0]?.currency ?? ledger?.currencies[0]?.currency ?? "CNY";
 
@@ -93,6 +99,7 @@ export default async function SupplierCosts({ params }: { params: Promise<{ id: 
 
   return (
     <div className="flex flex-col gap-4">
+      {failed && <CouldNotLoad what={failed} />}
       {/* Bought, Paid and We owe are the side panel's Money box; only what it does not say is here, in the facts line. */}
       <StatRow facts>
         <StatTile label="Other costs" value={costs ? whole(costs.total, costs.currency) : "—"} sub="visits, inspections" />

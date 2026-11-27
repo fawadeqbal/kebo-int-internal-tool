@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { accessibilityProblems, watchErrors } from "./check";
+import { foundPages } from "./routes";
 
 /**
  * A part of a page that could not be read says so in its place, and the rest of the page works (Fawad, 27 Nov;
@@ -48,5 +49,40 @@ test.describe("staff's dashboard with their orders failing", () => {
     await expect(panel.getByText("Could not load your open orders")).toBeVisible();
     await panel.getByRole("radio", { name: "The company" }).check();
     await expect(panel.getByText("Could not load your open orders")).toHaveCount(0);
+  });
+});
+
+test.describe("customers and suppliers with their money reads failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/insights/facts/owed,/payments,/insights/facts/factory-orders" });
+
+  test("the lists say which parts could not be read, and still list everyone", async ({ page }) => {
+    await page.goto("/customers");
+    await expect(page.getByText("Could not load what customers owe")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toBeVisible();
+    await expect(page.locator("tr[data-href]").first()).toBeVisible();
+    await page.goto("/suppliers");
+    await expect(page.getByText("Could not load what we owe suppliers")).toBeVisible();
+    await expect(page.locator("tr[data-href]").first()).toBeVisible();
+  });
+
+  test("a customer's page says their payments could not be read; its other parts are there", async ({ page }) => {
+    const customer = foundPages()["/customers/[id]"];
+    test.skip(!customer, "no customer in the demo data");
+    await page.goto(customer!);
+    await expect(page.getByText("Could not load their payments").first()).toBeVisible();
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
+    // The Orders tab says it, and so does the side panel beside every tab (both use their payments).
+    await page.goto(`${customer}/orders`);
+    await expect(page.getByRole("complementary", { name: "At a glance" }).getByText("Could not load their payments")).toBeVisible();
+    await expect(page.getByText("Could not load their payments")).toHaveCount(2);
+    expect(await accessibilityProblems(page), "the tab with a failed part meets WCAG 2.2 AA").toEqual([]);
+  });
+
+  test("a supplier's page says its orders could not be read", async ({ page }) => {
+    const supplier = foundPages()["/suppliers/[id]"];
+    test.skip(!supplier, "no supplier in the demo data");
+    await page.goto(supplier!);
+    await expect(page.getByText("Could not load its orders").first()).toBeVisible();
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
   });
 });

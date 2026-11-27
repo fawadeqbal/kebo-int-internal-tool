@@ -44,7 +44,7 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
   const today = companyToday();
   // Where their money went and what was spent on them: managers with expenses.
   const seesCosts = can(me, "expenses.manage") && (await hasFeature("expenses"));
-  const [c, pay, ledgerPart, accountPart, spentPart, people, settings] = await Promise.all([
+  const [c, payPart, ledgerPart, accountPart, spentPart, people, settings] = await Promise.all([
     customerOf(id),
     customerPaymentsOf(id),
     ledgerOn ? part("the statement from the books", () => api.get<LedgerParty>(`/ledger/parties/customer/${id}`, { from: "2000-01-01", to: today })) : null,
@@ -53,11 +53,12 @@ export default async function CustomerMoneyTab({ params }: { params: Promise<{ i
     seesCosts ? getPeople() : null,
     seesCosts ? getSettings() : null,
   ]);
+  const pay = dataOf(payPart);
   const ledger = dataOf(ledgerPart);
   const account = dataOf(accountPart);
   const spent = dataOf(spentPart);
   // Without the books' statement the one worked out from their orders and payments is shown, and it says so.
-  const failed = failedWhat(ledgerPart, accountPart, spentPart);
+  const failed = failedWhat(payPart, ledgerPart, accountPart, spentPart);
   const totals = pay?.totals ?? [];
   const main = totals[0]?.currency ?? c.defaultCurrency;
 

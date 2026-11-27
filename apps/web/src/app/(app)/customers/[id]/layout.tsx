@@ -12,6 +12,7 @@ import { CustomerSide } from "./side";
 import { MoreMenu } from "@/components/common/more-menu";
 import { removeCustomerAction } from "../actions";
 import { late } from "./shared";
+import { dataOf } from "@/lib/part";
 
 /** "Mar 2025" */
 const monthYear = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: currentZone() }); // "since Nov 2026", company time
@@ -25,7 +26,9 @@ const monthYear = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { m
 export default async function CustomerLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requireUser();
-  const [c, pay] = await Promise.all([customerOf(id), customerPaymentsOf(id)]);
+  const [c, payPart] = await Promise.all([customerOf(id), customerPaymentsOf(id)]);
+  // The page and the side panel say it if their payments could not be read; the frame only shows less.
+  const pay = dataOf(payPart);
   const today = companyToday();
   const canAsk = can(me, "inquiries.create");
   const countryKnown = c.country !== UNKNOWN_COUNTRY;
