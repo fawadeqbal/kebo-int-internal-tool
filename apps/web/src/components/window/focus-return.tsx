@@ -14,15 +14,48 @@ const KEY = "kebo-focus-return";
 type Note = { back: string; opener: string; at: number };
 /** Longer than any page takes to come back; a note older than this is from another visit. */
 const FRESH_MS = 15_000;
+/** How long the page it went back to may take to draw the link (its loading shape shows first). */
+const LOOK_MS = 8_000;
 
 const here = () => `${window.location.pathname}${window.location.search}`;
-/** An address as the browser writes it (a relative link, or `back` with or without its query). */
-const same = (a: string, b: string) => {
-  const base = window.location.origin;
-  const x = new URL(a, base);
-  const y = new URL(b, base);
-  return x.pathname === y.pathname && x.search === y.search;
+/** An address read as the browser would (a relative link, `back` with or without its query); null: not one. */
+const urlOf = (v: string): URL | null => {
+  try {
+    return new URL(v, window.location.origin);
+  } catch {
+    return null;
+  }
 };
+const same = (a: string, b: string) => {
+  const x = urlOf(a);
+  const y = urlOf(b);
+  return !!x && !!y && x.pathname === y.pathname && x.search === y.search;
+};
+/** Seen on the page (not in a hidden copy for another screen size): focus() on it does something. */
+const shown = (el: HTMLElement) => el.getClientRects().length > 0;
+/** Nothing has the focus yet: the new page's start. Something the person moved to since is left alone. */
+const focusFree = () => !document.activeElement || document.activeElement === document.body;
+
+/**
+ * The link to the window's address; else (a paper uploaded in the window: its link now says which file) a link
+ * to the same document, the same address without its query's file.
+ */
+function linkTo(opener: string): HTMLAnchorElement | null {
+  const links = [...document.querySelectorAll<HTMLAnchorElement>("a[href]")].filter(shown);
+  const exact = links.find((a) => same(a.href, opener));
+  if (exact) return exact;
+  const want = urlOf(opener);
+  if (!want) return null;
+  const sameDoc = (u: URL | null) => {
+    if (!u || u.pathname !== want.pathname) return false;
+    const q = new URLSearchParams(u.search);
+    q.delete("doc");
+    const w = new URLSearchParams(want.search);
+    w.delete("doc");
+    return q.toString() === w.toString();
+  };
+  return links.find((a) => sameDoc(urlOf(a.href))) ?? null;
+}
 
 /** Called as the window closes, before going `back`: the window's address is the link that opened it. */
 export function rememberOpener(back: string) {
@@ -53,13 +86,15 @@ export function FocusReturn() {
     if (!same(here(), note.back)) return;
     window.sessionStorage.removeItem(KEY);
     const { opener } = note;
-    // The list may draw a moment after the address changes: look for the link for a few frames.
-    let tries = 0;
+    // The list may draw a while after the address changes: look for the link until it is there, for a few seconds,
+    // and only while nothing else has the focus (the person may have gone on with the keyboard meanwhile).
+    const until = Date.now() + LOOK_MS;
     let frame = 0;
     const look = () => {
-      const link = [...document.querySelectorAll<HTMLAnchorElement>("a[href]")].find((a) => same(a.getAttribute("href") ?? "", opener));
+      if (!focusFree()) return;
+      const link = linkTo(opener);
       if (link) link.focus();
-      else if (++tries < 120) frame = requestAnimationFrame(look);
+      else if (Date.now() < until) frame = requestAnimationFrame(look);
     };
     look();
     return () => cancelAnimationFrame(frame);
