@@ -4,6 +4,7 @@ export * from "./badge";
 export * from "./notice";
 export * from "./pagination";
 export * from "./scroll";
+export * from "./phone-stack";
 export * from "./pending";
 export * from "./blocks";
 export * from "./rules";

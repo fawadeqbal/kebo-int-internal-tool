@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate } from "@kebo/database";
 import { convert, fromMinor, fxRate, type Minor } from "@kebo/money";
 import { can } from "@kebo/shared";
-import { ForbiddenError, type ISODate } from "@kebo/utils";
+import { ForbiddenError, monthEnd, monthsBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -23,25 +23,6 @@ interface Move {
 }
 
 const KINDS = ["customers", "suppliers", "bills", "company"] as const;
-
-/** "2026-09", "2026-10"… from the month of `from` to the month of `to`. */
-function monthsBetween(from: ISODate, to: ISODate): string[] {
-  const out: string[] = [];
-  let y = Number(from.slice(0, 4));
-  let m = Number(from.slice(5, 7));
-  const last = to.slice(0, 7);
-  for (;;) {
-    const key = `${y}-${String(m).padStart(2, "0")}`;
-    if (key > last) break;
-    out.push(key);
-    m += 1;
-    if (m > 12) {
-      m = 1;
-      y += 1;
-    }
-  }
-  return out;
-}
 
 /**
  * Reports › Cash (managers): the money that moved in a period. Read from the same rows as the cash book
@@ -161,10 +142,6 @@ export class CashReportService {
         t += inMain(bal, a.currency);
       }
       return t;
-    };
-    const monthEnd = (ym: string): ISODate => {
-      const d = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0));
-      return d.toISOString().slice(0, 10) as ISODate;
     };
 
     const total = empty();

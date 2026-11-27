@@ -1,0 +1,14 @@
+{
+  "/orders/[id]": 18,
+  "/orders/[id]/costs": 19,
+  "/orders/[id]/delivery": 20,
+  "/orders/[id]/documents": 20,
+  "/orders/[id]/factory": 19,
+  "/orders/[id]/history": 21,
+  "/orders/[id]/papers/[kind]": 19,
+  "/orders/[id]/payment": 21,
+  "/orders/[id]/production": 20,
+  "/orders/[id]/shipping": 20,
+  "/reports": 20,
+  "/users/[id]": 18
+}

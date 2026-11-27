@@ -233,7 +233,7 @@ async function OnOrder({
         <ChooseForm inWindow={inWindow}>
           <input type="hidden" name="kind" value={kind} />
           {back && <input type="hidden" name="back" value={back} />}
-          <AutoSelect name="order" defaultValue={orderId ?? ""} aria-label="Order" className="sm:w-96">
+          <AutoSelect name="order" defaultValue={orderId ?? ""} aria-label="Order" className="w-full">
             <option value="" disabled>
               Choose an order
             </option>
@@ -261,7 +261,7 @@ async function OnOrder({
           <ChooseForm inWindow={inWindow}>
             <input type="hidden" name="kind" value="in" />
             {back && <input type="hidden" name="back" value={back} />}
-            <AutoSelect name="customer" defaultValue="" aria-label="Customer" className="sm:w-96">
+            <AutoSelect name="customer" defaultValue="" aria-label="Customer" className="w-full">
               <option value="" disabled>
                 Choose a customer
               </option>
@@ -281,11 +281,17 @@ async function OnOrder({
       </Card>
     ) : null;
   if (!orderId || !open.some((o) => o.id === orderId))
-    return (
-      <>
-        {picker}
-        {several}
-      </>
+    // Two ways to start: side by side when the page has room (review 26 Nov: a big screen showed two wide, nearly
+    // empty boxes, one under the other).
+    return several ? (
+      <div className="@container">
+        <div className="grid items-start gap-4 @min-[44rem]:grid-cols-2">
+          {picker}
+          {several}
+        </div>
+      </div>
+    ) : (
+      picker
     );
 
   const [o, settings] = await Promise.all([orderOf(orderId), getSettings()]);

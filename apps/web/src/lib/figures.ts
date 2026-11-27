@@ -5,6 +5,8 @@
  * file is named above each group). A new line starts a new paragraph.
  */
 
+import { monthEnd, monthStart } from "@kebo/utils";
+
 /** The days a figure counts, and what its arrow compares them with, as phrases. */
 export interface Span {
   /** "from 1 to 15 November", "from 1 Sep to 30 Nov 2026" */
@@ -219,7 +221,7 @@ const between = (from: string, to: string) =>
 /** Home: this month so far, against the same days of last month (to its last day when it is shorter). */
 export function homeSpan(today: string, monthName: string, beforeName: string): Span {
   const day = Number(today.slice(8, 10));
-  const lastDay = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, 0)).getUTCDate();
+  const lastDay = Number(monthEnd(monthStart(today, -1)).slice(8));
   const dayBefore = Math.min(day, lastDay);
   const days = (d: number, name: string) => (d === 1 ? `on 1 ${name}` : `from 1 to ${d} ${name}`);
   return { days: days(day, monthName), vs: `the same days of ${beforeName} (${days(dayBefore, beforeName).replace(/^(on|from) /, "")})` };
@@ -235,6 +237,5 @@ export function reportSpan(p: { from: string; to: string; prevFrom: string; prev
 
 /** "1 May 2026": the first day of the month six months before `today` (Reports › Customers, Sleeping). */
 export function sixMonthsBack(today: string): string {
-  const d = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1 - 6, 1));
-  return dayOf(d.toISOString().slice(0, 10), true);
+  return dayOf(monthStart(today, -6), true);
 }

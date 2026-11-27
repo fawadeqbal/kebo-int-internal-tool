@@ -37,6 +37,35 @@ export function focusables(box: HTMLElement): HTMLElement[] {
 const LAYER = "[data-layer],[role=menu],[role=listbox],[role=alertdialog],[role=status]";
 
 /**
+ * The windows that keep the keyboard now, in the order they opened: the last one is on top, and only it
+ * acts. One opened over another (the Email panel over the document window, a confirm over a panel) takes
+ * the keyboard; the one under it has it again when the top one closes. Two windows each pulling the focus to
+ * themselves would leave neither usable.
+ */
+const traps: RefObject<HTMLElement | null>[] = [];
+
+/**
+ * The top window: the last one opened that is on the page and drawn. One that has gone before its turn to
+ * let go (a page shown as a window, once it is leaving), or that is hidden at this width (the phone's menu on
+ * a wide screen), is passed over, so the window under it is not left without the keyboard.
+ * (The order is the order the windows' effects ran in. A window that is first drawn with another trapped
+ * window already open inside it would be listed after its child: none is built that way.)
+ */
+const topTrap = () => traps.findLast((t) => !!t.current?.isConnected && (t.current.getClientRects().length > 0 || noLayout()));
+
+/**
+ * Focus that is not this window's to take back: in a layer over it (a menu, the toast), or in a window that
+ * covers the page without keeping the keyboard itself (it sits over this one, and its focus is its own). Focus
+ * in a window under this one is taken back like focus on the page.
+ */
+function elsewhere(box: HTMLElement, at: Element | null): boolean {
+  if (!at || box.contains(at)) return false;
+  if (at.closest(LAYER)) return true;
+  const other = at.closest('[role="dialog"][aria-modal="true"]');
+  return !!other && !other.contains(box) && !traps.some((t) => t.current === other);
+}
+
+/**
  * Keeps keyboard focus inside a dialog while it is open (Tab and Shift+Tab
  * go round), and gives it back to whatever had it before (the button that
  * opened it) when it closes.
@@ -45,11 +74,13 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
   useEffect(() => {
     if (!active) return;
     const opener = document.activeElement as HTMLElement | null;
+    traps.push(box);
+    const onTop = () => topTrap() === box;
     const tab = (e: KeyboardEvent) => {
       const el = box.current;
-      if (e.key !== "Tab" || !el) return;
-      // A layer on top (a confirm) handles its own Tab.
-      if (!el.contains(document.activeElement) && (document.activeElement as HTMLElement | null)?.closest(LAYER)) return;
+      if (e.key !== "Tab" || !el || !onTop()) return;
+      // A layer on top (a menu) handles its own Tab.
+      if (elsewhere(el, document.activeElement)) return;
       const items = focusables(el);
       if (!items.length) {
         e.preventDefault();
@@ -69,7 +100,7 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     const back = (e: FocusEvent) => {
       const el = box.current;
       const t = e.target as HTMLElement | null;
-      if (!el || !t || el.contains(t) || t.closest(LAYER)) return;
+      if (!el || !t || !onTop() || el.contains(t) || elsewhere(el, t)) return;
       (focusables(el)[0] ?? el).focus();
     };
     document.addEventListener("keydown", tab);
@@ -93,6 +124,8 @@ export function useFocusTrap(box: RefObject<HTMLElement | null>, active: boolean
     });
     return () => {
       cancelAnimationFrame(into);
+      const at = traps.indexOf(box);
+      if (at >= 0) traps.splice(at, 1);
       document.removeEventListener("keydown", tab);
       document.removeEventListener("focusin", back);
       // Give focus back to the opener; when the page drew it again meanwhile (a row's Pay link while its window was

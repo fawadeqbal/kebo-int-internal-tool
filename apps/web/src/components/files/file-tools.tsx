@@ -21,12 +21,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, Eye, FileText, Image as ImageIcon, MoreHorizontal } from "lucide-react";
 import { ATTACHMENT_KIND_LABEL, ATTACHMENT_KINDS, fileSize, FLOW_STEP_LABEL, type AttachmentKind } from "@kebo/shared";
-import { Button, buttonClass, cn, Field, Input, Select, Textarea, Notice, linkClass } from "@kebo/ui";
+import { Button, buttonClass, cn, Field, Input, Select, Notice, linkClass } from "@kebo/ui";
+import { useFocusTrap } from "@/components/common/dialog";
 import { FloatingMenu, useIsPhone } from "@/components/common/floating";
 import type { ActionState } from "@/lib/actions";
 import type { AttachTarget, OrderFile } from "@/lib/types-files";
 import { useFileViewer, type ViewFile } from "@/components/files/viewer";
-import { fileAttachAction, fileRemoveAction, filesShareAction, fileUpdateAction } from "@/app/(app)/orders/files-actions";
+import { EmailPanel, ShareNow, type Outgoing, type Recipient } from "@/components/send/send";
+import { emailOutAction, noteSentAction, noteSharedAction } from "@/app/(app)/send-actions";
+import { fileAttachAction, fileRemoveAction, fileUpdateAction } from "@/app/(app)/orders/files-actions";
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -93,7 +96,9 @@ type Dialog =
   | { kind: "replace"; file: OrderFile }
   | { kind: "delete"; files: OrderFile[] }
   | { kind: "attach-many"; files: OrderFile[] }
-  | { kind: "share"; files: OrderFile[]; papers: { key: string; label: string; draft?: boolean }[] };
+  /** Email and Share (design "Email and Share", 26 Nov): what goes, as the two buttons send it. */
+  | { kind: "email"; out: Outgoing[]; title: string }
+  | { kind: "share"; out: Outgoing[]; at: () => HTMLElement | null };
 
 export interface ShareContext {
   refNo: string;
@@ -101,7 +106,13 @@ export interface ShareContext {
   greeting: string | null;
   vessel: string | null;
   eta: string | null;
+  /** Who it goes to: the customer's main contact. */
+  to?: Recipient | null;
+  today?: string;
 }
+
+/** A file of the order as Email and Share send it. */
+export const outOfFile = (f: OrderFile): Outgoing => ({ key: f.id, name: f.name, detail: fileSize(f.size), view: f.viewHref, download: f.href, file: f.id });
 
 interface Tools {
   orderId: string;
@@ -138,7 +149,10 @@ export function FileToolsProvider({
   share: ShareContext;
   children: ReactNode;
 }) {
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  // Each one opened counts (n): a second Share… starts its own menu.
+  const [opened, setOpened] = useState<{ dialog: Dialog; n: number } | null>(null);
+  const setDialog = useCallback((d: Dialog | null) => setOpened((x) => (d ? { dialog: d, n: (x?.n ?? 0) + 1 } : null)), []);
+  const dialog = opened?.dialog ?? null;
   const viewer = useFileViewer();
   const t = useTime();
   const view = useCallback(
@@ -146,17 +160,17 @@ export function FileToolsProvider({
       if (!viewer) return downloadHref(file.href);
       const all = set?.some((f) => f.id === file.id) ? set : [file];
       viewer.open(
-        all.map((f) => toView(f, t, setDialog, viewer.close)),
+        all.map((f) => toView(f, t, setDialog, viewer.close, orderId, share)),
         all.findIndex((f) => f.id === file.id),
       );
     },
-    [viewer, t],
+    [viewer, t, orderId, share, setDialog],
   );
-  const tools = useMemo<Tools>(() => ({ orderId, files, targets, share, view, open: setDialog }), [orderId, files, targets, share, view]);
+  const tools = useMemo<Tools>(() => ({ orderId, files, targets, share, view, open: setDialog }), [orderId, files, targets, share, view, setDialog]);
   return (
     <FileToolsContext.Provider value={tools}>
       {children}
-      {dialog && <FileDialog dialog={dialog} tools={tools} onClose={() => setDialog(null)} />}
+      {dialog && <FileDialog dialog={dialog} n={opened!.n} tools={tools} onClose={() => setDialog(null)} />}
     </FileToolsContext.Provider>
   );
 }
@@ -213,7 +227,8 @@ export function FileMenu({
     >
       <MenuItem label="View" onClick={run(() => tools.view(file, set))} />
       <MenuItem label="Download" onClick={run(() => downloadHref(file.href))} />
-      <MenuItem label="Share…" onClick={run(() => tools.open({ kind: "share", files: [file], papers: [] }))} />
+      <MenuItem label="Email…" onClick={run(() => tools.open({ kind: "email", out: [outOfFile(file)], title: `Email ${file.name}` }))} />
+      <MenuItem label="Share…" onClick={run(() => tools.open({ kind: "share", out: [outOfFile(file)], at: anchor }))} />
       {(file.can.rename || file.can.describe || file.can.attach || file.can.replace) && <Sep />}
       {file.can.rename && <MenuItem label="Rename" onClick={run(() => tools.open({ kind: "rename", file }))} />}
       {file.can.describe && (
@@ -353,7 +368,14 @@ export function FileChip({
  * added it, its earlier versions, and Share, Replace and Delete. What it is and where it is attached change
  * from its Details.
  */
-function toView(file: OrderFile, t: ReturnType<typeof useTime>, open: (d: Dialog) => void, close: () => void): ViewFile {
+function toView(
+  file: OrderFile,
+  t: ReturnType<typeof useTime>,
+  open: (d: Dialog) => void,
+  close: () => void,
+  orderId: string,
+  share: ShareContext,
+): ViewFile {
   const then = (d: Dialog) => () => {
     close();
     open(d);
@@ -388,10 +410,11 @@ function toView(file: OrderFile, t: ReturnType<typeof useTime>, open: (d: Dialog
       ["Size", `${fileSize(file.size)} · ${typeLabel(file)}`],
     ],
     versions: file.versions.map((v) => ({ key: v.id, label: `v${v.version} · ${v.name} · ${t.date(v.at)}`, href: v.href })),
-    onShare: then({ kind: "share", files: [file], papers: [] }),
+    // Email and Share in the window's panel, noted in the order's History.
+    send: { message: shareMessage(share, [file.name]), order: orderId, file: file.id },
     actions: [
       ...(file.can.rename ? [{ label: "Rename", onClick: then({ kind: "rename", file }) }] : []),
-      ...(file.can.replace ? [{ label: "Replace", onClick: then({ kind: "replace", file }) }] : []),
+      ...(file.can.replace ? [{ label: "Replace with a newer one", onClick: then({ kind: "replace", file }) }] : []),
       ...(file.can.remove ? [{ label: "Delete", danger: true, onClick: then({ kind: "delete", files: [file] }) }] : []),
     ],
   };
@@ -413,6 +436,9 @@ function Modal({
   const id = useId();
   const mounted = useMounted();
   const head = useRef<HTMLHeadingElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  // It opens over the page or over the document window: Tab stays in it, and closing gives the focus back.
+  useFocusTrap(box, mounted);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
@@ -426,6 +452,7 @@ function Modal({
     <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-4">
       <button type="button" aria-label="Close" tabIndex={-1} className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-t`}
@@ -473,7 +500,7 @@ function Buttons({ pending, save, onClose, danger }: { pending: boolean; save: s
 
 const sourceOf = (f: OrderFile) => [f.source, f.sourceId] as const;
 
-function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; onClose: () => void }) {
+function FileDialog({ dialog, n, tools, onClose }: { dialog: Dialog; n: number; tools: Tools; onClose: () => void }) {
   const id = useId();
   const { pending, error, run, setError } = useRun(onClose);
   const { orderId } = tools;
@@ -680,7 +707,28 @@ function FileDialog({ dialog, tools, onClose }: { dialog: Dialog; tools: Tools; 
     );
   }
 
-  return <ShareDialog files={dialog.files} papers={dialog.papers} tools={tools} onClose={onClose} />;
+  // Email and Share: the app's two buttons, for what was chosen here (a file, a row, the set).
+  const { share } = tools;
+  const on = { order: tools.orderId };
+  const going = dialog.out.map((x) => ({ key: x.key, name: x.name, download: x.download, paper: x.paper ?? null, file: x.file ?? null }));
+  const message = shareMessage(share, dialog.out.map((x) => x.name.replace(/\.pdf$/i, "")));
+  if (dialog.kind === "share")
+    return <ShareNow key={n} share={{ items: dialog.out, message, to: share.to, noteAction: noteSharedAction.bind(null, on, going) }} at={dialog.at} />;
+  return (
+    <EmailPanel
+      title={dialog.title}
+      description={share.refNo}
+      onClose={onClose}
+      items={dialog.out}
+      ticked
+      to={share.to ?? null}
+      subject={(chosen) => `${chosen.length > 1 ? `Documents for ${share.refNo}` : `${chosen[0]!.name.replace(/\.pdf$/i, "")} · ${share.refNo}`}`}
+      message={message}
+      emailAction={emailOutAction.bind(null, on, going)}
+      markAction={noteSentAction.bind(null, on, going)}
+      today={share.today ?? new Date().toISOString().slice(0, 10)}
+    />
+  );
 }
 
 /** The message prepared for a share: the order, the papers, the vessel and ETA. */
@@ -690,143 +738,3 @@ export function shareMessage(ctx: ShareContext, names: string[]) {
   return `${ctx.greeting ? `${ctx.greeting}, please` : "Please"} find the documents for ${ctx.refNo}: ${list}.${ship ? ` ${ship}.` : ""}`;
 }
 
-/**
- * Share…: on a phone, the share sheet with the files themselves (WhatsApp,
- * email, WeChat); on a computer, the files download (one zip when several) and
- * the message is copied to paste. The app sends nothing; the share is noted in
- * History.
- */
-function ShareDialog({
-  files,
-  papers,
-  tools,
-  onClose,
-}: {
-  files: OrderFile[];
-  papers: { key: string; label: string; draft?: boolean }[];
-  tools: Tools;
-  onClose: () => void;
-}) {
-  const id = useId();
-  // A paper not issued yet goes out marked DRAFT: said before it is sent (review 24 Nov, O-30).
-  const drafts = papers.filter((p) => p.draft).map((p) => p.label);
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const names = [...papers.map((p) => p.label), ...files.map((f) => f.name)];
-  const [message, setMessage] = useState(() => shareMessage(tools.share, names));
-  const count = files.length + papers.length;
-  const downloadUrl =
-    papers.length && !files.length
-      ? `/pdf/set/${tools.orderId}?as=pdf&keys=${papers.map((p) => encodeURIComponent(p.key)).join(",")}`
-      : files.length === 1 && !papers.length
-        ? files[0]!.href
-        : `/files/orders/${tools.orderId}?files=${files.map((f) => f.id).join(",")}`;
-  const note = (via: "share" | "download") =>
-    filesShareAction(tools.orderId, { files: files.map((f) => f.id), papers: papers.map((p) => p.key), via, message });
-
-  const share = () =>
-    start(async () => {
-      setError(null);
-      // The share sheet on a phone or a tablet; a computer downloads instead.
-      const canShareFiles = "canShare" in navigator && window.matchMedia("(max-width: 639px), (pointer: coarse)").matches;
-      if (canShareFiles) {
-        try {
-          const blobs = await Promise.all(
-            (papers.length && !files.length
-              ? [{ href: downloadUrl, name: `${tools.share.refNo} documents.pdf` }]
-              : files.map((f) => ({ href: f.href, name: f.name }))
-            ).map(async (f) => {
-              const res = await fetch(f.href);
-              if (!res.ok) throw new Error(`${f.name} could not be fetched (${res.status}).`);
-              const b = await res.blob();
-              return new File([b], f.name, { type: b.type });
-            }),
-          );
-          if (navigator.canShare({ files: blobs })) {
-            await navigator.share({ files: blobs, text: message, title: tools.share.refNo });
-            await note("share");
-            onClose();
-            router.refresh();
-            return;
-          }
-        } catch (e) {
-          if (e instanceof DOMException && e.name === "AbortError") return; // closed the share sheet
-        }
-      }
-      // A computer (or a browser that cannot share files): download and copy the message.
-      await downloadOnly();
-    });
-
-  const downloadOnly = async () => {
-    downloadHref(downloadUrl);
-    try {
-      await navigator.clipboard.writeText(message);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-    const r = await note("download");
-    if (!r.ok) return setError(r.message ?? "The share could not be noted.");
-    router.refresh();
-  };
-
-  return (
-    <Modal
-      title={`Share ${count === 1 ? names[0] : `${count} files`}`}
-      description="Share opens the share sheet with the files themselves (WhatsApp, email, WeChat) where the device has one. WhatsApp and Email download the files (several as one zip) and open the chat or a new email with the message, to attach them."
-      onClose={onClose}
-    >
-      {drafts.length > 0 && (
-        <Notice tone="todo">
-          {drafts.join(", ")} {drafts.length === 1 ? "is a draft" : "are drafts"}: not issued yet, so {drafts.length === 1 ? "it goes" : "they go"} out marked DRAFT, without a number. Issue it first to send the real one.
-        </Notice>
-      )}
-      {error && <Notice tone="bad">{error}</Notice>}
-      {copied && <Notice tone="ok">Downloaded, and the message is copied: attach the file in WhatsApp or your email (📎).</Notice>}
-      <Field label="Message" htmlFor={`${id}-m`}>
-        <Textarea id={`${id}-m`} rows={4} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
-      </Field>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="primary" disabled={pending} onClick={share}>
-          {pending ? "Preparing…" : "Share"}
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              // WhatsApp with the message written; the files download to attach (the app sends nothing).
-              window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener");
-              await downloadOnly();
-            })
-          }
-        >
-          WhatsApp
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              await downloadOnly();
-              window.location.assign(`mailto:?subject=${encodeURIComponent(tools.share.refNo)}&body=${encodeURIComponent(message)}`);
-            })
-          }
-        >
-          Email
-        </Button>
-        <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(downloadOnly)}>
-          Download only
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          {copied ? "Done" : "Cancel"}
-        </Button>
-      </div>
-      <p className="text-xs text-muted">The share is noted in History (who, what, when). Nothing is sent by the app itself.</p>
-    </Modal>
-  );
-}

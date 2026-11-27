@@ -100,7 +100,7 @@ function Changes({ r }: { r: AuditRow }) {
         <span className="hidden group-open:inline">{diff.changed ? "Hide changes" : "Hide values"}</span>
       </summary>
       {!diff.changed && <p className="mt-1.5 text-xs text-text-2">None of these fields changed{r.entityType === "customer" ? " (only contacts were edited)" : ""}.</p>}
-      <Scroll axis="x" size="lg" fade label="What changed" className="mt-2 rounded-lg border border-line">
+      <Scroll axis="x" size="lg" fade stack label="What changed" className="mt-2 rounded-lg border border-line">
         <table className="w-full text-xs">
           <thead className="bg-surface-2/60 text-text-2">
             <tr>

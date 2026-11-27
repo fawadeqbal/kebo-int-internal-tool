@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { channelOf, DEFAULT_SITE, siteContent, type LeadOrigin, type SiteContent } from "@kebo/shared";
-import { addDays, todayIn, type ISODate } from "@kebo/utils";
+import { addDays, monthEnd, monthOf, monthStart, todayIn, type ISODate } from "@kebo/utils";
 import { ENV, type Env } from "../config/env";
 import { PrismaService } from "../database/prisma.service";
 import { PlatformCompaniesService } from "./companies.platform";
@@ -166,17 +166,8 @@ export class SiteService {
   async numbers(month?: string) {
     const today = this.today();
     const m = month && /^\d{4}-\d{2}$/.test(month) ? month : today.slice(0, 7);
-    const range = (ym: string) => {
-      const [y, mo] = ym.split("-").map(Number) as [number, number];
-      const from = `${ym}-01` as ISODate;
-      const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-      return { from, to: `${ym}-${String(last).padStart(2, "0")}` as ISODate };
-    };
-    const before = (() => {
-      const [y, mo] = m.split("-").map(Number) as [number, number];
-      const d = new Date(Date.UTC(y, mo - 2, 1));
-      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    })();
+    const range = (ym: string) => ({ from: monthStart(ym), to: monthEnd(ym) });
+    const before = monthOf(m, -1);
     const figures = async (ym: string) => {
       const r = range(ym);
       const start = new Date(`${r.from}T00:00:00Z`);

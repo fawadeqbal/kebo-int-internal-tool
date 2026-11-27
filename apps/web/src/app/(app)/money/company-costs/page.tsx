@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
 import { buildHref, Card, EmptyState, LinkTabs, PageHeader, Pager, StatRow, StatTile, toPage, toPageSize, Stack } from "@kebo/ui";
-import { addDays } from "@kebo/utils";
+import { lastMonths, monthEnd, monthOf, monthStart } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money, whole, companyToday, countOf } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -11,7 +11,7 @@ import type { ExpenseList, RepeatingCosts } from "@/lib/types-money";
 import { PlanOff } from "@/components/common/plan-off";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { Section } from "@/components/order-sections/section";
-import { ExpenseRecord } from "@/components/money/expense-record";
+import { ExpenseList as Costs } from "@/components/money/expense-list";
 import { RepeatingRow } from "@/components/money/company-costs";
 import { AddCost, type CostSetup } from "@/components/money/cost-window";
 import { COMPANY } from "@/components/money/cost-kinds";
@@ -23,10 +23,10 @@ export const metadata = { title: "Expenses" };
 
 const HERE = "/money/company-costs";
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-type Search = { p?: string; kind?: string; page?: string; size?: string; q?: string };
+type Search = { p?: string; kind?: string; removed?: string; page?: string; size?: string; q?: string };
 
 /** The first and the last day of a month ("2026-11"). */
-const span = (month: string) => ({ from: `${month}-01`, to: addDays(`${addDays(`${month}-28`, 4).slice(0, 7)}-01`, -1) });
+const span = (month: string) => ({ from: monthStart(month), to: monthEnd(month) });
 
 /**
  * Finance › Expenses (design "money, simple", board MCompany): what the company spends that is not a
@@ -44,8 +44,10 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const today = companyToday();
   const thisMonth = today.slice(0, 7);
   const month = /^\d{4}-\d{2}$/.test(sp.p ?? "") && sp.p! <= thisMonth ? sp.p! : thisMonth;
-  const prev = addDays(`${month}-01`, -1).slice(0, 7);
-  const category = (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
+  const prev = monthOf(month, -1);
+  // Removed costs have a tab of their own, as on Payments (review 26 Nov): the other tabs list the live ones.
+  const removed = sp.removed === "1";
+  const category = !removed && (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
   const q = { kind: "company" };
   const text = sp.q?.trim() || undefined;
   const [list, unsearched, before, year, repeating, people, settings] = await Promise.all([
@@ -54,6 +56,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
       ...span(month),
       category,
       q: text,
+      removed: removed ? "only" : "none",
       page: String(toPage(sp.page)),
       pageSize: String(toPageSize(sp.size)),
     }),
@@ -68,7 +71,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const c = list.currency;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   const setup: CostSetup = { mainCurrency: fx.main, fx, today, people, for: COMPANY };
-  const keep = { p: month === thisMonth ? undefined : month, kind: category, q: sp.q };
+  const keep = { p: month === thisMonth ? undefined : month, kind: category, removed: removed ? "1" : undefined, q: sp.q };
   const href = (change: Record<string, string | undefined>) => buildHref(HERE, keep, { page: undefined, ...change });
   const monthName = MONTH_YEAR.format(new Date(`${month}-01T00:00:00Z`));
   // The month's total over every kind (the list may be narrowed to one, or searched).
@@ -129,13 +132,14 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
         <LinkTabs
           label="Which kind"
           tabs={[
-            { href: href({ kind: undefined }), label: "All", count: foundCount, active: !category },
+            { href: href({ kind: undefined, removed: undefined }), label: "All", count: foundCount, active: !category && !removed },
             ...list.byCategory.map((k) => ({
-              href: href({ kind: k.category }),
+              href: href({ kind: k.category, removed: undefined }),
               label: companyKind(k.category),
               count: k.count,
               active: category === k.category,
             })),
+            ...(list.removed > 0 || removed ? [{ href: href({ kind: undefined, removed: "1" }), label: "Removed", count: list.removed, active: removed }] : []),
           ]}
         />
       </div>
@@ -143,7 +147,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
       <FilterCard
         search="Search what it was for, a note or who was paid…"
         value={sp.q}
-        keep={{ kind: category }}
+        keep={{ kind: category, removed: removed ? "1" : undefined }}
         month={{
           name: "p",
           current: month,
@@ -151,17 +155,19 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           thisMonth,
           label: monthName,
           // This month and the eleven before it.
-          options: Array.from({ length: 12 }, (_, i) => addDays(`${thisMonth}-15`, -30 * i).slice(0, 7))
-            .filter((m, i, all) => all.indexOf(m) === i)
+          options: lastMonths(thisMonth)
+            .reverse()
             .map((m) => ({ value: m, label: MONTH_YEAR.format(new Date(`${m}-01T00:00:00Z`)) })),
         }}
-        // The list shows removed costs crossed out too: say how many, so the tabs and the pages add up (M-27).
-        count={`${countOf(list.count, "cost")}${list.listed > list.count ? ` · ${list.listed - list.count} removed` : ""}`}
+        // What the tab lists (the removed ones are under Removed), so the tabs and the pages add up (M-27).
+        count={removed ? `${list.listed} removed` : countOf(list.listed, "cost")}
       />
 
-      <Card data-part="table" className="overflow-hidden">
+      <Card className="overflow-clip">
         {list.rows.length === 0 ? (
-          text ? (
+          removed ? (
+            <EmptyState framed title="Nothing removed" description={`No cost of ${monthName} was removed.`} />
+          ) : text ? (
             <EmptyState
               framed
               title="No cost matches"
@@ -176,17 +182,16 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           )
         ) : (
           <>
-            <ul className="flex flex-col divide-y divide-line" aria-label="Expenses">
-              {list.rows.map((e) => (
-                <ExpenseRecord key={e.id} e={e} mainCurrency={c} people={people} fx={fx} today={today} />
-              ))}
-            </ul>
-            <p className="flex items-baseline justify-between gap-3 border-t-2 border-line-strong px-4 py-3 text-sm font-bold">
-              <span>
-                Total{category ? ` · ${companyKind(category)}` : ""} · {monthName}
-              </span>
-              <span className="tabular">{money(list.total, c)}</span>
-            </p>
+            <Costs rows={list.rows} main={c} label={removed ? "Removed costs" : "Expenses"} />
+            {/* The month's total in the main currency, each cost at its own rate (a removed cost counts for nothing). */}
+            {!removed && (
+              <p className="flex items-baseline justify-between gap-3 border-t-2 border-line-strong px-4 py-3 text-sm font-bold sm:px-5">
+                <span>
+                  Total{category ? ` · ${companyKind(category)}` : ""} · {monthName}
+                </span>
+                <span className="tabular">{money(list.total, c)}</span>
+              </p>
+            )}
           </>
         )}
       </Card>

@@ -8,7 +8,7 @@ import type { Fx } from "@/lib/fx";
 import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
 import { EditCustomerPayment, FactoryPaymentForm } from "./forms";
-import { CostPanel } from "./cost-window";
+import { CostPanel, subOf } from "./cost-window";
 import { costForOf } from "./cost-kinds";
 
 /**
@@ -36,6 +36,27 @@ export function ChangeSupplierPayment(props: Omit<ComponentProps<typeof FactoryP
         </PanelBody>
       )}
     </UrlWindow>
+  );
+}
+
+/**
+ * "Add again" from a cost's ⋯ (?panel=again): a new cost filled in like this one (what for, the kind, the amount,
+ * who paid), dated today, in the same window as every new cost. It was a button in the old fold-open row of
+ * Expenses; the row now opens this page (review 26 Nov).
+ */
+export function AgainExpense({ e, people, fx, today }: { e: ExpenseView; people: Person[]; fx: Fx; today: string }) {
+  const panel = useSidePanel("again");
+  if (!panel.open) return null;
+  const setup = { mainCurrency: fx.main, fx, today, people, for: costForOf(e) };
+  return (
+    <CostPanel
+      title="New cost"
+      sub={subOf(setup.for)}
+      setup={setup}
+      mode={{ kind: "new", template: { ...e, for: setup.for ?? undefined } }}
+      onClose={() => panel.close()}
+      onFileError={() => {}}
+    />
   );
 }
 

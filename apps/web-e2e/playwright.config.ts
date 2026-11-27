@@ -8,6 +8,8 @@ const CI = !!process.env.CI;
  * In CI the API, the web app and the proxy are started here; on a laptop the running ones are used.
  */
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:8080";
+/** The counting door of proxy.mjs: the web app's way to the API here, so a page's calls can be counted (page-cost-flows.spec.ts). */
+const COUNT_URL = `http://localhost:${process.env.E2E_COUNT_PORT ?? 4001}`;
 
 export default defineConfig({
   testDir: "./tests",
@@ -48,20 +50,22 @@ export default defineConfig({
       reuseExistingServer: !CI,
       timeout: 120_000,
     },
+    // Before the web app: its first page already asks the API, through the proxy's counting door.
+    {
+      name: "Proxy",
+      command: "node proxy.mjs",
+      url: `${COUNT_URL}/__page-cost/ready`,
+      reuseExistingServer: !CI,
+      timeout: 30_000,
+    },
     {
       name: "Web",
       command: "pnpm start",
       cwd: "../web",
       url: "http://localhost:3000/login",
+      env: { API_URL: `${COUNT_URL}/api` },
       reuseExistingServer: !CI,
       timeout: 120_000,
-    },
-    {
-      name: "Proxy",
-      command: "node proxy.mjs",
-      url: `${BASE_URL}/login`,
-      reuseExistingServer: !CI,
-      timeout: 30_000,
     },
   ],
 });

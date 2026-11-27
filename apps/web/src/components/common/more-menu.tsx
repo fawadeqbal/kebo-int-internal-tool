@@ -7,6 +7,7 @@ import { Button, cn } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import type { ActionState } from "@/lib/actions";
 import { ConfirmDialog } from "./dialog";
+import { ShareNow, type ShareProps } from "@/components/send/send";
 import { FloatingMenu, useIsPhone } from "./floating";
 import { useOpenPanel } from "./panel";
 import { useOpenHere } from "@/components/files/viewer";
@@ -24,6 +25,8 @@ export type MenuEntry =
   | { label: string; panel: string; id?: string; danger?: true }
   | { label: string; copy: string }
   | { label: string; danger?: true; confirm: { title: string; body?: string; confirmLabel: string }; action: Action }
+  /** Share… (WhatsApp, WeChat…): the app's Share, opened at ⋯ (design "Email and Share", 26 Nov). */
+  | { label: string; share: ShareProps }
   | { separator: true };
 
 const itemClass =
@@ -53,6 +56,7 @@ export function MoreMenu({
   const [open, setOpen] = useState(false);
   const [asking, setAsking] = useState<Extract<MenuEntry, { action: Action }> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState<{ n: number; share: ShareProps } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const openHere = useOpenHere();
@@ -76,6 +80,7 @@ export function MoreMenu({
       if (e.newTab) window.open(e.href, "_blank", "noopener");
       else router.push(e.href);
     } else if ("panel" in e) openPanel(e.panel, e.id);
+    else if ("share" in e) setSharing((x) => ({ n: (x?.n ?? 0) + 1, share: e.share }));
     else if ("copy" in e) {
       const text = new URL(e.copy, window.location.href).toString();
       void navigator.clipboard?.writeText(text).then(
@@ -116,6 +121,7 @@ export function MoreMenu({
       >
         <MoreHorizontal aria-hidden />
       </Button>
+      {sharing && <ShareNow key={sharing.n} share={sharing.share} at={() => button.current} />}
       {open && (
         <FloatingMenu anchor={() => button.current} onClose={() => setOpen(false)} label={label} width={220}>
           {entries.map((e, i) =>

@@ -1,0 +1,20 @@
+{
+  "counts": {
+    "rawButton": 139,
+    "rawTable": 27,
+    "pixelText": 66,
+    "hiddenFailure": 123,
+    "handWiredWindow": 16,
+    "handDate": 2,
+    "apiOutsideData": 76
+  },
+  "longFiles": [
+    "components/deals/deal-form.tsx",
+    "components/deals/factory-quote-form.tsx",
+    "components/deals/offer-work.tsx",
+    "components/deals/revision-editor.tsx",
+    "components/lines/line-table.tsx",
+    "components/orders/make-paper.tsx",
+    "components/shell/nav.tsx"
+  ]
+}

@@ -1,0 +1,12 @@
+[
+  "modules/flow/flow.service.ts",
+  "modules/ledger/ledger.service.ts",
+  "modules/ledger/posting.service.ts",
+  "modules/money/money.service.ts",
+  "modules/orders/orders.service.ts",
+  "modules/papers/papers-data.ts",
+  "modules/papers/papers.service.ts",
+  "modules/quotations/quotations.service.ts",
+  "modules/treasury/customer-payments.service.ts",
+  "platform/dev-tools.ts"
+]

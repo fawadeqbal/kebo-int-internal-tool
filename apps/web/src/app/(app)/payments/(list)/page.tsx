@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowDownToLine, ArrowUpFromLine, Banknote, Plus } from "lucide-react";
 import { can, PAYMENT_STATUS_LABEL, type PaymentList, type PaymentRow } from "@kebo/shared";
 import { Badge, buildHref, ButtonLink, Card, cn, DataRow, EmptyState, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, RefCode, StatRow, StatTile, StatusBadge, Table, Td, Th, THead, toPage, toPageSize, Notice, linkClass, Dash, Stack } from "@kebo/ui";
-import { addDays } from "@kebo/utils";
+import { lastMonths } from "@kebo/utils";
 import { ExportCsv } from "@/components/sheets/export-link";
 import { api } from "@/lib/api";
 import { date, money, companyToday, countOf } from "@/lib/format";
@@ -90,7 +90,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const t = list.totals;
   const when = allDates ? "" : pr.period === pr.thisMonth ? " this month" : ` · ${pr.name}`;
   // The month filter: this month, the eleven before it, this year and last year.
-  const months = Array.from({ length: 12 }, (_, i) => addDays(`${pr.thisMonth}-15`, -30 * i).slice(0, 7)).filter((m, i, all) => all.indexOf(m) === i);
+  const months = lastMonths(pr.thisMonth).reverse();
   const periods = [
     ...months.map((m) => ({ value: m, label: MONTH.format(new Date(`${m}-01T00:00:00Z`)).replace(` ${today.slice(0, 4)}`, "") })),
     { value: today.slice(0, 4), label: `All of ${today.slice(0, 4)}` },

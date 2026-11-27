@@ -59,9 +59,74 @@ export async function accessibilityProblems(page: Page, within?: string): Promis
   });
 }
 
+/**
+ * Waits for the page an address lands on. An address may send on to another once its first page has come
+ * (a new role → the roles with its panel open): the first page says so in its head and the browser follows
+ * a moment later. Read in that moment, a check failed now and then ("execution context was destroyed", or a
+ * page with nothing on it): so the page that is read is the one it lands on.
+ */
+export async function landed(page: Page) {
+  await page.waitForLoadState("networkidle");
+  const from = page.url();
+  // Asked while it is already moving on: that is a yes.
+  const forwards = await page
+    .locator("meta#__next-page-redirect")
+    .count()
+    .catch(() => 1);
+  if (!forwards) return;
+  await page.waitForURL((u) => u.toString() !== from);
+  await page.waitForLoadState("networkidle");
+}
+
 /** Wider than the screen: the page scrolls sideways (a table or a long word that does not wrap). */
 export async function sidewaysBy(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
+
+/**
+ * On a phone, what is cut off at the screen's edge (review 26 Nov: a window slid sideways, facts and table columns
+ * cut): a table still wider than its box (it should be one card per row, usePhoneStack), and anything poking past
+ * the screen's edge that is not inside a row made to slide (tabs, chips, a comparison marked data-slides). One line
+ * each: "table wider than the screen: Customer Orders…".
+ */
+export async function cutOffOnPhone(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    const words = (el: Element) => (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 50);
+    const hidden = (el: Element) =>
+      !!el.closest('[aria-hidden="true"],[inert],[hidden],.sr-only,table[data-stack] > thead') || getComputedStyle(el).visibility === "hidden";
+    const slides = (el: Element) => {
+      const cs = getComputedStyle(el);
+      return (cs.overflowX === "auto" || cs.overflowX === "scroll") && el.scrollWidth > el.clientWidth + 2;
+    };
+    const out: string[] = [];
+    for (const table of document.querySelectorAll("table")) {
+      const r = table.getBoundingClientRect();
+      if (!r.width || hidden(table)) continue;
+      const box = table.parentElement;
+      // data-slides: a table that slides on purpose (the site's plans, compared side by side).
+      if (box && slides(box) && !box.closest("[data-slides]")) out.push(`table wider than the screen: ${words(table.querySelector("thead") ?? table)}`);
+    }
+    for (const el of document.body.querySelectorAll("*")) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height || (r.right <= vw + 1 && r.left >= -1) || hidden(el)) continue;
+      let p = el.parentElement;
+      let inSlider = false;
+      while (p && p !== document.documentElement) {
+        if (slides(p)) {
+          inSlider = true;
+          break;
+        }
+        p = p.parentElement;
+      }
+      if (inSlider) continue;
+      const pr = el.parentElement?.getBoundingClientRect();
+      if (pr && (pr.right > vw + 1 || pr.left < -1)) continue;
+      if (getComputedStyle(el).position === "fixed" && (r.left >= vw || r.right <= 0)) continue;
+      out.push(`past the edge: ${el.tagName.toLowerCase()} "${words(el)}"`);
+    }
+    return out.slice(0, 10);
+  });
 }
 
 /** The checks every page passes: it opened, nothing went wrong in the browser, nobody needs to scroll sideways, and it meets WCAG AA. */

@@ -22,7 +22,7 @@ import {
   type FlowStep,
   type RepayInput,
 } from "@kebo/shared";
-import { daysBetween, DomainError, ForbiddenError, NotFoundError, type ISODate } from "@kebo/utils";
+import { daysBetween, DomainError, ForbiddenError, monthEnd, NotFoundError, type ISODate } from "@kebo/utils";
 import { LimitsService } from "../../common/company/limits.service";
 import { removeProof, setProof } from "../../common/storage/proofs";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -485,6 +485,11 @@ export class MoneyService {
       /** The list comes a page at a time; the totals are always for the whole period. */
       page?: number;
       pageSize?: number;
+      /**
+       * none: only live costs are listed; only: only the removed ones (a list's Removed tab, as Payments has). Not
+       * given: both, the removed crossed out. The totals never count removed costs.
+       */
+      removed?: "none" | "only";
     },
   ) {
     this.assertExpenses(user);
@@ -572,14 +577,30 @@ export class MoneyService {
       byCustomer: [...customers.values()]
         .map((c) => ({ customer: c.customer, total: fromMinor(c.total), count: c.count, orders: c.orders.size }))
         .sort((a, b) => Number(b.total) - Number(a.total)),
+      /** The removed costs of the period (every kind), for a Removed tab. */
+      removed: rows.filter((e) => e.voidedAt && (!q.customerId || e.customerId === q.customerId)).length,
       ...(await (async () => {
-        const listed = rows.filter((e) => (!q.customerId || e.customerId === q.customerId) && (!q.category || e.category === q.category));
+        const listed = rows.filter(
+          (e) =>
+            (!q.customerId || e.customerId === q.customerId) &&
+            (!q.category || e.category === q.category) &&
+            (q.removed === "none" ? !e.voidedAt : q.removed === "only" ? !!e.voidedAt : true),
+        );
         const ids = listed.slice((page - 1) * pageSize, page * pageSize).map((e) => e.id);
         const full = ids.length
           ? await this.prisma.db.expense.findMany({ where: { id: { in: ids } }, include: expenseInclude, orderBy })
           : [];
-        /** `listed`: how many rows the list has (removed ones included), for the page links. */
-        return { page, pageSize, listed: listed.length, rows: full.map((e) => this.expenseView(e)) };
+        // Each cost's number (EX-2026-0213) is the one the ledger posted it under, as Payments shows it.
+        const posted = ids.length
+          ? await this.prisma.db.ledgerEntry.findMany({
+              where: { sourceType: "expense", sourceId: { in: ids }, part: "" },
+              select: { sourceId: true, ref: true },
+              distinct: ["sourceId"],
+            })
+          : [];
+        const number = new Map(posted.map((p) => [p.sourceId, p.ref]));
+        /** `listed`: how many rows the list has (removed ones included unless `removed` says), for the page links. */
+        return { page, pageSize, listed: listed.length, rows: full.map((e) => ({ ...this.expenseView(e), number: number.get(e.id) || null })) };
       })()),
     };
   }
@@ -856,7 +877,7 @@ export class MoneyService {
     this.assertExpenses(user);
     const today = this.clock.today();
     const month = today.slice(0, 7);
-    const lastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+    const lastDay = Number(monthEnd(today).slice(8));
     const latest = await this.repeatingLatest();
     return {
       month,
@@ -1085,7 +1106,7 @@ export class MoneyService {
       },
       cash: { in: 0, factories: 0, expenses: 0 },
     }));
-    const monthOf = (d: Date) => months[d.getUTCMonth()]!;
+    const rowOf = (d: Date) => months[d.getUTCMonth()]!;
     const profitOf = (e: (typeof months)[number]["earned"]) =>
       e.costedRevenue - e.goodsCost - e.basisCost - e.orderExpenses - e.bankCharges - e.generalExpenses;
 
@@ -1104,7 +1125,7 @@ export class MoneyService {
     for (const o of shipped) {
       const on = shippedOnOf(o.shipments.map((s) => ({ departedOn: fromDbDateOrNull(s.departedOn) })));
       if (!on || on < `${year}-01-01` || on > `${year}-12-31`) continue;
-      const m = monthOf(toDbDate(on));
+      const m = rowOf(toDbDate(on));
       const c = costings.get(o.id)!;
       const inMain = (minor: Minor) => fx.order(minor, o);
       const exp = o.expenses.reduce((t, e) => t + convert(decimalToMinor(e.amount), Number(e.rate)), 0);
@@ -1151,18 +1172,18 @@ export class MoneyService {
     for (const e of expenses) {
       const inMain = convert(decimalToMinor(e.amount), Number(e.rate));
       // The company's own, or spent on an order that was then cancelled: a general expense of the month.
-      if (!e.orderId || e.order?.status === "cancelled") monthOf(e.spentOn).earned.generalExpenses += inMain;
-      if (!e.payLater) monthOf(e.spentOn).cash.expenses += inMain;
+      if (!e.orderId || e.order?.status === "cancelled") rowOf(e.spentOn).earned.generalExpenses += inMain;
+      if (!e.payLater) rowOf(e.spentOn).cash.expenses += inMain;
     }
-    for (const e of billsPaid) monthOf(e.repaidOn!).cash.expenses += convert(decimalToMinor(e.amount), Number(e.rate));
+    for (const e of billsPaid) rowOf(e.repaidOn!).cash.expenses += convert(decimalToMinor(e.amount), Number(e.rate));
     for (const p of payments) {
       // Cash in is what arrived; bank charges never reached us.
-      monthOf(p.paidOn).cash.in += fx.order(decimalToMinor(p.amount), p.order);
+      rowOf(p.paidOn).cash.in += fx.order(decimalToMinor(p.amount), p.order);
       // Bank charges on a cancelled order's payments: a general cost of the month (no shipped order carries them).
       if (p.order.status === "cancelled")
-        monthOf(p.paidOn).earned.bankCharges += fx.order(decimalToMinor(p.bankCharges), p.order);
+        rowOf(p.paidOn).earned.bankCharges += fx.order(decimalToMinor(p.bankCharges), p.order);
     }
-    for (const p of factoryPaid) monthOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
+    for (const p of factoryPaid) rowOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
 
     const money = (n: number) => fromMinor(n);
     const earnedView = (e: (typeof months)[number]["earned"]) => ({

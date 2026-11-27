@@ -508,7 +508,8 @@ export function CostForm({
                 <MoneyInput id="cost-amount" name="amount" currency={currency} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" inputMode="decimal" />
               </Field>
               <Field label="Currency" htmlFor="cost-currency" error={st.errors?.currency}>
-                <CurrencySelect id="cost-currency" name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+                {/* The codes only (USD, CNY, PKR): beside the amount on a phone, "USD · US dollar" was cut to "USD · US d". */}
+                <CurrencySelect short id="cost-currency" name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
               </Field>
             </div>
             {worth && <p className="text-xs text-text-2">{worth}</p>}
@@ -737,7 +738,7 @@ export function CostPanel({
   );
 }
 
-const subOf = (f: CostFor | null) => (!f ? "Choose what it is for" : f.place === "company" ? "For the company" : `For ${f.label.replace(/^(Order|Inquiry) /, "")}`);
+export const subOf = (f: CostFor | null) => (!f ? "Choose what it is for" : f.place === "company" ? "For the company" : `For ${f.label.replace(/^(Order|Inquiry) /, "")}`);
 
 /** "Add a cost": the button and its window (New cost). With `template`: "Add again", filled in from that cost. */
 export function AddCost({

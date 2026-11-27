@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { Button, cn } from "@kebo/ui";
+import { useFocusTrap } from "./dialog";
 
 /**
  * A record's side panel (design "the record page", 17 Nov). On a laptop it is the panel itself, beside every
@@ -14,10 +15,10 @@ export function SideSheet({ title, summary, children }: { title: string; summary
   const [open, setOpen] = useState(false);
   const bar = useRef<HTMLButtonElement>(null);
   const shut = useRef<HTMLButtonElement>(null);
-  const close = () => {
-    setOpen(false);
-    bar.current?.focus({ preventScroll: true });
-  };
+  const sheet = useRef<HTMLDivElement>(null);
+  // As a sheet it covers the page: Tab stays in it (review 27 Nov: it went on over the page behind).
+  useFocusTrap(sheet, open);
+  const close = () => setOpen(false);
   useEffect(() => {
     if (!open) return;
     shut.current?.focus({ preventScroll: true });
@@ -31,6 +32,9 @@ export function SideSheet({ title, summary, children }: { title: string; summary
     return () => {
       document.body.style.overflow = was;
       wide.removeEventListener("change", onWide);
+      // Closed: the focus goes back to the bar, once the sheet has let go of the keyboard (the trap above ends
+      // first). By itself, not by what had the focus before: a phone's browser does not focus a button it taps.
+      bar.current?.focus({ preventScroll: true });
     };
   }, [open]);
 
@@ -54,6 +58,7 @@ export function SideSheet({ title, summary, children }: { title: string; summary
       <div className={cn("max-lg:hidden", open && "max-lg:fixed max-lg:inset-0 max-lg:z-[70] max-lg:block")}>
         {open && <div aria-hidden className="absolute inset-0 animate-in bg-black/40 lg:hidden" onClick={close} />}
         <div
+          ref={sheet}
           role={open ? "dialog" : undefined}
           aria-modal={open || undefined}
           aria-label={open ? title : undefined}

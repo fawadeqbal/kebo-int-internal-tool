@@ -1,6 +1,7 @@
 import { addDays, type ISODate } from "@kebo/utils";
+import type { Tone } from "../labels";
 import type { OrderWord } from "../workflows/progress";
-import type { OrderTab } from "../workflows/order-sections";
+import { dayMonth, type OrderTab } from "../workflows/order-sections";
 import { recordType } from "./types";
 
 /**
@@ -19,6 +20,48 @@ export const ORDER = recordType<OrderWord>({
     Cancelled: { words: "Cancelled", tone: "neutral" },
   },
 });
+
+/** What the order's header reads to say where the order stands. */
+export interface OrderStandingFacts {
+  status: "open" | "closed" | "cancelled";
+  /** The one word worked out from what is stored (orderWord). */
+  word: OrderWord;
+  /** When the goods are to be ready: the supplier's day, else the one on the order. */
+  readyOn: ISODate | null;
+  /** The day we said we would ship by. */
+  shipBy: ISODate | null;
+  /** Every item is in from the supplier. */
+  goodsIn: boolean;
+  /** What the customer still owes (null: this person does not see the money). */
+  due: number | null;
+}
+
+export interface OrderStanding {
+  /** Said after the word: "goods in" or "ready 4 Dec", then "ship by 12 Dec"; once the goods have left, "paid in full". */
+  notes: string[];
+  /** Our ship-by day has passed and the goods have not left. */
+  late: boolean;
+  /** The colour of the whole line: red when cancelled or late, quiet when closed, else the word's own. */
+  tone: Tone;
+}
+
+/**
+ * Where an order stands, beside its one word (the order's header; design "the order, final"): until the goods
+ * leave, the next two dates (ready, ship by) and red once ship-by has passed; after that only whether it is paid.
+ * A closed or cancelled order says nothing more.
+ */
+export function orderStanding(f: OrderStandingFacts, today: ISODate): OrderStanding {
+  const open = f.status === "open";
+  const left = f.word !== "Confirmed" && f.word !== "In production";
+  const notes = !open
+    ? []
+    : left
+      ? [f.due !== null && f.due <= 0 ? "paid in full" : null]
+      : [f.goodsIn ? "goods in" : f.readyOn ? `ready ${dayMonth(f.readyOn)}` : null, f.shipBy ? `ship by ${dayMonth(f.shipBy)}` : null];
+  const late = open && !left && !!f.shipBy && f.shipBy < today;
+  const tone = f.status === "cancelled" ? "bad" : f.status === "closed" ? "neutral" : late ? "bad" : ORDER.states[f.word].tone;
+  return { notes: notes.filter((n): n is string => n !== null), late, tone };
+}
 
 /** What the header's next step reads from an order (worked out from what is saved). */
 export interface OrderStepFacts {

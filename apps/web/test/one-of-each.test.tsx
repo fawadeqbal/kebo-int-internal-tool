@@ -158,12 +158,15 @@ describe("one of each", () => {
     expect(found(/\|\| "empty"/g)).toEqual([]);
   });
 
-  it("one app frame, no help line under a page's title, settings in one 720 column", () => {
+  it("one app frame, no help line under a page's title, settings in one way (720 column, columns on a big screen)", () => {
     expect(found(/max-w-\[1400px\]|lg:px-8/g)).toEqual([]);
     expect(found(/<main id="main" className=\{cn\(RULES\.page\.frame/g)).toHaveLength(2);
     expect(found(/data-page-desc|<PageHeader\b[^>]*\sdescription=|<PageHeader\b[^>]*\ssummary="/g)).toEqual([]);
     expect(found(/<SettingsPage\b[^>]*description=/g)).toEqual([]);
-    expect(found(/<div className=\{RULES\.page\.column\}>/g).length).toBeGreaterThanOrEqual(4);
+    // Settings: the page of cards (RULES.page.settings, its cards in SettingsCardsFrame); one-form pages: the 720 column.
+    expect(found(/<div className=\{RULES\.page\.settings\}>/g).length).toBeGreaterThanOrEqual(3);
+    expect(found(/className=\{RULES\.page\.cards\}/g).length).toBeGreaterThanOrEqual(1);
+    expect(found(/<div className=\{RULES\.page\.column\}>/g).length).toBeGreaterThanOrEqual(2);
   });
 
   it("one record body: every record's panel is RecordBody's 320, no hand-typed page grid, no second RecordFrame", () => {
@@ -300,7 +303,7 @@ describe("one of each", () => {
     expect(found(/\[&_thead_th\]:bg-surface-2/g)).toEqual([]);
     expect(found(/tableClassName="text-md"/g)).toEqual([]);
     // A record's read table draws THead/Th, not a hand-made head (editors in windows keep their grids).
-    const read = ["sourcing/page.tsx", "person-spending.tsx", "quotation-tab.tsx", "customer-payments.tsx", "payment-record.tsx", "targets-grid.tsx", "domain-card.tsx", "entry-body.tsx", "lines-sheet.tsx"];
+    const read = ["sourcing/page.tsx", "person-spending.tsx", "quotation-tab.tsx", "customer-payments.tsx", "targets-grid.tsx", "domain-card.tsx", "entry-body.tsx", "lines-sheet.tsx"];
     expect(found(/<thead className="bg-surface-2|<tr className="bg-surface-2 text-(?:left )?text-xs/g).filter((f) => read.some((r) => f.includes(r)))).toEqual([]);
     // Numbers (RFQ-, QUO-, SO-, PO-) are RefCode, not plain mono or bold words.
     expect(found(/cell: \(d\) => d\.refNo \}/g)).toEqual([]);

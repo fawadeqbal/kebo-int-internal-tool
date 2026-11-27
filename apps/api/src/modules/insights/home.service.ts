@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { convert, fromMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import { can, EXPENSE_CATEGORY_LABEL, orderWord, orderWordColumn, type ExpenseCategory } from "@kebo/shared";
 import { wordFactsByOrder } from "@kebo/database";
-import { ForbiddenError, type ISODate } from "@kebo/utils";
+import { addDays, ForbiddenError, lastMonths, monthStart, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { LimitsService } from "../../common/company/limits.service";
@@ -10,7 +10,7 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { SettingsService } from "../settings/settings.service";
 import { CashReportService } from "../treasury/cash-report.service";
 import { FactsService } from "./facts/facts.service";
-import { addDays, costSentence, lateSentence, monthStart, quotesSentence, salesSentence, standoutOf, supplierSentence, weeksAhead } from "./home-rules";
+import { costSentence, lateSentence, quotesSentence, salesSentence, standoutOf, supplierSentence, weeksAhead } from "./home-rules";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthName = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1]!;
@@ -296,7 +296,7 @@ export class HomeService {
       },
       standout,
       weeks,
-      months: Array.from({ length: 6 }, (_, i) => monthStart(today, i - 5).slice(0, 7)).map((k) => ({
+      months: lastMonths(today, 6).map((k) => ({
         month: k,
         orders: month(k)?.orders ?? 0,
         sold: fromMinor(m(month(k)?.sold)),

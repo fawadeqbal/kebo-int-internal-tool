@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
-import { can, PAPER, PAYMENT_ROUTE_LABEL, type Tone } from "@kebo/shared";
+import { can, ITEM_WHERE_TONE, itemWhere, PAPER, PAYMENT_ROUTE_LABEL, type Tone } from "@kebo/shared";
 import { Badge, cn, Notice, linkClass, Dash } from "@kebo/ui";
 import { requireUser } from "@/lib/session";
 import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
@@ -48,23 +48,46 @@ function shipHintOf(a: NonNullable<OrderView["agreed"]>): string {
   return "Type a date only when the customer agreed one.";
 }
 
-/** Where one item is now, in one word (the Items box's last column): the furthest it has got. */
+/**
+ * Where one item is now, in one word (the Items box's last column). Where it is comes from the shared rule
+ * (itemWhere: the furthest it has got); only the words are said here.
+ */
 function whereOf(l: OrderLineView, o: OrderView, poSent: boolean): { text: string; tone: Tone } | null {
-  if (l.type !== "goods") return null;
-  const n = Number(l.quantity);
-  const out = l.delivered ? Number(l.delivered.qty) : 0;
-  if (out > 0) {
-    const marked = !!l.delivered?.condition && l.delivered.condition !== "good";
-    if (out >= n) return marked ? { text: "Delivered · marked", tone: "warn" } : { text: "Delivered", tone: "ok" };
-    return { text: `${qty(out)} of ${qty(n)} delivered`, tone: "warn" };
+  const w = itemWhere(
+    {
+      goods: l.type === "goods",
+      quantity: Number(l.quantity),
+      deliveredQty: l.delivered ? Number(l.delivered.qty) : 0,
+      deliveredMarked: !!l.delivered?.condition && l.delivered.condition !== "good",
+      // A line counts as packed once it has packages of its own or one of its cases sits inside a package.
+      packed: !!l.packing.packages || !!l.packing.cases?.some((c) => c.inPackage),
+      receivedQty: Number(l.receivedQty),
+      receivedOn: l.receivedOn,
+    },
+    { word: o.word, poSent },
+  );
+  if (!w) return null;
+  const tone = w.at === "delivered" && w.marked ? "warn" : ITEM_WHERE_TONE[w.at];
+  switch (w.at) {
+    case "delivered":
+      return { text: w.marked ? "Delivered · marked" : "Delivered", tone };
+    case "part_delivered":
+      return { text: `${qty(w.got)} of ${qty(w.of)} delivered`, tone };
+    case "arrived":
+      return { text: "Arrived", tone };
+    case "on_its_way":
+      return { text: "On its way", tone };
+    case "packed":
+      return { text: "Packed", tone };
+    case "received":
+      return { text: `Received${w.on ? ` ${dayMonth(w.on)}` : ""}`, tone };
+    case "part_received":
+      return { text: `${qty(w.got)} of ${qty(w.of)} in`, tone };
+    case "at_supplier":
+      return { text: "At the supplier", tone };
+    case "not_ordered":
+      return { text: "Not ordered yet", tone };
   }
-  if (o.word === "Arrived" || o.word === "Delivered" || o.word === "Done") return { text: "Arrived", tone: "info" };
-  if (o.word === "Shipped") return { text: "On its way", tone: "info" };
-  if (l.packing.packages || l.packing.cases?.some((c) => c.inPackage)) return { text: "Packed", tone: "info" };
-  const got = Number(l.receivedQty);
-  if (got >= n && n > 0) return { text: `Received${l.receivedOn ? ` ${dayMonth(l.receivedOn)}` : ""}`, tone: "ok" };
-  if (got > 0) return { text: `${qty(got)} of ${qty(n)} in`, tone: "warn" };
-  return poSent ? { text: "At the supplier", tone: "neutral" } : { text: "Not ordered yet", tone: "neutral" };
 }
 
 /** The order's items in the one items box: the quotation's columns, and where each item is now. */

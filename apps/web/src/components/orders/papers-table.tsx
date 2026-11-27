@@ -4,23 +4,22 @@ import { ViewSwitch } from "@/components/common/view-switch";
 import { useId, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileText, MoreHorizontal, Plus, Share2 } from "lucide-react";
+import { Download, FileText, Mail, MoreHorizontal, Plus, Share2 } from "lucide-react";
 import { BANK_PAPERS, paperDone, type FlowStep, type PaperKind } from "@kebo/shared";
 import { Badge, Button, buttonClass, Card, CardHeader, cn, capsClass } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { useConfirm } from "@/components/common/dialog";
 import { FloatingMenu } from "@/components/common/floating";
-import { useOpenHere } from "@/components/files/viewer";
 import type { ActionState } from "@/lib/actions";
 import type { PaperRow } from "@/lib/types-papers";
 import { downloadHref, FileChip, uploadToOrder, useFileTools } from "@/components/files/file-tools";
+import { outOf, rowWindowHref } from "@/lib/doc-links";
 import { ownDocumentAction, paperAgainAction, paperDeleteDraftAction } from "@/app/(app)/orders/files-actions";
 import { RecordForm, StateMark } from "./papers-card";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
-/** The paper's Make page, coming back to Documents when done or on Esc (review 24 Nov, O-28: it went to Payment). */
-const makeHref = (orderId: string, r: { kind: string; ref?: string | null }) =>
-  `/orders/${orderId}/papers/${r.kind}?${new URLSearchParams({ ...(r.ref ? { ref: r.ref } : {}), back: `/orders/${orderId}/documents` })}`;
+/** The document's window (one window for every document, 26 Nov), coming back to Documents when done or on Esc. */
+const windowOf = (orderId: string, r: PaperRow) => rowWindowHref(orderId, r, `/orders/${orderId}/documents`);
 
 export type PapersTab = "bank" | "all" | "missing";
 /** A row of the table: a paper of GET /orders/:id/papers, or the quotation (its own print page); `links` overrides where it prints. */
@@ -84,6 +83,9 @@ export function printOf(orderId: string, r: PaperLineRow) {
   return { view: `/print/orders/${orderId}/${r.kind}?${q}`, pdf: `/pdf/${r.kind}/${orderId}${pq.size ? `?${pq}` : ""}` };
 }
 
+/** Share's menu opens at what has focus once the row's ⋯ closes: the ⋯ itself. */
+const focused = () => document.activeElement as HTMLElement | null;
+
 /** Where a paper takes a file ("paper:doc:<id>" or "paper:<kind>"), for drops and "Attach the signed scan". */
 const attachKey = (r: PaperRow) => (r.doc ? `paper:doc:${r.doc.id}` : r.docKind ? `paper:${r.docKind}` : null);
 
@@ -106,7 +108,6 @@ export function PapersTable({
   description,
   shipNumber,
   today,
-  issueProforma,
 }: {
   orderId: string;
   dealId: string;
@@ -120,8 +121,6 @@ export function PapersTable({
   /** The B/L or AWB number from the shipment, to prefill. */
   shipNumber: string | null;
   today: string;
-  /** The proforma's "Issue it" (gets its number dated today). */
-  issueProforma?: Action;
 }) {
   const tools = useFileTools();
   const [open, setOpen] = useState<{ key: string; mode: "upload" | "elsewhere" } | null>(null);
@@ -136,6 +135,10 @@ export function PapersTable({
   const still = bank.filter((r) => !paperDone(r.state));
   const makeable = rows.filter((r) => r.makeable && !paperDone(r.state));
   const setKeys = (tab === "bank" ? bank : shown).filter((r) => paperDone(r.state) || r.live);
+  const setOut = setKeys.flatMap((r) => {
+    const o = outOf(orderId, r);
+    return o ? [o] : [];
+  });
   const tabs: { key: PapersTab; label: string; n: number }[] = [
     { key: "bank", label: "For the bank", n: bank.length },
     { key: "all", label: "All documents", n: rows.length },
@@ -156,7 +159,6 @@ export function PapersTable({
       update={r.doc ? updateActions[r.doc.id] : undefined}
       shipNumber={shipNumber}
       today={today}
-      issueProforma={r.kind === "proforma" ? issueProforma : undefined}
     />
   );
 
@@ -166,6 +168,7 @@ export function PapersTable({
       <div className="flex flex-col px-4 pt-3 pb-3.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <ViewSwitch
+            fill
             label="Documents"
             current={tab}
             views={tabs.map((t) => ({ key: t.key, label: t.label, href: `${base}?tab=${t.key}#papers`, count: t.n }))}
@@ -236,20 +239,23 @@ export function PapersTable({
                 >
                   as zip
                 </a>
-                {tools && (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() =>
-                      tools.open({
-                        kind: "share",
-                        files: [],
-                        papers: setKeys.map((r) => ({ key: r.key, label: [r.label, r.number].filter(Boolean).join(" "), draft: r.draft || (r.kind === "proforma" && !r.number) })),
-                      })
-                    }
-                  >
-                    <Share2 aria-hidden /> Share…
-                  </Button>
+                {/* Email and Share (design "Email and Share"): the set's documents, each as its own file. */}
+                {tools && setOut.length > 0 && (
+                  <>
+                    <Button size="xs" variant="ghost" onClick={() => tools.open({ kind: "email", out: setOut, title: `Email the set · ${setOut.length} documents` })}>
+                      <Mail aria-hidden /> Email {setOut.length}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={(e) => {
+                        const el = e.currentTarget;
+                        tools.open({ kind: "share", out: setOut, at: () => el });
+                      }}
+                    >
+                      <Share2 aria-hidden /> Share {setOut.length}
+                    </Button>
+                  </>
                 )}
               </>
             )}
@@ -271,7 +277,7 @@ export function PapersTable({
                       <Link
                         key={r.key}
                         role="menuitem"
-                        href={makeHref(orderId, r)}
+                        href={windowOf(orderId, r)}
                         className="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none"
                       >
                         <span className="truncate">{r.label}</span>
@@ -301,7 +307,6 @@ function PaperLine({
   update,
   shipNumber,
   today,
-  issueProforma,
 }: {
   r: PaperLineRow;
   orderId: string;
@@ -314,98 +319,42 @@ function PaperLine({
   update?: Action;
   shipNumber: string | null;
   today: string;
-  issueProforma?: Action;
 }) {
   const tools = useFileTools();
-  const router = useRouter();
-  const [busy, start] = useTransition();
-  const { ask, dialog } = useConfirm();
   const from = fromOf(r);
-  const print = printOf(orderId, r);
-  // The paper's name in the viewer's list ("Packing list PL-2026-0572"), not the link's words.
-  const paperName = [r.label, r.number].filter(Boolean).join(" ");
-  const make = r.makeable ? makeHref(orderId, r) : null;
+  const open_ = windowOf(orderId, r);
   const file = r.doc?.file ? (tools?.files.find((f) => f.sourceId === r.doc!.file!.id) ?? null) : null;
   const isDate = r.doc?.issuedOn ?? (/\d{4}-\d{2}-\d{2}/.exec(r.sub)?.[0] || null);
   const numberLine = [r.number, isDate ? day(isDate) : null].filter(Boolean).join(" · ") || "—";
   const recordable = r.docKind && canRecord;
   const drop = attachKey(r);
+  const own = ownDoc(r);
 
-  // The next version of the proforma / packing list (Make again): issued or made final from the row.
-  const ownDraft =
-    canMake && ownDoc(r) && r.draft ? (
-      <Button
-        size="xs"
-        variant="primary"
-        disabled={busy}
-        onClick={() =>
-          ask({ question: `Make version ${r.version} of the ${r.label.toLowerCase()} final? It keeps exactly what it prints now; version ${(r.version ?? 2) - 1} stays as it was.`, confirmLabel: r.kind === "proforma" ? "Issue it" : "Make it final" }, () => start(async () => {
-            const res = await ownDocumentAction(orderId, r.kind as "proforma" | "packing-list", "final");
-            if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
-            router.refresh();
-          }))
-        }
-      >
-        {r.kind === "proforma" ? `Issue version ${r.version}` : `Make version ${r.version} final`}
-      </Button>
-    ) : null;
-  const issue = ownDraft ? (
-    ownDraft
-  ) : issueProforma && r.state === "can" ? (
-      <Button
-        size="xs"
-        variant="secondary"
-        disabled={busy}
-        onClick={() =>
-          ask({ question: "Issue the proforma now? It gets its number dated today (your letters, the date, the customer's letters, the handler's count) and is final: re-printing it shows exactly what it prints now. A correction later is Make again (version 2, same number).", confirmLabel: "Issue it" }, () => start(async () => {
-            const res = await issueProforma({}, new FormData());
-            if (!res.ok) toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
-            router.refresh();
-          }))
-        }
-      >
-        Issue it
-      </Button>
-    ) : null;
-  const action = issue ? (
-    <>
-      {issue}
-      {print && (
-        <Link href={print.view} data-file-name={paperName} className={buttonClass("ghost", "xs", "hidden sm:inline-flex")}>
-          View / Print
-        </Link>
-      )}
-    </>
-  ) : r.source === "upload" && recordable && (r.state === "miss" || r.state === "draft") ? (
-    <>
-      <Button size="xs" variant="secondary" onClick={() => setOpen("upload")}>
-        Upload
-      </Button>
-      <Button size="xs" variant="ghost" className="hidden sm:inline-flex" onClick={() => setOpen("elsewhere")}>
-        Kept elsewhere…
-      </Button>
-    </>
-  ) : r.state === "else" && recordable ? (
-    <Button size="xs" variant="ghost" onClick={() => setOpen("elsewhere")}>
-      Change
-    </Button>
-  ) : make && canMake && !r.live && !r.kept && (r.state === "can" || r.state === "wait" || r.state === "draft") ? (
-    <Link href={make} className={buttonClass(r.state === "draft" ? "primary" : "secondary", "xs")}>
-      {r.state === "draft" ? "Continue" : "Make"}
+  // One button a row, by where it stands (design "One window", 26 Nov): Make · Continue · Open · Upload. Each opens
+  // the document's window, where its next step is (Make final, Issue it, Send, Upload); the rest is in ⋯.
+  const word =
+    r.source === "upload"
+      ? r.state === "miss" || (r.state === "draft" && !file)
+        ? recordable
+          ? "Upload"
+          : null
+        : r.state === "else"
+          ? null
+          : "Open"
+      : r.draft || r.state === "draft"
+        ? canMake
+          ? "Continue"
+          : "Open"
+        : (r.state === "can" || r.state === "wait") && canMake && (r.makeable || own) && !r.live && !r.kept
+          ? "Make"
+          : r.printable || r.links || r.live || r.kept || paperDone(r.state)
+            ? "Open"
+            : null;
+  const action = word && (
+    <Link href={open_} className={buttonClass("secondary", "xs")}>
+      {word}
     </Link>
-  ) : print && (paperDone(r.state) || r.live || r.kept) ? (
-    <Link href={print.view} data-file-name={paperName} className={buttonClass("ghost", "xs")}>
-      View / Print
-    </Link>
-  ) : file ? (
-    <Button size="xs" variant="ghost" onClick={() => tools?.view(file)}>
-      View
-    </Button>
-  ) : r.kind === "packing-list" && r.state === "wait" ? (
-    <Link href={`/orders/${orderId}/shipping#packing`} className={buttonClass("secondary", "xs")}>
-      Make it
-    </Link>
-  ) : null;
+  );
 
   const fileCell =
     r.source === "app" && (r.version !== null || r.live || r.kept) ? (
@@ -434,13 +383,9 @@ function PaperLine({
           <StateMark state={r.state} />
         </span>
         <span role="cell" className="min-w-0 font-medium">
-          {make ? (
-            <Link href={make} className="hover:underline">
-              {r.label}
-            </Link>
-          ) : (
-            r.label
-          )}
+          <Link href={open_} className="hover:underline">
+            {r.label}
+          </Link>
           <span className="block text-xs font-normal text-muted md:hidden">
             {numberLine !== "—" ? `${numberLine} · ` : ""}
             {from.label.toLowerCase()}
@@ -458,8 +403,7 @@ function PaperLine({
         </span>
         <span role="cell" className="col-start-3 row-start-1 flex items-center justify-end gap-1 md:col-start-6">
           <span className="hidden items-center gap-1 sm:flex">{action}</span>
-          {busy && <span className="text-xs text-muted">…</span>}
-          <PaperMenu r={r} orderId={orderId} canMake={canMake} canRecord={canRecord} issuing={!!issue} onRecord={setOpen} />
+          <PaperMenu r={r} orderId={orderId} canMake={canMake} canRecord={canRecord} onRecord={setOpen} />
         </span>
         {/* A row holds only cells: the phone's own place for the action is one too. */}
         {action && (
@@ -488,7 +432,6 @@ function PaperLine({
           />
         </div>
       )}
-      {dialog}
     </div>
   );
 }
@@ -505,7 +448,6 @@ export function PaperMenu({
   orderId,
   canMake,
   canRecord,
-  issuing,
   onRecord,
   lead,
   size = "icon-xs",
@@ -514,8 +456,6 @@ export function PaperMenu({
   orderId: string;
   canMake: boolean;
   canRecord: boolean;
-  /** The proforma can be issued from the row: its print page is already there. */
-  issuing?: boolean;
   onRecord?: (mode: "upload" | "elsewhere") => void;
   /** Items before the paper's own (the side panel: Make, Open in Papers). */
   lead?: (item: (label: string, on: () => void, hint?: string) => ReactNode) => ReactNode;
@@ -525,14 +465,13 @@ export function PaperMenu({
   const tools = useFileTools();
   const router = useRouter();
   const [menu, setMenu] = useState(false);
-  const openHere = useOpenHere();
-  const viewPaper = (href: string, name: string) => openHere(href, name) || window.location.assign(href);
   const [busy, start] = useTransition();
   const { ask, dialog } = useConfirm();
   const more = useRef<HTMLButtonElement>(null);
+  const out = outOf(orderId, r);
   const scanId = useId();
   const print = printOf(orderId, r);
-  const make = r.makeable ? makeHref(orderId, r) : null;
+  const win = windowOf(orderId, r);
   const file = r.doc?.file ? (tools?.files.find((f) => f.sourceId === r.doc!.file!.id) ?? null) : null;
   const recordable = r.docKind && canRecord;
   const drop = attachKey(r);
@@ -588,27 +527,20 @@ export function PaperMenu({
       {menu && (
         <FloatingMenu anchor={() => more.current} onClose={() => setMenu(false)} label={r.label} width={260}>
           {leading}
-          {print && (paperDone(r.state) || r.live || r.kept || r.state === "draft" || !!issuing) && (
+          {/* Taken out without opening it; opening it is the row's button (one window, 26 Nov). */}
+          {print && (paperDone(r.state) || r.live || r.kept || r.state === "draft") && (
             <>
-              {item("View / Print", () => viewPaper(print.view, r.label))}
               {item("Download PDF", () => downloadHref(print.pdf))}
               {print.internal && item("Internal copy (PDF)", () => downloadHref(print.internal!), "all prices, costs")}
             </>
           )}
-          {file && item("View the file", () => tools?.view(file))}
-          {tools &&
-            (paperDone(r.state) || r.live) &&
-            (print || file) &&
-            item(
-              "Share…",
-              () =>
-                tools.open({
-                  kind: "share",
-                  files: print ? [] : file ? [file] : [],
-                  papers: print ? [{ key: r.key, label: [r.label, r.number].filter(Boolean).join(" "), draft: r.draft || (r.kind === "proforma" && !r.number) }] : [],
-                }),
-              "WhatsApp, email",
-            )}
+          {file && !print && item("Download", () => downloadHref(file.href))}
+          {tools && out && (
+            <>
+              {item("Email…", () => tools.open({ kind: "email", out: [out], title: `Email the ${r.label.toLowerCase()}` }))}
+              {item("Share…", () => tools.open({ kind: "share", out: [out], at: focused }), "WhatsApp, WeChat…")}
+            </>
+          )}
           {canMake && finalApp && sep}
           {canMake &&
             finalApp &&
@@ -618,7 +550,7 @@ export function PaperMenu({
                 start(async () => {
                   const res = await paperAgainAction(orderId, r.kind as PaperKind, r.ref);
                   if (!res.ok) return toast({ message: res.message ?? "Something went wrong.", kind: "fail" });
-                  router.push(make!);
+                  router.push(win);
                 }),
               `version ${(r.version ?? 1) + 1}, keeps ${r.version ?? 1}`,
             )}
@@ -642,7 +574,7 @@ export function PaperMenu({
             r.version !== null &&
             r.version > 1 &&
             Array.from({ length: r.version - 1 }, (_, i) => i + 1).map((v) => (
-              <span key={v}>{item(`View version ${v}`, () => viewPaper(`${print.view}&v=${v}`, `${r.label} · version ${v}`), "as printed")}</span>
+              <span key={v}>{item(`Open version ${v}`, () => router.push(`${win}&v=${v}`), "as printed")}</span>
             ))}
           {canMake &&
             ownDoc(r) &&
@@ -662,8 +594,7 @@ export function PaperMenu({
             r.source === "app" &&
             paperDone(r.state) &&
             item(r.doc?.file ? "Replace the signed scan" : "Attach the signed scan", () => document.getElementById(scanId)?.click())}
-          {make && r.version !== null && item("Versions", () => router.push(make), String(r.version))}
-          {!onRecord && recordable && r.source === "upload" && (r.state === "miss" || r.state === "draft") && item("Upload…", () => record("upload"), "in Documents")}
+          {!onRecord && recordable && r.source === "upload" && (r.state === "miss" || r.state === "draft") && item("Upload…", () => router.push(win))}
           {recordable && r.state !== "else" && r.source === "upload" && item(onRecord ? "Kept elsewhere instead" : "Kept elsewhere…", () => record("elsewhere"))}
           {recordable && r.state === "else" && item("Upload it instead", () => record("upload"))}
           {canMake && r.draft && r.paperId && !ownDoc(r) && (

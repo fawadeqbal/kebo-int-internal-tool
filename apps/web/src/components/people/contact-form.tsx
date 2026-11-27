@@ -39,7 +39,8 @@ export function ContactForm({ action, contact }: { action: Action; contact?: Con
               defaultValue={s.values?.position ?? f("position")}
             />
           </Field>
-          <Field label="Email" htmlFor={`${id}-email`} error={s.errors?.email}>
+          {/* An email address is long: the whole width on a phone (it was cut at half, "ali-mwx9s69u@vis"). */}
+          <Field label="Email" htmlFor={`${id}-email`} error={s.errors?.email} className="max-sm:col-span-2">
             <Input id={`${id}-email`} name="email" type="email" defaultValue={s.values?.email ?? f("email")} />
           </Field>
           <Field label="Phone" htmlFor={`${id}-phone`} error={s.errors?.phone}>

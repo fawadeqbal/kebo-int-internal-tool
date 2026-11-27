@@ -17,9 +17,9 @@ import { editsOf } from "@/lib/edit-data";
 import type { BankStepView } from "@/lib/types-flow";
 import { lightAction } from "../../light-actions";
 import { addDocumentAction, updateDocumentAction } from "../../flow-actions";
-import { issueProformaAction, papersPrintAction } from "../../actions";
+import { papersPrintAction } from "../../actions";
 import { bankPaidAction } from "../../section-actions";
-import { docHref } from "../shared";
+import { paperRowsOf } from "../shared";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
 
@@ -49,40 +49,7 @@ export default async function OrderDocuments({
   const open = d.open;
   const tab: PapersTab = TABS.includes(sp.tab as PapersTab) ? (sp.tab as PapersTab) : "all";
 
-  // Papers: the API's list, with the quotation the order was made from (its own print page) and the proforma's internal copy.
-  const quotation = o.documents.find((x) => x.kind === "quotation");
-  const proforma = o.documents.find((x) => x.kind === "proforma");
-  const rows: PaperLineRow[] = [
-    ...(quotation
-      ? [
-          {
-            key: "quotation",
-            kind: "quotation",
-            source: "app" as const,
-            label: quotation.label,
-            step: "payment" as const,
-            state: "ready" as const,
-            stateLabel: "Ready",
-            number: null,
-            version: null,
-            sub: "accepted",
-            ref: null,
-            printable: true,
-            makeable: false,
-            live: true,
-            inSet: false,
-            doc: null,
-            docKind: null,
-            links: { ...docHref(o, quotation), internal: `${docHref(o, quotation).pdf}?copy=internal` },
-          },
-        ]
-      : []),
-    ...(papers?.papers ?? []).map((p) =>
-      p.kind === "proforma" && proforma
-        ? { ...p, links: { ...docHref(o, proforma), internal: `${docHref(o, proforma).pdf}?copy=internal` } }
-        : p,
-    ),
-  ];
+  const rows: PaperLineRow[] = paperRowsOf(o, papers);
 
   const bankSteps = flow?.documents?.bankSteps ?? [];
   const contract = flow?.payment.bankContract ?? null;
@@ -276,7 +243,6 @@ export default async function OrderDocuments({
           )}
           shipNumber={o.blNo}
           today={now}
-          issueProforma={!o.proforma && can(me, "orders.update") && open ? issueProformaAction.bind(null, o.id) : undefined}
         />
       )}
 

@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { accessibilityProblems, watchErrors } from "./check";
+import { newOrder } from "./orders";
 
 /**
  * Papers in the customer's format (25 Nov 2026), done in a browser: the LC's bank reference and address on the
@@ -8,38 +9,6 @@ import { accessibilityProblems, watchErrors } from "./check";
  * English with Chinese.
  */
 
-async function newOrder(page: Page) {
-  const tag = Date.now().toString(36);
-  const send = async (method: "post" | "put" | "patch", url: string, data: object) => {
-    const r = await page.request[method](`/api${url}`, { data });
-    expect(r.ok(), `${url}: ${await r.text()}`).toBe(true);
-    return r.json();
-  };
-  const me = await (await page.request.get("/api/auth/me")).json();
-  const customer = await send("post", "/customers", {
-    name: `Vision Pharma ${tag}`,
-    country: "PK",
-    address: "Plot No. 22-23, Industrial Triangle, Kahuta Road, Islamabad",
-    taxNo: "8890224-6",
-    contacts: [{ name: "Ali", email: `ali-${tag}@vision.test` }],
-  });
-  const inquiry = await send("post", "/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me.id, items: [{ description: "Vial capping machine RHZ-8", quantity: 1, unit: "set" }] });
-  const item = (await (await page.request.get(`/api/inquiries/${inquiry.id}`)).json()).items[0].id;
-  await send("post", `/inquiries/${inquiry.id}/factory-quotes`, {
-    newFactoryName: `Jining Capping ${tag}`,
-    receivedOn: new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10),
-    currency: "CNY",
-    lines: [{ requestedItemId: item, description: "Vial capping machine RHZ-8", quantity: 1, unit: "set", unitPrice: 200000 }],
-  });
-  const draft = await (await page.request.get(`/api/inquiries/${inquiry.id}/quotation/draft`)).json();
-  const rev = await send("post", `/inquiries/${inquiry.id}/quotation/revisions`, draft);
-  await send("post", `/revisions/${rev.id}/status`, { to: "sent" });
-  await send("post", `/revisions/${rev.id}/status`, { to: "accepted" });
-  const id = (await (await page.request.get(`/api/inquiries/${inquiry.id}`)).json()).orders[0].id as string;
-  await send("patch", `/orders/${id}/route`, { route: "letter_of_credit" });
-  await send("post", `/orders/${id}/shipments`, { mode: "sea", status: "booked", portOfLoading: "Qingdao, China", portOfDischarge: "Karachi Port, Pakistan" });
-  return id;
-}
 
 test("the LC's reference and bank, the packing case by case, and the packing list in the customer's format, in English and Chinese", async ({ page }) => {
   test.setTimeout(150_000);

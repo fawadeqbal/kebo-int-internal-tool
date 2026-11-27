@@ -109,11 +109,13 @@ const KINDS: Record<string, { id: (id: string) => boolean; target: Kind }> = {
   ...Object.fromEntries(PAPER_KINDS.map((k) => [k, { id: (id: string) => UUID.test(id), target: paper(k) }])),
   revisions: {
     id: (id) => UUID.test(id),
-    target: async (id, token) => {
+    target: async (id, token, url) => {
       const r = await ask<RevisionDoc>(token, `/revisions/${id}`);
+      // ?sending=1: printed as it goes to the customer (no DRAFT mark), for Share and Email from a draft.
+      const sending = url.searchParams.get("sending") === "1";
       return {
-        name: `Quotation ${r.quotation.refNo}-R${r.number}${r.status === "draft" ? " (draft)" : ""}`,
-        path: `/print/revisions/${id}`,
+        name: `Quotation ${r.quotation.refNo}-R${r.number}${r.status === "draft" && !sending ? " (draft)" : ""}`,
+        path: `/print/revisions/${id}${sending ? "?sending=1" : ""}`,
       };
     },
   },

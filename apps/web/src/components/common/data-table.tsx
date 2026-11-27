@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { cn, tableClass } from "@kebo/ui";
+import { cn, tableClass, usePhoneStack } from "@kebo/ui";
 
 /**
  * A list's table (design system: List frame). Rows are DataRow: a click on a
@@ -38,6 +38,8 @@ export function DataTable({
   // (arrow keys scroll it), as the design system's Table does. A list with no link in it (a ledger) had no other
   // way in. Where it fits, the box is not a stop on the way through the page.
   const [scrolls, setScrolls] = useState(false);
+  // On a phone, columns that do not fit: one card per row instead (the design system's "tables become rows").
+  usePhoneStack(box);
   useEffect(() => {
     const el = box.current;
     if (!el || typeof ResizeObserver === "undefined") return;

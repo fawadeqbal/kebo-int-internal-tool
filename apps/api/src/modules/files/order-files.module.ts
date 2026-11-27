@@ -10,11 +10,13 @@ import { FilesController } from "./files.controller";
 import { FilesService } from "./files.service";
 import { OrderFilesController } from "./order-files.controller";
 import { OrderFilesService } from "./order-files.service";
+import { MailOutController } from "./mail-out.controller";
+import { MailOutService } from "./mail-out.service";
 
 /** Documents v3: every file of an order in one list, with the same tools everywhere; any stored file opened by its id. */
 @Module({
   imports: [InquiriesModule, OrdersModule, PapersModule, FlowModule, MoneyModule, TreasuryModule, ApprovalsModule],
-  controllers: [OrderFilesController, FilesController],
-  providers: [OrderFilesService, FilesService],
+  controllers: [OrderFilesController, FilesController, MailOutController],
+  providers: [OrderFilesService, FilesService, MailOutService],
 })
 export class OrderFilesModule {}

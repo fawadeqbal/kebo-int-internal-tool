@@ -33,7 +33,7 @@ export function MailCards({ view, me, saveAction, testAction }: { view: MailSett
       ? { tone: "neutral" as const, text: "Not set: sent through the server's own email" }
       : { tone: "warn" as const, text: "Not set: no email is sent" };
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <Card className="overflow-hidden">
         <CardHeader title="How email is sent" description={<span className={cn("font-medium", status.tone === "ok" ? "text-ok" : status.tone === "warn" ? "text-warn" : undefined)}>{status.text}</span>} />
         <CardBody>
@@ -133,6 +133,6 @@ export function MailCards({ view, me, saveAction, testAction }: { view: MailSett
         </CardBody>
       </Card>
 
-    </div>
+    </>
   );
 }

@@ -97,16 +97,38 @@ describe("the file viewer", () => {
     expect(screen.getAllByRole("link", { name: /Download/ })[0]!.getAttribute("href")).toBe("/files/eee");
   });
 
-  it("shares any file outside the app: WhatsApp, email, or the link for the team", () => {
+  it("sends any file with the app's two buttons: Share (chat apps, the link) and Email, once each", () => {
     render(
       <FileViewerProvider>
         <a href="/files/fff?view=1">Bank slip.pdf</a>
       </FileViewerProvider>,
     );
     fireEvent.click(screen.getByText("Bank slip.pdf"));
-    fireEvent.click(screen.getAllByRole("button", { name: /Share/ })[0]!);
-    expect(screen.getByRole("menuitem", { name: /WhatsApp/ })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: /Email/ })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: /Copy link for the team/ })).toBeTruthy();
+    // No Send tab: the panel's foot holds Share and Email, nothing else sends.
+    expect(screen.queryByRole("tab", { name: "Send" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Share$/ })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Email$/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /^Share$/ }));
+    const apps = screen.getAllByRole("menuitem").map((m) => m.textContent ?? "");
+    expect(apps.some((t) => t.startsWith("WhatsApp"))).toBe(true);
+    expect(apps.some((t) => t.startsWith("WeChat"))).toBe(true);
+    expect(apps.some((t) => t.startsWith("Copy link"))).toBe(true);
+  });
+
+  it("opens an order's paper in the order's own window, not the viewer", () => {
+    const toOrder = vi.fn();
+    const id = "6f1d2b3c-4a5b-4c6d-8e9f-0a1b2c3d4e5f";
+    render(
+      <FileViewerProvider toOrder={toOrder}>
+        <a href={`/print/orders/${id}/commercial-invoice?v=2&back=/orders/${id}/documents`}>View the commercial invoice</a>
+        <a href="/print/revisions/abc">The quotation</a>
+      </FileViewerProvider>,
+    );
+    fireEvent.click(screen.getByText("View the commercial invoice"));
+    expect(toOrder).toHaveBeenCalledWith(`/orders/${id}/papers/commercial-invoice?v=2&back=%2F`);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // A paper that is not an order's (a quotation's revision) still opens in the viewer.
+    fireEvent.click(screen.getByText("The quotation"));
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });

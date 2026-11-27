@@ -2,7 +2,7 @@
 
 import { SegmentedChoice } from "@kebo/ui/client";
 import { useState, type ReactNode } from "react";
-import { Card, CardHeader, cn } from "@kebo/ui";
+import { Card, CardHeader, cn, Scroll } from "@kebo/ui";
 
 export interface ChartTable {
   columns: string[];
@@ -64,7 +64,7 @@ export function ChartCard({
 function FiguresTable({ table }: { table: ChartTable }) {
   const text = new Set([0, ...(table.textColumns ?? [])]);
   return (
-    <div className="scroll-x" tabIndex={0} role="region" aria-label="Figures">
+    <Scroll axis="x" fade stack label="Figures">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -100,6 +100,6 @@ function FiguresTable({ table }: { table: ChartTable }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </Scroll>
   );
 }

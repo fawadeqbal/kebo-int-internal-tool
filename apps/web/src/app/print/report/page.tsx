@@ -176,7 +176,8 @@ export default async function ReportPrint({ searchParams }: { searchParams: Prom
         <Profit title="By category" rows={r.profit.byCategory} currency={r.currency} />
         <Profit title="By person" rows={r.profit.byPerson} currency={r.currency} />
 
-        <div className="grid grid-cols-2 gap-x-6">
+        {/* Two columns on paper and from a tablet up; one on a phone (the win rate's columns did not fit half). */}
+        <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 print:grid-cols-2">
           <Counts
             title="Why inquiries were lost"
             rows={r.lostReasons.map((x) => ({ label: x.label, count: x.count }))}

@@ -13,7 +13,12 @@ import { useWindowDone } from "./route-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
-/** A form that closes this soon after its save closed because of it (its window shut): its message goes to a toast. */
+/**
+ * A form that closes this soon after the page has its save's answer closed because of it (its window shut): its
+ * message goes to a toast. Counted from the page having the answer, not from the server giving it: the answer
+ * and the fresh page come back together, and a busy server takes seconds over the page (review 27 Nov: three
+ * payments recorded at the same moment, each window shut after 4 seconds and none said "Payment recorded").
+ */
 const CLOSES_WITHIN_MS = 3000;
 
 /** The save never reached the server (no connection, or the connection dropped): nothing was saved. */
@@ -147,9 +152,6 @@ export function ActionForm({
           toasts: toastsShown(),
         };
         unseen.current = note;
-        setTimeout(() => {
-          if (unseen.current === note) unseen.current = null;
-        }, CLOSES_WITHIN_MS);
       }
       return r;
     },
@@ -178,6 +180,12 @@ export function ActionForm({
   useEffect(() => {
     if (state === seen.current || state.ok === undefined) return;
     seen.current = state;
+    // The page has the answer: a form still here in a moment stays open, and says its message itself.
+    const note = unseen.current;
+    if (note)
+      setTimeout(() => {
+        if (unseen.current === note) unseen.current = null;
+      }, CLOSES_WITHIN_MS);
     focusNext.current = problemsOf(state)[0]?.name ?? null;
     // A mistake: the fields it names are marked, and the cursor goes to the first one (nothing typed is lost).
     // A tick later: a steps window first goes to the step that holds the first one (JumpToStep), then it is found.
@@ -205,6 +213,10 @@ export function ActionForm({
         named[0]?.focus();
       }
       // Else it waits for its step to be drawn (the effect above).
+      // A refusal with no field to go to (the company's email not set up…): its note, drawn at the top, comes
+      // into view, as the button was pressed at the foot of a long form.
+      if (state.ok === false && !named.length)
+        form?.querySelector('[role="alert"]')?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
     }, 0);
     // No connection: the note says so, with Try again (the window stays, with what was typed).
     if (state.code === "offline")

@@ -1,4 +1,4 @@
-import { addDays, daysBetween } from "@kebo/utils";
+import { addDays, daysBetween, monthEnd, monthStart } from "@kebo/utils";
 
 /** Insights' sections, in the order of the list on the left. */
 export const SECTIONS = ["overview", "money", "customers", "factories", "cash", "people", "funnel"] as const;
@@ -26,15 +26,6 @@ export interface Period {
 }
 
 const isDay = (v?: string) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
-
-/** The first day of the month `n` months after `day`'s month. */
-export function monthStart(day: string, n = 0): string {
-  const d = new Date(`${day.slice(0, 7)}-01T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + n);
-  return d.toISOString().slice(0, 10);
-}
-/** The last day of `day`'s month. */
-export const monthEnd = (day: string) => addDays(monthStart(day, 1), -1);
 
 /** Short month names ("Sep", not the "Sept" some browsers give). */
 export const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -111,11 +102,6 @@ export function periodOf(q: { period?: string; from?: string; to?: string }, tod
 export function change(now: number, before: number): number | null {
   if (!Number.isFinite(now) || !Number.isFinite(before) || before === 0) return null;
   return Math.round(((now - before) / Math.abs(before)) * 100);
-}
-
-/** The 12 months ending with `to`'s month: ["2025-12", …, "2026-11"]. */
-export function lastMonths(to: string, n = 12): string[] {
-  return Array.from({ length: n }, (_, i) => monthStart(to, i - (n - 1)).slice(0, 7));
 }
 
 /** Old links (?tab=…) to the new sections. */

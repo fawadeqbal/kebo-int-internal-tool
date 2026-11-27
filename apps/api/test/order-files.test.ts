@@ -1,12 +1,14 @@
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { unzipSync } from "fflate";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { FIRST_COMPANY_ID } from "@kebo/database";
 import { STEP_OF_ACTION } from "@kebo/shared";
 import { api, signIn, startApp } from "./app";
 import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
+import { CompanyMail } from "../src/common/notify/company-mail";
+import type { MailMessage } from "../src/common/notify/mailer";
 
 type File = {
   id: string;
@@ -278,7 +280,52 @@ describe("order files", () => {
       .post(`/orders/${orderId}/files/share`, { files: two, papers: [ci.key], via: "download", message: `Documents for ${refNo}` })
       .expect(200);
     const shared = (await history()).find((e) => e.action === "file.share")!;
-    expect(shared.summary).toMatch(/shared 3 files .*downloaded to send/);
+    expect(shared.summary).toMatch(/shared 3 files .*after downloading it/);
+  });
+
+  it("emails from the company's address with the files, noted in History; sent another way is noted with how and when", async () => {
+    const l = await list();
+    const one = l.files.find((f) => f.group === "shipping")!;
+    const ci = (await papers()).find((p) => p.kind === "commercial-invoice")!;
+    const mailOut = (fields: Record<string, string>, files: { name: string; bytes: string }[]) => {
+      let r = request(app.getHttpServer()).post("/api/mail/send").set("authorization", `Bearer ${sana}`);
+      for (const [k, v] of Object.entries(fields)) r = r.field(k, v);
+      for (const f of files) r = r.attach("files", Buffer.from(f.bytes), { filename: "x.pdf", contentType: "application/pdf" });
+      return r;
+    };
+    const fields = {
+      to: "buyer@vp.test",
+      subject: `Commercial invoice · ${refNo}`,
+      message: "Please find attached.",
+      order: orderId,
+      papers: ci.key,
+      files: one.id,
+      names: JSON.stringify(["Commercial invoice.pdf", one.name]),
+    };
+    const pdfs = [
+      { name: "a.pdf", bytes: "%PDF-1.4 CI" },
+      { name: "b.pdf", bytes: "%PDF-1.4 BL" },
+    ];
+    // Not set up: it says so, and nothing is noted.
+    vi.spyOn(app.get(CompanyMail), "mailer").mockResolvedValueOnce({ enabled: false, send: async () => undefined });
+    expect((await mailOut(fields, pdfs).expect(400)).body.error).toMatch(/not set up/);
+    // A file that is not this order's is refused before anything goes.
+    const sent: MailMessage[] = [];
+    vi.spyOn(app.get(CompanyMail), "mailer").mockResolvedValue({ enabled: true, send: async (m: MailMessage) => void sent.push(m) });
+    await mailOut({ ...fields, files: "attachment:00000000-0000-4000-8000-000000000000" }, pdfs).expect(404);
+    await mailOut({ ...fields, names: JSON.stringify(["only one"]) }, pdfs).expect(400);
+    expect(sent).toHaveLength(0);
+    await mailOut(fields, pdfs).expect(200);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.attachments?.map((a) => a.filename)).toEqual(["Commercial invoice.pdf", one.name]);
+    const emailed = (await history()).find((e) => e.action === "file.email")!;
+    expect(emailed.summary).toMatch(/emailed 2 files .* to buyer@vp\.test from the app/);
+
+    // Sent myself: on WeChat, yesterday.
+    await api(app, sana).post(`/orders/${orderId}/files/share`, { papers: [ci.key], via: "wechat", on: day(-1) }).expect(200);
+    const wechat = (await history()).find((e) => e.action === "file.share" && /WeChat/.test(e.summary))!;
+    expect(wechat.summary).toMatch(new RegExp(`sent Commercial invoice.* on WeChat on ${day(-1)}`));
+    vi.restoreAllMocks();
   });
 
   it("each source keeps its own rule: payments for accounts, documents for documents, nothing for viewers", async () => {

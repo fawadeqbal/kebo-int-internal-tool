@@ -3,6 +3,7 @@ import { crumbsFor } from "@/lib/nav";
 import { Pencil, Plus } from "lucide-react";
 import { Badge, Card, cn, EmptyState, linkClass, LinkTabs, PageHeader, Pager, PhoneList, PhoneRow, Segmented, Td, Th, THead, toPage, toPageSize } from "@kebo/ui";
 import { can, type Tone } from "@kebo/shared";
+import { addDays, monthEnd, monthStart } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { allPages } from "@/lib/exports";
 import { requireUser } from "@/lib/session";
@@ -35,25 +36,14 @@ const DUE = [
   { value: "month", label: "This month" },
 ] as const;
 
-const plusDays = (day: string, n: number) => {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-};
-
 /** The Due filter as days: today; this week (Monday to Sunday); this month. */
 function dueRange(due: string | undefined, today: string): { from?: string; to?: string } {
   if (due === "today") return { from: today, to: today };
   if (due === "week") {
-    const monday = plusDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7));
-    return { from: monday, to: plusDays(monday, 6) };
+    const monday = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7));
+    return { from: monday, to: addDays(monday, 6) };
   }
-  if (due === "month") {
-    const first = `${today.slice(0, 8)}01`;
-    const next = new Date(`${first}T00:00:00Z`);
-    next.setUTCMonth(next.getUTCMonth() + 1);
-    return { from: first, to: plusDays(next.toISOString().slice(0, 10), -1) };
-  }
+  if (due === "month") return { from: monthStart(today), to: monthEnd(today) };
   return {};
 }
 
@@ -63,7 +53,7 @@ function duePill(f: FollowUp, today: string): { text: string; tone: Tone } {
   const words = dueText(f.dueOn, f.dueAt, today);
   const text = words.charAt(0).toUpperCase() + words.slice(1);
   if (f.late) return { text, tone: "bad" };
-  return { text, tone: f.dueOn <= plusDays(today, 1) ? "warn" : "neutral" };
+  return { text, tone: f.dueOn <= addDays(today, 1) ? "warn" : "neutral" };
 }
 
 /**

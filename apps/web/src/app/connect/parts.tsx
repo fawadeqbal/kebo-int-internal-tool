@@ -39,7 +39,7 @@ export function CheckForm({ action, value = "", label = "Check the record" }: { 
 /** The one record, as a table to copy from. */
 export function RecordTable({ name = "the first part, e.g. staff" }: { name?: string }) {
   return (
-    <Scroll axis="x" size="lg" fade label="The record to add" className="rounded-lg border border-line">
+    <Scroll axis="x" size="lg" fade stack label="The record to add" className="rounded-lg border border-line">
       <table className="w-full min-w-[460px] text-left text-md">
         <thead className="bg-surface-2 text-xs text-text-2">
           <tr>

@@ -64,7 +64,8 @@ test("a draft's Send window includes the deal's other ready drafts, and marks th
   await include.getByRole("checkbox", { name: new RegExp(`${b!.refNo} R1`) }).check();
 
   // Sent another way: both are marked sent, by WhatsApp.
-  await send.getByText("I sent it myself").click();
+  await send.getByText("I'll send it myself").click();
+  await send.getByText("I sent it already").click();
   await expect(send.getByText(new RegExp(`${a!.refNo} R1 and B R1 become Sent: by WhatsApp`))).toBeVisible();
   await send.getByRole("button", { name: "Mark 2 as sent" }).click();
   await expect(send).toBeHidden();

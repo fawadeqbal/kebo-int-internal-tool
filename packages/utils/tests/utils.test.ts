@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   addDays,
+  addMonths,
   amountInWords,
   daysBetween,
+  lastMonths,
+  monthEnd,
+  monthOf,
+  monthStart,
+  monthsBetween,
   startOfDayIn,
   formatReference,
   isISODate,
@@ -29,6 +35,72 @@ describe("dates", () => {
     expect(addDays("2026-12-30", 3)).toBe("2027-01-02");
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(daysBetween("2026-10-01", "2026-10-26")).toBe(25);
+  });
+  it("adds months, staying inside the month it lands in", () => {
+    expect(addMonths("2026-11-04", 12)).toBe("2027-11-04");
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonths("2028-01-31", 1)).toBe("2028-02-29"); // a leap year
+    expect(addMonths("2026-11-30", 3)).toBe("2027-02-28");
+    expect(addMonths("2026-03-31", -1)).toBe("2026-02-28");
+    expect(addMonths("2026-05-15", 0)).toBe("2026-05-15");
+  });
+  it("finds the first and the last day of a month, this one or some months away", () => {
+    expect(monthStart("2026-11-27")).toBe("2026-11-01");
+    expect(monthStart("2026-11-27", 2)).toBe("2027-01-01");
+    expect(monthStart("2026-01-31", -1)).toBe("2025-12-01");
+    expect(monthStart("2026-01-31", 1)).toBe("2026-02-01"); // February, not March: the 31st is not carried over
+    expect(monthStart("2026-11", -11)).toBe("2025-12-01"); // a month is read as any day in it
+    expect(monthEnd("2026-11-03")).toBe("2026-11-30");
+    expect(monthEnd("2026-02-10")).toBe("2026-02-28");
+    expect(monthEnd("2028-02")).toBe("2028-02-29"); // a leap year
+    expect(monthEnd("2100-02-01")).toBe("2100-02-28"); // a century year that is not one
+    expect(monthEnd("2026-12-31")).toBe("2026-12-31");
+  });
+  it("names a month, and lists the months up to one", () => {
+    expect(monthOf("2026-11-27")).toBe("2026-11");
+    expect(monthOf("2026-01-31", -1)).toBe("2025-12");
+    expect(monthOf("2026-12", 1)).toBe("2027-01");
+    expect(lastMonths("2026-11-30")).toEqual([
+      "2025-12",
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11",
+    ]);
+    expect(lastMonths("2026-03-31", 3)).toEqual(["2026-01", "2026-02", "2026-03"]); // the 31st does not skip February
+    expect(lastMonths("2026-01", 1)).toEqual(["2026-01"]);
+    const eighteen = lastMonths("2026-02-28", 18); // over two year ends
+    expect([eighteen.length, eighteen[0], eighteen[3], eighteen[4], eighteen[15], eighteen[16], eighteen[17]]).toEqual([
+      18,
+      "2024-09",
+      "2024-12",
+      "2025-01",
+      "2025-12",
+      "2026-01",
+      "2026-02",
+    ]);
+    expect(lastMonths("2026-11", 0)).toEqual([]);
+  });
+  it("lists the months from one day to another, both in", () => {
+    expect(monthsBetween("2026-09-30", "2026-11-01")).toEqual(["2026-09", "2026-10", "2026-11"]);
+    expect(monthsBetween("2025-11-15", "2026-02-03")).toEqual(["2025-11", "2025-12", "2026-01", "2026-02"]);
+    expect(monthsBetween("2026-11-01", "2026-11-30")).toEqual(["2026-11"]);
+    expect(monthsBetween("2026-12-01", "2026-11-30")).toEqual([]); // the end is before the start
+    expect(monthsBetween("2026-11-30", "2026-11-01")).toEqual(["2026-11"]); // an earlier day of the same month
+    // The last month a date can name: it ends there (a typed "to" of 9999-12-31 reaches the spending report).
+    const last = monthsBetween("9999-01-01", "9999-12-31");
+    expect([last.length, last[0], last[11]]).toEqual([12, "9999-01", "9999-12"]);
+  });
+  it("refuses what is not a day or a month", () => {
+    expect(() => monthStart("2026-13")).toThrow(RangeError);
+    expect(() => monthEnd("soon")).toThrow(RangeError);
   });
   it("validates dates", () => {
     expect(isISODate("2026-02-28")).toBe(true);
