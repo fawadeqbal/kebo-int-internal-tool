@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { Button, capsClass, cn, Field, Input, Notice, Textarea, linkClass } from "@kebo/ui";
 import type { SupplierOption } from "@/lib/types-deals";
 import type { QuickSupplier, QuickSupplierResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
+import { isFailed, type Failed } from "@/lib/failed";
 
 /** Enter in these small inputs must not save the whole offer. */
 const noSubmit = (e: KeyboardEvent) => {
@@ -28,7 +29,7 @@ export function NewSupplierForm({
 }: {
   initialName: string;
   add: (v: QuickSupplier) => Promise<QuickSupplierResult>;
-  search: (q: string) => Promise<SupplierOption[]>;
+  search: (q: string) => Promise<SupplierOption[] | Failed>;
   onUse: (f: SupplierOption) => void;
   /** Gives the window's Add and use its way in. */
   onReady: (api: { save: () => void }) => void;
@@ -37,7 +38,7 @@ export function NewSupplierForm({
   const [q, setQ] = useState<QuickSupplier>({ name: initialName, contactPerson: "", phone: "", wechat: "", email: "", address: "", bankDetails: "", notes: "" });
   const [more, setMore] = useState(false);
   const [result, setResult] = useState<Extract<QuickSupplierResult, { ok: false }> | null>(null);
-  const [found, setFound] = useState<{ name: string; list: SupplierOption[] }>({ name: "", list: [] });
+  const [found, setFound] = useState<{ name: string; list: SupplierOption[]; failed?: boolean }>({ name: "", list: [] });
   const set = (k: keyof QuickSupplier, value: string) => setQ((s) => ({ ...s, [k]: value }));
   const err = (k: string) => result?.errors?.[k]?.[0];
 
@@ -52,7 +53,7 @@ export function NewSupplierForm({
         .toLowerCase()
         .split(/\s+/)
         .filter((w) => w.length > 2);
-      if (live) setFound({ name, list: list.filter((f) => words.some((w) => f.name.toLowerCase().includes(w))).slice(0, 2) });
+      if (live) setFound(isFailed(list) ? { name, list: [], failed: true } : { name, list: list.filter((f) => words.some((w) => f.name.toLowerCase().includes(w))).slice(0, 2) });
     }, 300);
     return () => {
       live = false;
@@ -60,6 +61,8 @@ export function NewSupplierForm({
     };
   }, [name, search]);
   const similar = name.length >= 3 && found.name === name ? found.list : [];
+  // The look for a similar name failed: said, so "none shown" is not taken for "none there".
+  const checkFailed = name.length >= 3 && found.name === name && !!found.failed;
 
   const save = async () => {
     onBusy(true);
@@ -83,6 +86,7 @@ export function NewSupplierForm({
   return (
     <section aria-label="New supplier" className="flex flex-col gap-4" onKeyDown={noSubmit}>
       <h4 className="-mb-1 text-base font-bold">New supplier</h4>
+      {checkFailed && <p className="text-xs text-bad">Could not look for a supplier with a similar name: check Suppliers before adding one.</p>}
       {similar.length > 0 && (
         <Notice tone="todo">
           <div className="flex flex-col gap-2">

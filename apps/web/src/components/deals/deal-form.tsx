@@ -43,6 +43,7 @@ import type { EditCard, EditRef } from "@/lib/types-edits";
 import { ITEM_COLUMNS, itemsBody, useItemRows } from "./items-sheet";
 import { rowKey } from "./form-bits";
 import { useFileViewer } from "@/components/files/viewer";
+import { isFailed, type Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -116,10 +117,10 @@ export function DealForm({
   canAssignOthers: boolean;
   canAddCustomer?: boolean;
   customerLocked?: string;
-  searchCustomers: (q: string) => Promise<CustomerOption[]>;
+  searchCustomers: (q: string) => Promise<CustomerOption[] | Failed>;
   /** The picker's "Recent", before anything is typed. */
-  recentCustomers?: () => Promise<CustomerOption[]>;
-  loadContacts: (customerId: string) => Promise<ContactOption[]>;
+  recentCustomers?: () => Promise<CustomerOption[] | Failed>;
+  loadContacts: (customerId: string) => Promise<ContactOption[] | Failed>;
   addCustomer?: (v: QuickCustomer) => Promise<QuickCustomerResult>;
   mode: "create" | "edit";
   /** Edit: the files it already has. */
@@ -144,6 +145,7 @@ export function DealForm({
   const viewer = useFileViewer();
   const [v, setV] = useState<DealFormValues>(initial);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
+  const [contactsFailed, setContactsFailed] = useState<string | null>(null);
   const [otherCategory, setOtherCategory] = useState(
     () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
   );
@@ -191,7 +193,10 @@ export function DealForm({
     set("contactId", "");
     setContacts([]);
     if (!c) return;
-    const list = known ?? (await loadContacts(c.id));
+    const read = known ?? (await loadContacts(c.id));
+    // Not read: no contact to choose, and the field says why (never "no contacts").
+    setContactsFailed(isFailed(read) ? read.what : null);
+    const list = isFailed(read) ? [] : read;
     setContacts(list);
     setV((s) => (s.customer?.id === c.id ? { ...s, contactId: (list.find((x) => x.isPrimary) ?? list[0])?.id ?? "" } : s));
   };
@@ -533,7 +538,7 @@ export function DealForm({
                         </>
                       }
                       htmlFor="contactId"
-                      error={s.errors?.contactId}
+                      error={s.errors?.contactId ?? (contactsFailed ? [`Could not load ${contactsFailed}: choose the customer again to try once more.`] : undefined)}
                     >
                       <Select id="contactId" value={v.contactId} onChange={(e) => set("contactId", e.target.value)} disabled={!v.customer}>
                         <option value="">{v.customer ? "None" : "Choose a customer first"}</option>
@@ -1072,7 +1077,7 @@ function NewCustomerForm({
 }: {
   initialName: string;
   add: (v: QuickCustomer) => Promise<QuickCustomerResult>;
-  search: (q: string) => Promise<CustomerOption[]>;
+  search: (q: string) => Promise<CustomerOption[] | Failed>;
   onUse: (c: CustomerOption, contacts?: ContactOption[]) => void;
   /** Gives the window's Add and use its way in. */
   onReady: (api: { save: () => void }) => void;
@@ -1095,7 +1100,7 @@ function NewCustomerForm({
   const [sameWhatsapp, setSameWhatsapp] = useState(true);
   const [more, setMore] = useState(false);
   const [result, setResult] = useState<Extract<QuickCustomerResult, { ok: false }> | null>(null);
-  const [found, setFound] = useState<{ name: string; list: CustomerOption[] }>({ name: "", list: [] });
+  const [found, setFound] = useState<{ name: string; list: CustomerOption[]; failed?: boolean }>({ name: "", list: [] });
   const set = (k: keyof QuickCustomer, value: string) => setQ((s) => ({ ...s, [k]: value }));
   const err = (k: string) => result?.errors?.[k]?.[0];
   // A contact-wide message goes where it belongs: "at least one way to reach" under Phone, not under Name (S-25).
@@ -1114,7 +1119,7 @@ function NewCustomerForm({
         .toLowerCase()
         .split(/\s+/)
         .filter((w) => w.length > 2);
-      if (live) setFound({ name, list: list.filter((c) => words.some((w) => c.name.toLowerCase().includes(w))).slice(0, 2) });
+      if (live) setFound(isFailed(list) ? { name, list: [], failed: true } : { name, list: list.filter((c) => words.some((w) => c.name.toLowerCase().includes(w))).slice(0, 2) });
     }, 300);
     return () => {
       live = false;
@@ -1122,6 +1127,8 @@ function NewCustomerForm({
     };
   }, [name, search]);
   const similar = name.length >= 3 && found.name === name ? found.list : [];
+  // The look for a similar name failed: said (saving still checks for the same name).
+  const checkFailed = name.length >= 3 && found.name === name && !!found.failed;
 
   const save = async (allowDuplicate = false) => {
     onBusy(true);
@@ -1144,7 +1151,8 @@ function NewCustomerForm({
   }, [onReady]);
 
   const use = async (m: { id: string; label: string }) => {
-    const found = (await search(m.label)).find((c) => c.id === m.id);
+    const read = await search(m.label);
+    const found = isFailed(read) ? undefined : read.find((c) => c.id === m.id);
     onUse(found ?? { id: m.id, name: m.label, country: UNKNOWN_COUNTRY, primaryContact: null });
   };
   const matches = result?.matches?.length
@@ -1160,6 +1168,7 @@ function NewCustomerForm({
       <div className="-mb-1 flex items-center gap-2">
         <h4 className="text-base font-bold">New customer</h4>
       </div>
+      {checkFailed && <p className="text-xs text-bad">Could not look for a customer with a similar name. Saving still checks for the same name.</p>}
       {matches.length > 0 && (
         <Notice tone="todo">
           <div className="flex flex-col gap-2">

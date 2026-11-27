@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
 import type { DealDetail, Paged } from "@/lib/types";
 import type { ContactOption, CustomerOption } from "@/lib/types-deals";
+import { isFailed, part, type Failed } from "@/lib/part";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -113,44 +114,37 @@ const customerOption = (c: CustomerRow): CustomerOption => ({
   primaryContact: c.primaryContact && { id: c.primaryContact.id, name: c.primaryContact.name, detail: c.primaryContact.email ?? c.primaryContact.whatsapp ?? c.primaryContact.phone },
 });
 
-export async function searchCustomersAction(q: string): Promise<CustomerOption[]> {
-  try {
-    const res = await api.get<Paged<CustomerRow>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
-    return res.rows.map(customerOption);
-  } catch {
-    return [];
-  }
+// The pickers' reads: not read (logged), a Failed, and the picker says it could not search, never "none found".
+export async function searchCustomersAction(q: string): Promise<CustomerOption[] | Failed> {
+  const res = await part("the customers", () => api.get<Paged<CustomerRow>>("/customers", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 }));
+  return isFailed(res) ? res : (res?.rows ?? []).map(customerOption);
 }
 
 /** The customers of the latest inquiries, newest first (the picker's "Recent", before anything is typed). */
-export async function recentCustomersAction(): Promise<CustomerOption[]> {
-  try {
+export async function recentCustomersAction(): Promise<CustomerOption[] | Failed> {
+  const recent = await part("the recent customers", async () => {
     const inq = await api.get<Paged<{ customer: { id: string } | null }>>("/inquiries", { pageSize: 30 });
     const ids = [...new Set(inq.rows.map((r) => r.customer?.id).filter((x): x is string => !!x))].slice(0, 5);
     if (!ids.length) return [];
     const res = await api.get<Paged<CustomerRow>>("/customers", { ids: ids.join(","), pageSize: 5 });
     const by = new Map(res.rows.map((c) => [c.id, customerOption(c)]));
     return ids.map((id) => by.get(id)).filter((x): x is CustomerOption => !!x);
-  } catch {
-    return [];
-  }
+  });
+  return recent ?? [];
 }
 
 /** The contacts of the chosen customer. */
-export async function customerContactsAction(customerId: string): Promise<ContactOption[]> {
-  try {
-    const c = await api.get<{ contacts: ContactOption[] }>(`/customers/${customerId}`);
-    return c.contacts.map((x) => ({
-      id: x.id,
-      name: x.name,
-      email: x.email,
-      phone: x.phone,
-      whatsapp: x.whatsapp,
-      isPrimary: x.isPrimary,
-    }));
-  } catch {
-    return [];
-  }
+export async function customerContactsAction(customerId: string): Promise<ContactOption[] | Failed> {
+  const c = await part("their contacts", () => api.get<{ contacts: ContactOption[] }>(`/customers/${customerId}`));
+  if (isFailed(c)) return c;
+  return (c?.contacts ?? []).map((x) => ({
+    id: x.id,
+    name: x.name,
+    email: x.email,
+    phone: x.phone,
+    whatsapp: x.whatsapp,
+    isPrimary: x.isPrimary,
+  }));
 }
 
 /** A new inquiry, without leaving the page: the form then uploads the URS and documents and opens the deal. */

@@ -5,6 +5,7 @@ import { PanelBody, UrlWindow } from "@/components/common/panel";
 import type { ActionState } from "@/lib/actions";
 import type { QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { QuoteStepsPanel, TermsPanel } from "./quotation-step";
+import type { Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -21,7 +22,7 @@ export function EditAllWindow({
   number: number;
   initial: RevisionDraft;
   offers: QuoteOffers;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   showCosts: boolean;
   action: Action;
 }) {
@@ -46,7 +47,7 @@ export function NewRevisionWindow({
 }: {
   draft: RevisionDraft | null;
   offers: QuoteOffers | null;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   showCosts: boolean;
   action: Action;
   whyNot: string | null;

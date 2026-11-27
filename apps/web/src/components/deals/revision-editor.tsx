@@ -49,6 +49,7 @@ import { PANEL_FORM, PanelSection, useReportDirty, WindowFooter } from "@/compon
 import { StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
+import { isFailed, type Failed } from "@/lib/failed";
 import {
   CheckNote,
   LeadInputs,
@@ -462,7 +463,7 @@ export function RevisionEditor({
   initial: RevisionDraft;
   offers: QuoteOffers;
   /** The offers with costs in another currency (when the quotation currency changes). */
-  loadOffers?: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers?: (currency: string) => Promise<QuoteOffers | Failed | null>;
   showCosts: boolean;
   submitLabel: string;
   /** Saved: given the answer, so a window can close without asking "Discard your change?". */
@@ -584,7 +585,10 @@ export function RevisionEditor({
     );
     if (loadOffers && to !== offers.currency) {
       const next = await loadOffers(to);
-      if (next) setOffers(next);
+      // Not read: the costs shown are still in the old currency, and the note says so.
+      if (isFailed(next))
+        setConverted((c) => ({ ok: false, text: `${c ? `${c.text} ` : ""}Could not load ${next.what}: the costs shown are still in ${offers.currency}.` }));
+      else if (next) setOffers(next);
     }
   };
 

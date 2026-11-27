@@ -35,6 +35,7 @@ import type { ExpenseView } from "@/lib/types-money";
 import { AccountSelect, RecordedBy, useMe } from "./accounts";
 import { useSaveThenSend } from "./attachment";
 import { COMPANY, costKind } from "./cost-kinds";
+import { isFailed } from "@/lib/failed";
 
 /*
  * The one cost window (design "spending", board CostWindow): every place that adds or changes a cost opens it,
@@ -200,11 +201,14 @@ export function CostForm({
     send ? { customers: [], deals: [], orders: send.orders.map((o) => ({ id: o.id, refNo: o.refNo, dealId: "", customerId: "", customer: o.customer })), factories: [] } : (s0.choices ?? null),
   );
   const [loading, startLoading] = useTransition();
+  // Not read: said where the loading line was (the cost can still go on the company).
+  const [choicesFailed, setChoicesFailed] = useState<string | null>(null);
   useEffect(() => {
     if (choices || send) return;
     startLoading(async () => {
       const c = await costChoicesAction();
-      if (c) setChoices(s0.choices?.customerId ? { ...c, customerId: s0.choices.customerId } : c);
+      if (isFailed(c)) setChoicesFailed(c.what);
+      else if (c) setChoices(s0.choices?.customerId ? { ...c, customerId: s0.choices.customerId } : c);
     });
     // Once, when the window opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -388,6 +392,9 @@ export function CostForm({
               <>
                 <ChoiceChips labelledBy="cost-for-label" value={place} items={forOptions} onChange={setPlace} />
                 {loading && !choices && <p className="text-xs text-muted">Loading the customers, inquiries and orders…</p>}
+                {choicesFailed && place !== "company" && (
+                  <p className="text-xs text-bad">Could not load {choicesFailed}: close the window and open it again to try once more.</p>
+                )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {!send && place !== "company" && !fixedCustomer && (
                     <Field label="Customer" htmlFor="cost-customer" error={st.errors?.customerId} optional={place !== "customer"}>

@@ -31,6 +31,7 @@ import { Totals } from "@/components/records/totals";
 import { useBatchLines, type LineHandlers } from "@/components/edits/batch-lines";
 import { editedMark } from "@/components/edits/edits";
 import type { EditCard, EditsView } from "@/lib/types-edits";
+import type { Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 type Items = SourcingView["items"];
@@ -76,7 +77,7 @@ export type OfferKit = {
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
+  searchSuppliers: (q: string) => Promise<SupplierOption[] | Failed>;
   saveAction: Action;
   removeAction: Action;
   removeFile: OfferLineActions["removeFile"];
@@ -201,7 +202,7 @@ function OfferWindow({
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
+  searchSuppliers: (q: string) => Promise<SupplierOption[] | Failed>;
   saveAction: Action;
   removeAction?: Action;
   removeFile?: OfferLineActions["removeFile"];
@@ -1081,7 +1082,7 @@ export function AddOfferButton({
   today: string;
   mainCurrency: string;
   rates: Record<string, number>;
-  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
+  searchSuppliers: (q: string) => Promise<SupplierOption[] | Failed>;
   /** saveSupplierQuoteAction bound to the deal and null (a new offer). */
   createAction: Action;
   /** A new offer's tax and advance: the company's defaults (Settings). */

@@ -34,6 +34,7 @@ import { date, money } from "@/lib/format";
 import { Facts, ReviewBox } from "./deal-form";
 import { NewSupplierForm } from "./new-supplier-form";
 import { quickSupplierAction } from "@/app/(app)/inquiries/[id]/sourcing/actions";
+import type { Failed } from "@/lib/failed";
 import {
   LeadField,
   PartsField,
@@ -225,7 +226,7 @@ export function SupplierPicker({
   onChange: (f: QuoteState["factory"], known?: SupplierOption) => void;
   /** "+ New supplier": opens the New supplier form with what was typed (without it: added on save, by name). */
   onNew?: (typed: string) => void;
-  search: (q: string) => Promise<SupplierOption[]>;
+  search: (q: string) => Promise<SupplierOption[] | Failed>;
   asked?: AskedSupplier[];
   error?: string[];
 }) {
@@ -358,7 +359,7 @@ export function OfferHeaderForm({
   rates: Record<string, number>;
   /** A new offer's tax and advance: the company's defaults (Settings). */
   defaults?: { taxIncluded: boolean; taxRate: number; advancePercent?: number };
-  searchSuppliers: (q: string) => Promise<SupplierOption[]>;
+  searchSuppliers: (q: string) => Promise<SupplierOption[] | Failed>;
   /** The suppliers asked for this inquiry, offered first (design 18 Nov). */
   asked?: AskedSupplier[];
   /** Saved: the answer, the reason given and what changed. */

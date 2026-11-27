@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { api, SESSION_COOKIE } from "@/lib/api";
 import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
-import { dataOf, part } from "@/lib/part";
+import { dataOf, part, type Failed } from "@/lib/part";
 import type { DealDetail } from "@/lib/types";
 import { LOST_REASON_LABEL, SENT_VIA_TEXT, type LostReason, type SentVia, type ShareVia } from "@kebo/shared";
 import type { NewQuotationsResult, QuotationView, QuoteOffers } from "@/lib/types-deals";
@@ -144,12 +144,11 @@ export async function shareSentAction(dealId: string, revisionId: string, via: S
 }
 
 /** The offers with costs in another currency (the editor asks when the quotation currency changes). */
-export async function offersAction(dealId: string, currency: string): Promise<QuoteOffers | null> {
-  try {
-    return await api.get<QuoteOffers>(`/inquiries/${dealId}/quotation/offers`, { currency: currency.trim().toUpperCase().slice(0, 3) });
-  } catch {
-    return null;
-  }
+export async function offersAction(dealId: string, currency: string): Promise<QuoteOffers | Failed | null> {
+  // A Failed: the editor says the costs are still in the old currency (they were kept silently before).
+  return part("the offers' costs in that currency", () =>
+    api.get<QuoteOffers>(`/inquiries/${dealId}/quotation/offers`, { currency: currency.trim().toUpperCase().slice(0, 3) }),
+  );
 }
 
 /**

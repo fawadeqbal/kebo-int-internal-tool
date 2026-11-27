@@ -4,6 +4,7 @@ import { Building2 } from "lucide-react";
 import { Picker } from "@/components/common/picker";
 import { countryName } from "@/lib/countries";
 import type { CustomerOption } from "@/lib/types-deals";
+import type { Failed } from "@/lib/failed";
 
 const countryText = (c: string) => (c === "ZZ" ? "Country not set" : countryName(c));
 
@@ -25,9 +26,9 @@ export function CustomerPicker({
 }: {
   value: CustomerOption | null;
   onChange: (c: CustomerOption | null) => void;
-  search: (q: string) => Promise<CustomerOption[]>;
+  search: (q: string) => Promise<CustomerOption[] | Failed>;
   /** The recent customers, shown before anything is typed. */
-  recent?: () => Promise<CustomerOption[]>;
+  recent?: () => Promise<CustomerOption[] | Failed>;
   /** "+ New customer": called with what was typed. */
   onNew?: (typed: string) => void;
   newLabel?: string;

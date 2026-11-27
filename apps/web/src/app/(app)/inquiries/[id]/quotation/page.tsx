@@ -12,6 +12,8 @@ import { NewQuotationsButton } from "@/components/deals/quotation-tab";
 import { checksOf, CheckChip, optionOf, termsFacts } from "@/components/deals/quote-view";
 import { shortName } from "@/components/deals/offer-facts";
 import { newQuotationsAction, offersAction } from "./actions";
+import { isFailed } from "@/lib/part";
+import { CouldNotLoad } from "@/components/common/could-not-load";
 import { inquiryTitle } from "@/lib/titles";
 import { WithSide } from "../side";
 
@@ -59,7 +61,9 @@ export default async function QuotationPage({
 
   // New quotations' offers, costed in its own currency.
   const loadOffers = offersAction.bind(null, d.id);
-  const offersForNew = manage ? await loadOffers(q.newDefaults.currency) : null;
+  // Not read: said at the top, and New quotations starts without the offers.
+  const offersRead = manage ? await loadOffers(q.newDefaults.currency) : null;
+  const offersForNew = isFailed(offersRead) ? null : offersRead;
   // Which quotations each offer is in (an offer can be quoted again on other terms).
   const usedIn: Record<string, string[]> = {};
   for (const x of quotations) for (const o of currentOf(x).options) if (o.supplierQuoteId) (usedIn[o.supplierQuoteId] ??= []).push(x.letter);
@@ -96,6 +100,7 @@ export default async function QuotationPage({
     // The same panel as every tab of the inquiry, beside its quotations.
     <WithSide id={id}>
     <div className="flex flex-col gap-4">
+      {isFailed(offersRead) && <CouldNotLoad what={offersRead.what} />}
       {accepted && order && (
         <Notice
           tone="ok"

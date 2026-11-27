@@ -15,6 +15,7 @@ import { date, money } from "@/lib/format";
 import type { OptionView, QuoteOffers } from "@/lib/types-deals";
 import { AcceptForm, ExpiredForm } from "./quotation-step";
 import { shortName } from "./offer-facts";
+import { isFailed, type Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -44,7 +45,7 @@ export function NewQuotationsButton({
   only?: string | null;
   action: Action;
   offers: QuoteOffers | null;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   defaults: { currency: string; validUntil: string; margin: number };
   /** The letters of the quotations already made from each offer (by offer id). */
   usedIn: Record<string, string[]>;
@@ -89,7 +90,7 @@ function NewQuotationsForm({
   only: string | null;
   action: Action;
   first: QuoteOffers | null;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   defaults: { currency: string; validUntil: string; margin: number };
   usedIn: Record<string, string[]>;
   letters: string[];
@@ -122,10 +123,13 @@ function NewQuotationsForm({
     if (o.lines.some((l) => l.unitCost === null)) return null;
     return o.lines.reduce((t, l) => t + Number(fromMinor(priceForMargin(toMinor(l.unitCost!), m))) * Number(l.quantity), 0);
   };
+  // The offers' costs in the new currency; not read: the costs stay in the old one, and the field says so.
+  const [offersFailed, setOffersFailed] = useState<string | null>(null);
   const changeCurrency = async (c: string) => {
     setCurrency(c);
     const more = await loadOffers(c);
-    if (more) setOffers(more);
+    setOffersFailed(isFailed(more) ? `Could not load ${more.what}: the costs shown are still in ${offers?.currency ?? "the old currency"}.` : null);
+    if (more && !isFailed(more)) setOffers(more);
   };
   const rows = [...(offers?.offers ?? []).map((o) => o.supplierQuoteId), "own"].filter((id) => ticked.includes(id));
   return (
@@ -215,7 +219,7 @@ function NewQuotationsForm({
             <fieldset className="flex flex-col gap-3">
               <legend className="mb-2 text-md font-semibold">Drafts</legend>
               <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Currency" htmlFor="nq-currency" error={s.errors?.currency}>
+                <Field label="Currency" htmlFor="nq-currency" error={s.errors?.currency ?? (offersFailed ? [offersFailed] : undefined)}>
                   <Select id="nq-currency" name="currency" value={currency} onChange={(e) => void changeCurrency(e.target.value)}>
                     {CURRENCIES.map((c) => (
                       <option key={c} value={c}>
