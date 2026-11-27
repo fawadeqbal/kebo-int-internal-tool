@@ -3,7 +3,7 @@ import { liveFile, isCustomer } from "@kebo/database";
 import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, toMinor } from "@kebo/money";
-import { can, expenseInput, PAYMENT_METHOD_LABEL, paymentInput, rowsOf, type ExpenseInput, type Message, type PaymentInput } from "@kebo/shared";
+import { can, expenseInput, PAYMENT_METHOD_LABEL, paymentInput, rowsOf, type ExpenseInput, type Message, type PaymentInput, withNewNames } from "@kebo/shared";
 import { ConflictError, DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { z } from "zod";
 import { removeProof, setProof } from "../../common/storage/proofs";
@@ -19,7 +19,6 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { day, money } from "../notifications/facts";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { customerAccess } from "../parties/customers.service";
-import { withNewNames } from "../../common/names/old-names";
 
 export const SUBMISSION_KINDS = ["payment", "expense"] as const;
 export type SubmissionKind = (typeof SUBMISSION_KINDS)[number];

@@ -25,6 +25,8 @@ const TARGET_KEYS = [
   ["factory", "supplierId"],
 ] as const satisfies readonly (readonly [RecordType, string])[];
 type TargetIds = { inquiryId?: string | null; orderId?: string | null; customerId?: string | null; supplierId?: string | null };
+/** The column that links a follow-up to each kind of record ("factory" is the stored word for a supplier). */
+const TARGET_KEY = Object.fromEntries(TARGET_KEYS) as Record<RecordType, keyof TargetIds>;
 
 /** The record a row or an input names: { type, id } or null (a general one). */
 export function targetOf(v: TargetIds): { type: RecordType; id: string } | null {
@@ -259,7 +261,7 @@ export class FollowUpsService {
       scope.push(
         q.about === "none"
           ? { inquiryId: null, orderId: null, customerId: null, supplierId: null }
-          : { [`${q.about}Id`]: { not: null } },
+          : { [TARGET_KEY[q.about]]: { not: null } },
       );
     const { today, time } = this.now();
     const lateWhere: Prisma.FollowUpWhereInput = { doneAt: null, OR: [{ dueOn: { lt: toDbDate(today) } }, { dueOn: toDbDate(today), dueAt: { lt: time } }] };

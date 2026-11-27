@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isOldPhone, newName, newNames, oldName, oldPhoneNames, withNewNames, withOldNamesToo } from "../src/common/names/old-names";
+import { newName, newNames, oldName, readSettings, withNewNames, withOldNamesToo } from "../src";
+import renamed from "./old-names.renamed.json";
 
 describe("old names: JSON saved before the rename, and phone apps installed before it", () => {
   it("reads a compound old name as the new one, and nothing else", () => {
@@ -61,29 +62,33 @@ describe("old names: JSON saved before the rename, and phone apps installed befo
     });
   });
 
-  it("knows an old phone app by Dart's user agent, until the app says it knows the new names", () => {
-    expect(isOldPhone({ "user-agent": "Dart/3.5 (dart:io)" })).toBe(true);
-    expect(isOldPhone({ "user-agent": "Dart/3.5 (dart:io)", "x-names": "supplier" })).toBe(false);
-    expect(isOldPhone({ "user-agent": "Mozilla/5.0" })).toBe(false);
-    expect(isOldPhone({})).toBe(false);
+  it("reads every name the rename changed exactly as the rename wrote it, and back", () => {
+    // The list is the rename tool's own record of the camelCase names it changed (step R1a, 27 Nov 2026).
+    const pairs = Object.entries(renamed as Record<string, string>);
+    expect(pairs.length).toBe(225);
+    expect(pairs.filter(([old, now]) => newName(old) !== now || oldName(now) !== old)).toEqual([]);
   });
 
-  it("for an old phone app: body and query read as new names, the answer with both; others untouched", () => {
-    const run = (headers: Record<string, string>, url: string, body: unknown) => {
-      const req = { headers, url, body };
-      let sent: unknown;
-      const res = { json: (b: unknown) => (sent = b) };
-      oldPhoneNames()(req, res, () => undefined);
-      res.json({ supplierId: "f1" });
-      return { url: req.url, body: req.body, sent };
-    };
-    const phone = run({ "user-agent": "Dart/3.5 (dart:io)" }, "/api/expenses?factoryId=f1&q=film+factory", { factoryIds: ["f1"] });
-    expect(phone).toEqual({
-      url: "/api/expenses?supplierId=f1&q=film+factory",
-      body: { supplierIds: ["f1"] },
-      sent: { supplierId: "f1", factoryId: "f1" },
-    });
-    const web = run({ "user-agent": "Mozilla/5.0" }, "/api/expenses?factoryId=f1", { factoryIds: ["f1"] });
-    expect(web).toEqual({ url: "/api/expenses?factoryId=f1", body: { factoryIds: ["f1"] }, sent: { supplierId: "f1" } });
+  it("a body from an old phone app: the name it knows is the one it means", () => {
+    // It got both names, changed the one it knows, and sent the other back as it was.
+    expect(withNewNames({ factoryQuoteId: "edited", supplierQuoteId: "as it got it" }, "old")).toEqual({ supplierQuoteId: "edited" });
+    expect(withNewNames({ supplierQuoteId: "q1", note: "x" }, "old")).toEqual({ supplierQuoteId: "q1", note: "x" });
+  });
+
+  it("a key named __proto__ is data, never a prototype", () => {
+    const body = JSON.parse('{"__proto__":{"factoryIds":["x"]},"a":1}') as Record<string, unknown>;
+    const read = withNewNames(body);
+    expect(Object.getPrototypeOf(read)).toBe(Object.prototype);
+    expect((read as { supplierIds?: unknown }).supplierIds).toBeUndefined();
+    expect(Object.keys(read)).toEqual(["__proto__", "a"]);
+    expect(Object.getPrototypeOf(withOldNamesToo(body))).toBe(Object.prototype);
+  });
+
+  it("settings saved before the rename keep their values", () => {
+    // Settings › Sales as every company's row holds it today: with the old names, and not the defaults.
+    const read = readSettings({ sales: { factoryAdvancePercent: 40, factoryTaxIncluded: true, factoryTaxRate: 13 } });
+    expect(read.sales).toMatchObject({ supplierAdvancePercent: 40, supplierTaxIncluded: true, supplierTaxRate: 13 });
+    // Saved again with today's names, and read again: the same.
+    expect(readSettings({ sales: read.sales }).sales).toEqual(read.sales);
   });
 });

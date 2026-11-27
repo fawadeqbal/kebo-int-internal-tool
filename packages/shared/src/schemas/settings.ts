@@ -3,6 +3,7 @@ import { BALANCE_TERMS, CURRENCIES, INCOTERMS } from "../enums";
 import { DEFAULT_ORDER_REMINDER_DAYS } from "../workflows/order";
 import { isPaperSwitch } from "../workflows/papers";
 import { DATE_FORMATS, TIME_FORMATS } from "@kebo/utils";
+import { withNewNames } from "../old-names";
 
 /** A time zone the system knows ("Asia/Karachi"); empty: the server's. */
 const isZone = (v: string) => {
@@ -274,7 +275,8 @@ export type Settings = { [K in SettingsKey]: z.infer<(typeof SETTINGS)[K]> };
 export function readSettings(stored: Partial<Record<string, unknown>>): Settings {
   const out = {} as Record<SettingsKey, unknown>;
   for (const key of Object.keys(SETTINGS) as SettingsKey[]) {
-    let raw = stored[key] ?? {};
+    // A group saved before "factory" became "supplier" says factoryTaxRate: read as today's name, not dropped.
+    let raw = withNewNames(stored[key] ?? {});
     // Time and dates come from the company row; a stray copy in the stored JSON is ignored (and never breaks the rest).
     // Colours no longer offered go back to the default, rather than making the whole group unreadable.
     if (key === "company" && raw && typeof raw === "object")

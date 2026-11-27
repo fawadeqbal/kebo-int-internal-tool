@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import type { Request, Response } from "express";
 import { from, lastValueFrom, type Observable } from "rxjs";
 import { PrismaService } from "../../database/prisma.service";
-import { withNewNames } from "../names/old-names";
+import { withNewNames } from "@kebo/shared";
 
 /**
  * One-time keys for money saves. A client sends `Idempotency-Key: <key>` with a save (the web's forms one per
@@ -47,8 +47,11 @@ export class OnceInterceptor implements NestInterceptor {
     if (!ONCE_KEY.test(key)) throw new HttpException({ message: "This save's one-time key is not valid. Reload and try again." }, HttpStatus.BAD_REQUEST);
     const db = this.prisma.db;
     const action = `${req.method} ${(req.originalUrl ?? req.url).split("?")[0]}`.slice(0, 200);
+    // The body as it arrived: an old phone app's names are read as new ones on the way in, and a save it
+    // repeats must look the same as the first time it was sent.
+    const sent = (req as Request & { bodyAsSent?: unknown }).bodyAsSent ?? req.body;
     const fingerprint = createHash("sha256")
-      .update(JSON.stringify(req.body ?? null))
+      .update(JSON.stringify(sent ?? null))
       .digest("hex");
     const until = Date.now() + WAIT_MS;
     for (;;) {

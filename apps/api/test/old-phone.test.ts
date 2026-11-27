@@ -1,7 +1,13 @@
+import { createHash } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
+import { FIRST_COMPANY_ID } from "@kebo/database";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
+import { CompaniesService } from "../src/common/company/companies.service";
+import { CompanyContext } from "../src/common/company/company-context";
+import { isOldPhone, oldPhoneNames } from "../src/common/names/old-names";
+import { PrismaService } from "../src/database/prisma.service";
 
 /**
  * A phone app installed before "factory" became "supplier" in the API's field names (27 Nov 2026) still
@@ -111,5 +117,75 @@ describe("a phone app from before the rename keeps working", () => {
       .set("x-names", "supplier")
       .expect(200);
     expect("factoryTotal" in (res.body.quotes as Record<string, unknown>[])[0]!).toBe(false);
+  });
+
+  it("a money save it repeats is known as the same save: by the body as the phone sent it", async () => {
+    const manager = await signIn(app, "manager@example.com", "Manager@12345");
+    const prisma = app.get(PrismaService);
+    const inCompany = async <T>(fn: () => Promise<T>) => CompanyContext.run((await app.get(CompaniesService).byId(FIRST_COMPANY_ID))!, fn);
+    const description = `Courier to the supplier ${tag}`;
+    const body = {
+      category: "travel",
+      description,
+      amount: 15,
+      currency: "USD",
+      spentOn: new Date().toISOString().slice(0, 10),
+      factoryId: ruian,
+    };
+    const key = `old-phone-${tag}`;
+    const send = () =>
+      request(app.getHttpServer())
+        .post("/api/expenses")
+        .set("authorization", `Bearer ${manager}`)
+        .set("user-agent", DART)
+        .set("idempotency-key", key)
+        .send(body);
+    const first = await send().expect(201);
+    const again = await send().expect(201);
+    expect(again.headers["idempotent-replayed"]).toBe("true");
+    expect(again.body).toEqual(first.body);
+    // One expense, on that supplier: the old name went in as the new one.
+    const saved = await inCompany(() => prisma.db.expense.findMany({ where: { description }, select: { supplierId: true } }));
+    expect(saved).toEqual([{ supplierId: ruian }]);
+    // The save is remembered by the body as it was sent, old names and all: so a save first sent to the API
+    // from before the rename, and repeated after it, is still the same save.
+    const [row] = await inCompany(
+      () => prisma.db.$queryRaw<{ fingerprint: string }[]>`select fingerprint from request_keys where key = ${key}`,
+    );
+    expect(row!.fingerprint).toBe(createHash("sha256").update(JSON.stringify(body)).digest("hex"));
+  });
+
+  it("the layer itself: who is an old phone app, and what it changes", () => {
+    expect(isOldPhone({ "user-agent": DART })).toBe(true);
+    expect(isOldPhone({ "user-agent": "okhttp/4.12.0" })).toBe(true);
+    expect(isOldPhone({ "user-agent": DART, "x-names": "supplier" })).toBe(false);
+    expect(isOldPhone({ "user-agent": "Mozilla/5.0" })).toBe(false);
+    expect(isOldPhone({})).toBe(false);
+    const run = (headers: Record<string, string>, url: string, body: unknown) => {
+      const req: { headers: Record<string, string>; url: string; body?: unknown; bodyAsSent?: unknown } = { headers, url, body };
+      let sent: unknown;
+      const res = { json: (b: unknown) => (sent = b) };
+      oldPhoneNames()(req, res, () => undefined);
+      res.json({ supplierId: "f1" });
+      return { url: req.url, body: req.body, asSent: req.bodyAsSent, sent };
+    };
+    expect(
+      run({ "user-agent": DART }, "/api/expenses?factoryId=f1&q=film+factory", {
+        factoryIds: ["f1"],
+        supplierQuoteId: "as it got it",
+        factoryQuoteId: "edited",
+      }),
+    ).toEqual({
+      url: "/api/expenses?supplierId=f1&q=film+factory",
+      body: { supplierIds: ["f1"], supplierQuoteId: "edited" },
+      asSent: { factoryIds: ["f1"], supplierQuoteId: "as it got it", factoryQuoteId: "edited" },
+      sent: { supplierId: "f1", factoryId: "f1" },
+    });
+    expect(run({ "user-agent": "Mozilla/5.0" }, "/api/expenses?factoryId=f1", { factoryIds: ["f1"] })).toEqual({
+      url: "/api/expenses?factoryId=f1",
+      body: { factoryIds: ["f1"] },
+      asSent: undefined,
+      sent: { supplierId: "f1" },
+    });
   });
 });

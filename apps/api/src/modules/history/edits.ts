@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Injectable, Post, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { can, editCardLabel } from "@kebo/shared";
+import { can, editCardLabel, newNames } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { isSupplier } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
@@ -11,7 +11,7 @@ import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../../common/auth/order-access";
-import { newNames, savedHistory } from "../../common/names/old-names";
+import { savedHistory } from "../../common/names/old-names";
 
 /** The records whose cards count their edits (their history shows them too). */
 const EDIT_TYPES = ["inquiry", "factory_quote", "quotation", "order", "customer", "factory"] as const;

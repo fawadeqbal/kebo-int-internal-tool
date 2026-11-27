@@ -36,6 +36,7 @@ export * from "./schemas/notes";
 export * from "./schemas/plain-errors";
 export * from "./workflows/devices";
 export * from "./platform";
+export * from "./old-names";
 export * from "./treasury";
 export * from "./site";
 export * from "./workflows/tracking";
