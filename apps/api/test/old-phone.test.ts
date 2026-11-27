@@ -255,7 +255,8 @@ describe("a phone app from before the rename keeps working", () => {
     // The bare word (step B) is an answer's twin only: never read in a body (Terms' sides and who bears a cost are
     // tables keyed by the stored "factory"), and left alone for the web that says it reads it (supplier.2).
     const answer = { supplier: { id: "f1" }, rows: [{ suppliers: [] }], borneBy: { customer: "a", factory: "b" } };
-    for (const headers of [{ "user-agent": DART }, { "user-agent": "Mozilla/5.0", "x-names": "supplier" }]) {
+    const beforeBare: Record<string, string>[] = [{ "user-agent": DART }, { "user-agent": "Mozilla/5.0", "x-names": "supplier" }];
+    for (const headers of beforeBare) {
       let sent: unknown;
       const res = { json: (b: unknown) => (sent = b) };
       const req: { headers: Record<string, string>; url: string; body?: unknown } = {
