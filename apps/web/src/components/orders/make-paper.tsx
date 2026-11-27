@@ -33,6 +33,7 @@ import { ownDocumentAction, paperDeleteDraftAction } from "@/app/(app)/orders/fi
 import { useTime } from "@/lib/time-client";
 import type { PaperLineRow } from "./papers-table";
 import { RecordForm } from "./papers-card";
+import { rememberOpener } from "@/components/window/focus-return";
 
 /** paperAction bound to the order, the paper and its ref: (op, paper id, …). */
 export type PaperRun = (op: PaperOp, paperId: string | null, prev: ActionState, form: FormData) => Promise<ActionState>;
@@ -383,7 +384,11 @@ export function OrderDocWindow(props: OrderWindowProps) {
 function useOrderWindow(props: OrderWindowProps) {
   const router = useRouter();
   const { back } = props;
-  const close = useCallback(() => router.push(back), [router, back]);
+  // Back where it was opened, and the focus on the link that opened it (the window is a page of its own).
+  const close = useCallback(() => {
+    rememberOpener(back);
+    router.push(back);
+  }, [router, back]);
   const at = props.items.findIndex((x) => x.key === props.current);
   const items: WindowItem[] =
     at < 0 ? [] : props.items.map((x) => ({ key: x.key, name: x.name, state: x.state, go: () => router.replace(x.href, { scroll: false }) }));
