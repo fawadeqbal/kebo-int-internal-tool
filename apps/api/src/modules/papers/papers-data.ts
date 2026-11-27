@@ -73,7 +73,7 @@ export const paperOrderInclude = {
           },
         },
       },
-      factory: { select: { id: true, name: true, address: true } },
+      supplier: { select: { id: true, name: true, address: true } },
     },
   },
   // The accepted option's discount and lead time (the revision keeps no figures of its own).
@@ -106,15 +106,15 @@ export const paperOrderInclude = {
   // (an LC's instalment is due from it): what the plan's dates are worked out from.
   ...readySelect,
   // Each supplier's ready date, and its factory test (the FAT report prints from it).
-  factories: {
+  suppliers: {
     select: {
-      ...readySelect.factories.select,
+      ...readySelect.suppliers.select,
       fatPlannedOn: true,
       fatDoneOn: true,
       fatResult: true,
       fatRemarks: true,
       fatAttendedBy: { select: { name: true } },
-      factory: { select: { name: true } },
+      supplier: { select: { name: true } },
     },
   },
   bankSteps: { where: { step: "customer_bank_received" }, select: { doneOn: true }, orderBy: { doneOn: "asc" } },
@@ -544,7 +544,7 @@ function commercialInvoice(c: PaperCtx): Built {
 
 /** The suppliers of the order's lines, in the order they first appear. */
 export function suppliersOf(o: PaperOrder) {
-  return [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
+  return [...new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : []))).values()];
 }
 
 /**
@@ -972,7 +972,7 @@ function paymentRequest(c: PaperCtx): Built {
 
 /** The factory test kept on Production: the one done, else the one planned. */
 export function fatOf(c: { o: PaperOrder }) {
-  return c.o.factories.find((f) => f.fatDoneOn || f.fatResult) ?? c.o.factories.find((f) => f.fatPlannedOn) ?? null;
+  return c.o.suppliers.find((f) => f.fatDoneOn || f.fatResult) ?? c.o.suppliers.find((f) => f.fatPlannedOn) ?? null;
 }
 
 const FAT_WORD: Record<string, string> = { passed: "Passed", passed_with_remarks: "Passed with remarks", failed: "Failed" };
@@ -983,7 +983,7 @@ function fatReport(c: PaperCtx, t: NonNullable<ReturnType<typeof fatOf>>): Built
   const result = t.fatResult ? (FAT_WORD[t.fatResult] ?? t.fatResult) : null;
   return {
     checks: [
-      check("item", "The factory test", t.factory?.name ? `at ${t.factory.name}` : "on Production", true, { required: true, href: "production" }),
+      check("item", "The factory test", t.supplier?.name ? `at ${t.supplier.name}` : "on Production", true, { required: true, href: "production" }),
       check("done", "Recorded", day ? [`Done ${day}`, result].filter(Boolean).join(" · ") : "no result yet", !!day, { required: true, href: "production" }),
     ],
     doc: {
@@ -998,7 +998,7 @@ function fatReport(c: PaperCtx, t: NonNullable<ReturnType<typeof fatOf>>): Built
       boxTitle: "Factory acceptance test",
       bullets: [
         ...(day ? [{ label: "Date:", value: date(day) }] : []),
-        ...(t.factory?.name ? [{ label: "Supplier:", value: t.factory.name }] : []),
+        ...(t.supplier?.name ? [{ label: "Supplier:", value: t.supplier.name }] : []),
         ...(t.fatAttendedBy ? [{ label: "Attended by:", value: t.fatAttendedBy.name }] : []),
         ...(t.fatRemarks ? [t.fatRemarks] : []),
       ],

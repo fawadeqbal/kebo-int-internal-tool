@@ -108,7 +108,7 @@ export class OperationsService {
             supplierTaxRate: true,
             supplierTaxIncluded: true,
             quantity: true,
-            factory: { select: { id: true, name: true } },
+            supplier: { select: { id: true, name: true } },
           },
         },
         supplierPaid: supplierPaidRelation,
@@ -121,7 +121,7 @@ export class OperationsService {
     const today = this.clock.today();
     const features = await this.limits.features();
     const rows = orders.flatMap((o) => {
-      const names = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.name] as const] : [])));
+      const names = new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier.name] as const] : [])));
       const ready = new Map(readyByOf(o).map((r) => [r.supplierId, r.readyOn] as const));
       // Where the order stands, by its one worked-out word: still with the supplier, or shipped and after.
       const at = orderWordColumn(orderWord(wordFactsOf(o), features));

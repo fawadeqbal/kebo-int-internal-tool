@@ -111,7 +111,7 @@ const orderInclude = {
         },
       },
       // The supplier it was bought from (frozen when the order was made).
-      factory: { select: { id: true, name: true } },
+      supplier: { select: { id: true, name: true } },
       // How it is packed, case by case (the packing list's rows).
       cases: caseRowsSelect,
     },
@@ -217,7 +217,7 @@ function lineView(l: LineRow, no: string, show: LineShows) {
     unit: l.unit,
     unitPrice: l.unitPrice.toFixed(2),
     lineTotal: l.lineTotal.toFixed(2),
-    factory: l.factory ?? null,
+    factory: l.supplier ?? null,
     /** The papers' customs side: the customer's and China's HS codes, the item in Chinese and who wrote it. */
     customs: { hsCode: l.hsCode, hsCodeCn: l.hsCodeCn, descriptionZh: l.descriptionZh, zhBy: (l.zhBy as "machine" | "staff" | null) ?? null },
     receivedQty: trimQty(l.receivedQty),
@@ -761,7 +761,7 @@ export class OrdersService {
       /** The latest of the suppliers' ready dates (known once each has given one). */
       readyOn: readyOnOf(o),
       /** Each supplier's own ready date. */
-      readyBy: readyByOf(o).map((r) => ({ ...r, name: o.lines.find((l) => l.factory?.id === r.supplierId)?.factory?.name ?? null })),
+      readyBy: readyByOf(o).map((r) => ({ ...r, name: o.lines.find((l) => l.supplier?.id === r.supplierId)?.supplier?.name ?? null })),
       /** The shipment's, never the order's: the earliest day a shipment left, and Shipment 1's B/L. */
       shippedOn: ship.shippedOn,
       blNo: ship.blNo,
@@ -882,7 +882,7 @@ export class OrdersService {
         reference: true,
         receivedOn: true,
         supplierId: true,
-        factory: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
         basis: true,
         basisPlace: true,
         leadTime: true,
@@ -906,7 +906,7 @@ export class OrdersService {
       const po = pos.find((p) => p.supplierId === q.supplierId);
       const terms = offerTermsOf(q, sales.supplierAdvancePercent);
       return {
-        factory: q.factory,
+        factory: q.supplier,
         offer: { id: q.id, reference: q.reference, receivedOn: fromDbDate(q.receivedOn) },
         basis: po ? po.basis : q.basis,
         basisPlace: po ? po.basisPlace : q.basisPlace,
@@ -1047,7 +1047,7 @@ export class OrdersService {
     if (!can(user, "sourcing.manage")) return [];
     const quotes = await this.prisma.db.supplierQuote.findMany({
       where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId } } } } } } },
-      select: { id: true, factory: { select: { name: true } } },
+      select: { id: true, supplier: { select: { name: true } } },
     });
     if (!quotes.length) return [];
     const files = await this.prisma.db.attachment.findMany({
@@ -1062,7 +1062,7 @@ export class OrdersService {
       kind: f.kind,
       note: f.note,
       uploadedOn: f.createdAt.toISOString(),
-      factory: quotes.find((q) => q.id === f.supplierQuoteId)!.factory.name,
+      factory: quotes.find((q) => q.id === f.supplierQuoteId)!.supplier.name,
     }));
   }
 
@@ -1252,13 +1252,13 @@ export class OrdersService {
     const o = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       select: {
-        lines: { select: { supplierId: true, supplierUnitPrice: true, supplierCurrency: true, supplierTaxRate: true, supplierTaxIncluded: true, quantity: true, factory: { select: { name: true } } } },
+        lines: { select: { supplierId: true, supplierUnitPrice: true, supplierCurrency: true, supplierTaxRate: true, supplierTaxIncluded: true, quantity: true, supplier: { select: { name: true } } } },
         supplierPaid: supplierPaidRelation,
         expenses: supplierBorneExpenses,
       },
     });
     const bills = await tx.expense.findMany({ where: { orderId, voidedAt: null, payLater: true, repaidOn: null }, select: { amount: true, currency: true, description: true } });
-    const name = (id: string) => o.lines.find((l) => l.supplierId === id)?.factory?.name ?? "a supplier";
+    const name = (id: string) => o.lines.find((l) => l.supplierId === id)?.supplier?.name ?? "a supplier";
     return [
       ...supplierPositionOf(o, fx)
         .filter((r) => r.toPayMinor > 0)
@@ -1814,7 +1814,7 @@ export class OrdersService {
           : input.readyOn !== undefined
             ? await setReadyAll(tx, o.id, input.readyOn)
             : null;
-      const names = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.name] as const] : [])));
+      const names = new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier.name] as const] : [])));
       const { readyBy: _readyBy, ...sent } = input;
       await this.audit.record(tx, {
         userId: user.id,

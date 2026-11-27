@@ -319,7 +319,7 @@ export class TreasuryService {
               order: orderRef,
               inquiry: orderRef,
               customer: name,
-              factory: name,
+              supplier: name,
               account: { select: { id: true, name: true, kind: true } },
               repaidAccount: { select: { id: true, name: true, kind: true } },
               paidBy: name,
@@ -456,7 +456,7 @@ export class TreasuryService {
         amount: money(e.amount),
         currency: e.currency,
         // Who was paid: the payee typed on it, else the supplier it was charged to; never the customer it was for.
-        party: e.payee ? { label: e.payee, href: null } : e.factory ? supplierLink(e.factory) : null,
+        party: e.payee ? { label: e.payee, href: null } : e.supplier ? supplierLink(e.supplier) : null,
         for: e.order ? [orderLink(e.order)] : e.inquiry ? [{ label: e.inquiry.refNo, href: `/inquiries/${e.inquiry.id}` }] : [],
         account: e.ownMoney ? `${e.paidBy?.name ?? "Someone"}'s own money` : (from?.name ?? null),
         reference: e.reference,

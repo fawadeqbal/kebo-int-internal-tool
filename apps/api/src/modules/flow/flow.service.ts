@@ -90,7 +90,7 @@ interface FlowRows {
   paymentTerms: WithTerms["paymentTerms"];
   supplierOrderedOn: Date | null;
   /** Each supplier's ready date, and the suppliers on the lines (the order's ready date is the latest). */
-  factories: { supplierId: string | null; readyOn: Date | null }[];
+  suppliers: { supplierId: string | null; readyOn: Date | null }[];
   /** The lines: whose supplier makes each, and (goods) how much of it came from the supplier. */
   lines: { supplierId: string | null; type: string; quantity: Prisma.Decimal; receivedQty: Prisma.Decimal | null }[];
   proformaNo: string | null;
@@ -270,7 +270,7 @@ export class FlowService {
         lines: {
           select: {
             supplierId: true,
-            factory: { select: { id: true, name: true } },
+            supplier: { select: { id: true, name: true } },
             type: true,
             quantity: true,
             receivedQty: true,
@@ -360,7 +360,7 @@ export class FlowService {
     }));
     const steps = flowSteps(factsOf(o, depositIn, settings.papers.off), features);
 
-    const suppliers = [...new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
+    const suppliers = [...new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : []))).values()];
     const b = o.bankContract;
     const terms = termsOf(o);
     const checks = has("bank_contracts") ? lcChecksOf({ ...o, readyOn: readyOnOf(o) }, settings.reminders.lcCourierDays) : null;

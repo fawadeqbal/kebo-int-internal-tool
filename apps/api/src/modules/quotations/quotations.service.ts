@@ -82,7 +82,7 @@ const revisionInclude = {
         select: {
           id: true,
           currency: true,
-          factory: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
           // What the supplier gives (its terms now), beside what this option promises the customer.
           leadTime: true,
           leadDays: true,
@@ -189,7 +189,7 @@ export class QuotationsService {
       ? await db.supplierQuote.findMany({
           // An offer still being typed in (no lines yet) cannot be offered.
           where: { inquiryId, deletedAt: null, lines: { some: {} } },
-          include: { factory: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
+          include: { supplier: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
           orderBy: { receivedOn: "asc" },
         })
       : [];
@@ -216,7 +216,7 @@ export class QuotationsService {
       });
       return {
         supplierQuoteId: q.id,
-        factory: q.factory,
+        factory: q.supplier,
         currency: q.currency,
         /** What the supplier's prices already pay for (EXW, FOB…), and where. */
         basis: q.basis,
@@ -287,7 +287,7 @@ export class QuotationsService {
       letter: o.letter,
       status: o.status,
       /** The supplier whose offer this is (internal; null when priced from the customer's items). */
-      factory: seeCosts ? (o.supplierQuote?.factory ?? null) : null,
+      factory: seeCosts ? (o.supplierQuote?.supplier ?? null) : null,
       supplierQuoteId: seeCosts ? o.supplierQuoteId : null,
       leadTime: o.leadTime,
       /** The lead time we promise as days from a moment (null: only its words, an older option). */

@@ -43,7 +43,7 @@ export class SupplierRequestsService {
       this.prisma.db.supplierRequest.findMany({
         where: { inquiryId },
         orderBy: { createdAt: "asc" },
-        include: { factory: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
+        include: { supplier: { select: { id: true, name: true } }, createdBy: { select: { id: true, name: true } } },
       }),
       this.prisma.db.supplierQuote.findMany({ where: { inquiryId, deletedAt: null }, select: { id: true, supplierId: true }, orderBy: { createdAt: "asc" } }),
       this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null }, select: { id: true, name: true, createdAt: true, contacts: { where: { deletedAt: null }, select: { name: true, isPrimary: true, wechat: true, email: true, phone: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] } }, orderBy: { name: "asc" }, take: 500 }),
@@ -63,7 +63,7 @@ export class SupplierRequestsService {
       const replyBy = fromDbDateOrNull(r.replyBy);
       return {
         id: r.id,
-        factory: r.factory,
+        factory: r.supplier,
         status,
         statusLabel: SUPPLIER_REQUEST_STATUS_LABEL[status],
         sentOn: fromDbDate(r.sentOn),
@@ -154,7 +154,7 @@ export class SupplierRequestsService {
 
   async update(user: SessionUser, id: string, input: SupplierRequestUpdateInput) {
     await this.must(user);
-    const r = await this.prisma.db.supplierRequest.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
+    const r = await this.prisma.db.supplierRequest.findUnique({ where: { id }, include: { supplier: { select: { name: true } } } });
     if (!r) throw new NotFoundError("Request");
     const i = await this.inquiry(user, r.inquiryId);
     if (input.supplierQuoteId) {
@@ -177,7 +177,7 @@ export class SupplierRequestsService {
         action: "update",
         entityType: "inquiry",
         entityId: r.inquiryId,
-        summary: `${i.refNo}: request to ${r.factory.name}${input.status ? ` marked ${SUPPLIER_REQUEST_STATUS_LABEL[input.status].toLowerCase()}` : " changed"}`,
+        summary: `${i.refNo}: request to ${r.supplier.name}${input.status ? ` marked ${SUPPLIER_REQUEST_STATUS_LABEL[input.status].toLowerCase()}` : " changed"}`,
         oldValues: { status: r.status },
         newValues: input,
       });
@@ -187,12 +187,12 @@ export class SupplierRequestsService {
 
   async remove(user: SessionUser, id: string) {
     await this.must(user);
-    const r = await this.prisma.db.supplierRequest.findUnique({ where: { id }, include: { factory: { select: { name: true } } } });
+    const r = await this.prisma.db.supplierRequest.findUnique({ where: { id }, include: { supplier: { select: { name: true } } } });
     if (!r) throw new NotFoundError("Request");
     const i = await this.inquiry(user, r.inquiryId);
     await this.prisma.tx(async (tx) => {
       await tx.supplierRequest.delete({ where: { id } });
-      await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "inquiry", entityId: r.inquiryId, summary: `${i.refNo}: request to ${r.factory.name} removed` });
+      await this.audit.record(tx, { userId: user.id, action: "delete", entityType: "inquiry", entityId: r.inquiryId, summary: `${i.refNo}: request to ${r.supplier.name} removed` });
     });
     return this.list(user, r.inquiryId);
   }

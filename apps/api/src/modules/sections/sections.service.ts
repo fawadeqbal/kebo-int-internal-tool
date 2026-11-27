@@ -70,10 +70,10 @@ export class SectionsService {
    */
   private async production(orderId: string) {
     const [rows, lines] = await Promise.all([
-      this.prisma.db.orderSupplier.findMany({ where: { orderId }, include: { factory: { select: { id: true, name: true } }, fatAttendedBy: { select: { id: true, name: true } } } }),
-      this.prisma.db.orderLine.findMany({ where: { orderId, type: "goods" }, select: { supplierId: true, factory: { select: { id: true, name: true } } } }),
+      this.prisma.db.orderSupplier.findMany({ where: { orderId }, include: { supplier: { select: { id: true, name: true } }, fatAttendedBy: { select: { id: true, name: true } } } }),
+      this.prisma.db.orderLine.findMany({ where: { orderId, type: "goods" }, select: { supplierId: true, supplier: { select: { id: true, name: true } } } }),
     ]);
-    const suppliers = [...new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : []))).values()];
+    const suppliers = [...new Map(lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : []))).values()];
     const slots: ({ id: string; name: string } | null)[] = suppliers.length ? suppliers : [null];
     return slots.map((f) => {
       const r = rows.find((x) => x.supplierId === (f?.id ?? null));
@@ -104,7 +104,7 @@ export class SectionsService {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change this order.");
     const o = await this.prisma.db.order.findFirst({
       where: { id, ...orderAccess(user) },
-      select: { id: true, refNo: true, status: true, lines: { where: { type: "goods" }, select: { supplierId: true, factory: { select: { name: true } } } } },
+      select: { id: true, refNo: true, status: true, lines: { where: { type: "goods" }, select: { supplierId: true, supplier: { select: { name: true } } } } },
     });
     if (!o) throw new NotFoundError("Order");
     if (o.status !== "open") throw new DomainError(o.status === "closed" ? "This order is closed." : "This order is cancelled.");
@@ -112,7 +112,7 @@ export class SectionsService {
     const supplierId = input.supplierId ?? (ids.length === 1 ? ids[0]! : null);
     if (supplierId ? !ids.includes(supplierId) : ids.length > 0) throw new DomainError("Choose a supplier of this order.");
     if (input.fatAttendedById && !(await this.prisma.db.user.findFirst({ where: { id: input.fatAttendedById }, select: { id: true } }))) throw new DomainError("Choose a person of the company.");
-    const name = o.lines.find((l) => l.supplierId === supplierId)?.factory?.name ?? null;
+    const name = o.lines.find((l) => l.supplierId === supplierId)?.supplier?.name ?? null;
     // A test that has a result has been done: not on a day still to come (review 24 Nov: a future day was kept as Passed).
     if (input.fatDoneOn && input.fatDoneOn > this.clock.today())
       throw new DomainError("The factory test cannot be done on a day still to come: plan it with the planned day.");

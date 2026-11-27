@@ -94,7 +94,7 @@ export class SuppliersService {
       // The cities to choose from: the last part of every supplier's address.
       this.prisma.db.party.findMany({ where: { ...isSupplier, deletedAt: null, address: { not: null } }, select: { address: true } }),
       // Asked for a price and not answered yet (the "Offers waiting" figure).
-      this.prisma.db.supplierRequest.count({ where: { status: "sent", factory: { deletedAt: null } } }),
+      this.prisma.db.supplierRequest.count({ where: { status: "sent", supplier: { deletedAt: null } } }),
       this.prisma.db.party.count({ where: whereFor({}) }),
       this.prisma.db.party.count({ where: whereFor({ status: "offers" }) }),
       this.prisma.db.party.count({ where: whereFor({ status: "none" }) }),
@@ -159,7 +159,7 @@ export class SuppliersService {
     const [requests, quotes, orders, late, every] = await Promise.all([
       db.supplierRequest.findMany({ where: { supplierId: id }, select: { inquiryId: true, status: true, sentOn: true } }),
       db.supplierQuote.findMany({ where: { supplierId: id, deletedAt: null }, select: { inquiryId: true, receivedOn: true } }),
-      db.order.findMany({ where: { status: "open", lines: { some: { supplierId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, factories: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" } }),
+      db.order.findMany({ where: { status: "open", lines: { some: { supplierId: id } }, ...(user ? orderAccess(user) : { id: { in: [] } }) }, select: { id: true, refNo: true, suppliers: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } }, orderBy: { orderedOn: "desc" } }),
       // Late: the ready date it gave has passed and not every line of its goods has come in.
       db.orderSupplier.findMany({
         where: { supplierId: id, readyOn: { lt: new Date() }, order: { status: "open" } },
@@ -169,7 +169,7 @@ export class SuppliersService {
       user
         ? db.order.findMany({
             where: { status: { not: "cancelled" }, lines: { some: { supplierId: id } }, ...orderAccess(user) },
-            select: { id: true, refNo: true, status: true, stage: true, factories: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } },
+            select: { id: true, refNo: true, status: true, stage: true, suppliers: { where: { supplierId: id }, select: { readyOn: true } }, customer: { select: { name: true } } },
             orderBy: { orderedOn: "desc" },
           })
         : Promise.resolve([]),
@@ -188,8 +188,8 @@ export class SuppliersService {
       declined: requests.filter((r) => r.status === "declined").length,
       noReply: requests.filter((r) => r.status === "no_reply").length,
       avgDaysToAnswer: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
-      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })), // this supplier's own ready date
-      orders: every.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, status: o.status, stage: o.stage, readyOn: fromDbDateOrNull(o.factories[0]?.readyOn ?? null) })),
+      openOrders: orders.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, readyOn: fromDbDateOrNull(o.suppliers[0]?.readyOn ?? null) })), // this supplier's own ready date
+      orders: every.map((o) => ({ id: o.id, refNo: o.refNo, customer: o.customer.name, status: o.status, stage: o.stage, readyOn: fromDbDateOrNull(o.suppliers[0]?.readyOn ?? null) })),
       lateSteps,
     };
   }

@@ -38,7 +38,7 @@ const person = { select: { id: true, name: true } } as const;
 /** Lines of an order with the supplier price frozen on them when it was made (for what we owe each supplier). */
 const linesWithSupplier = {
   orderBy: { sortOrder: "asc" },
-  include: { factory: { select: { id: true, name: true, owner: person } } },
+  include: { supplier: { select: { id: true, name: true, owner: person } } },
 } satisfies Prisma.Order$linesArgs;
 
 type SupplierRow = { id: string; name: string; owner: { id: string; name: string } | null };
@@ -182,7 +182,7 @@ export class BillingService {
       if (!f) throw new DomainError("Choose a supplier of this order.");
       const lines = await tx.orderLine.findMany({
         where: { orderId, supplierId: f.id },
-        include: { factory: { select: { id: true, name: true } } },
+        include: { supplier: { select: { id: true, name: true } } },
       });
       const owed = [...owedBySupplier(lines).values()][0];
       if (!owed) throw new DomainError(`${f.name} has no items with a price on this order.`);
@@ -284,7 +284,7 @@ export class BillingService {
     // Every order's payment plans in one read, not one read per order.
     const plans = await supplierPlansFor(this.prisma.db, orders.map((o) => o.id), s.sales.supplierAdvancePercent, today, s.reminders.dueSoonDays, fx);
     for (const o of orders) {
-      const supplierOf = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+      const supplierOf = new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : [])));
       // What we owe each supplier here, less what we paid and what it bears: supplierPosition, as on the order.
       for (const f of supplierPositionOf(o, fx).filter((r) => r.lines > 0)) {
         // Only orders with something still to pay count, so "paid X of Y" is about those.
@@ -765,11 +765,11 @@ export class BillingService {
       if (!can(user, "sourcing.manage")) throw new ForbiddenError("You cannot see supplier costs.");
       const orders = await this.prisma.db.order.findMany({
         where: { status: { not: "cancelled" }, id: { in: await ordersOwingSuppliers(this.prisma, fx) } },
-        select: { id: true, refNo: true, lines: { select: { factory: { select: { id: true, owner: person } } } } },
+        select: { id: true, refNo: true, lines: { select: { supplier: { select: { id: true, owner: person } } } } },
       });
       const plans = await supplierPlansFor(this.prisma.db, orders.map((o) => o.id), s.sales.supplierAdvancePercent, today, s.reminders.dueSoonDays, fx);
       for (const o of orders) {
-        const owners = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.owner] as const] : [])));
+        const owners = new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier.owner] as const] : [])));
         for (const f of plans.get(o.id) ?? []) {
           const owner = owners.get(f.factory.id) ?? null;
           if (mine && owner?.id !== user.id) continue;
@@ -843,7 +843,7 @@ export class BillingService {
         customer: { select: { id: true, name: true } },
         allocations: { where: livePart, select: { amount: true, bankCharges: true } },
         receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
-        lines: { select: { factory: { select: { id: true, owner: person } } } },
+        lines: { select: { supplier: { select: { id: true, owner: person } } } },
         purchaseOrders: { select: { number: true, supplierId: true } },
         ...termsSelect,
       },
@@ -853,7 +853,7 @@ export class BillingService {
     // Every order's payment plans in one read, not one read per order.
     const plans = await supplierPlansFor(this.prisma.db, orders.map((o) => o.id), s.sales.supplierAdvancePercent, today, s.reminders.dueSoonDays, fx);
     for (const o of orders) {
-      const owners = new Map(o.lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory.owner] as const] : [])));
+      const owners = new Map(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier.owner] as const] : [])));
       const pos = positionOf(o, fx);
       const route = termsOf(o).route;
       const theirs = customerMoney({ totalMinor: pos.owedMinor, receivedMinor: pos.settledMinor, depositMinor: pos.depositMinor, route });

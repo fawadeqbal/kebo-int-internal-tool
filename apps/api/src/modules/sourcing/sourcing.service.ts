@@ -31,7 +31,7 @@ import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 
 const quoteInclude = {
-  factory: { select: { id: true, name: true } },
+  supplier: { select: { id: true, name: true } },
   lines: {
     orderBy: { sortOrder: "asc" as const },
     include: { _count: { select: { quoteLines: { where: { revision: { deletedAt: null } } } } } },
@@ -134,7 +134,7 @@ export class SourcingService {
       });
       return {
         id: q.id,
-        factory: q.factory,
+        factory: q.supplier,
         reference: q.reference,
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
@@ -739,10 +739,10 @@ export class SourcingService {
     await this.prisma.tx(async (tx) => {
       const { q, inquiry } = await this.findQuote(user, quoteId, tx);
       if (input.fromQuoteId === quoteId) throw new DomainError("Choose another supplier's offer.");
-      const from = await tx.supplierQuote.findFirst({ where: { id: input.fromQuoteId, inquiryId: q.inquiryId, deletedAt: null }, include: { factory: true } });
+      const from = await tx.supplierQuote.findFirst({ where: { id: input.fromQuoteId, inquiryId: q.inquiryId, deletedAt: null }, include: { supplier: true } });
       if (!from) throw new DomainError("That offer is not on this inquiry any more.");
       const source = await this.linesOf(tx, from.id);
-      if (!source.length) throw new DomainError(`${from.factory.name}'s offer has no items yet.`);
+      if (!source.length) throw new DomainError(`${from.supplier.name}'s offer has no items yet.`);
       const existing = await tx.supplierQuoteLine.count({ where: { supplierQuoteId: quoteId } });
       if (existing + source.length > 1000) throw new DomainError("An offer can have up to 1,000 items.");
       const ids = new Map<string, string>();
@@ -771,7 +771,7 @@ export class SourcingService {
         action: "update",
         entityType: "factory_quote",
         entityId: quoteId,
-        summary: `${inquiry.refNo}: copied ${source.length} items from ${from.factory.name}'s offer`,
+        summary: `${inquiry.refNo}: copied ${source.length} items from ${from.supplier.name}'s offer`,
       });
     });
     return this.quote(user, quoteId);

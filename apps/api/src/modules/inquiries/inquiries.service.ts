@@ -256,7 +256,7 @@ export class InquiriesService {
           ? {
               supplierQuotes: {
                 where: { deletedAt: null },
-                include: { factory: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
+                include: { supplier: { select: { id: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } },
                 orderBy: { receivedOn: "desc" },
               },
             }

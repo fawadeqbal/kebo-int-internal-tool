@@ -15,11 +15,11 @@ type SupplierRef = { id: string; name: string };
  * currency, keyed "supplierId:currency".
  */
 export function owedBySupplier<F extends SupplierRef>(
-  lines: { factory: F | null; supplierUnitPrice: Prisma.Decimal | null; supplierCurrency: string | null; supplierTaxRate: Prisma.Decimal | null; supplierTaxIncluded: boolean; quantity: Prisma.Decimal }[],
+  lines: { supplier: F | null; supplierUnitPrice: Prisma.Decimal | null; supplierCurrency: string | null; supplierTaxRate: Prisma.Decimal | null; supplierTaxIncluded: boolean; quantity: Prisma.Decimal }[],
 ) {
   // The one formula (supplierPosition), without payments or expenses: only what the lines owe.
-  const rows = supplierPositionOf({ lines: lines.map((l) => ({ ...l, supplierId: l.factory?.id ?? null })), supplierPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
-  const suppliers = new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+  const rows = supplierPositionOf({ lines: lines.map((l) => ({ ...l, supplierId: l.supplier?.id ?? null })), supplierPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
+  const suppliers = new Map(lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : [])));
   return new Map(rows.map((r) => [r.key, { factory: suppliers.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
 }
 
@@ -27,7 +27,7 @@ const planLines = {
   where: { supplierId: { not: null } },
   select: {
     supplierId: true,
-    factory: { select: { id: true, name: true } },
+    supplier: { select: { id: true, name: true } },
     supplierUnitPrice: true,
     supplierCurrency: true,
     supplierTaxRate: true,
@@ -103,7 +103,7 @@ const planSelect = {
 
 function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
   const names = new Map<string, SupplierRef>();
-  for (const l of o.lines) if (l.factory) names.set(l.factory.id, l.factory);
+  for (const l of o.lines) if (l.supplier) names.set(l.supplier.id, l.supplier);
   for (const r of o.payables) names.set(r.supplier!.id, r.supplier!);
   const positions = supplierPositionOf(o, fx).filter((r) => r.lines > 0);
   const owed = new Map(positions.map((r) => [r.key, { factory: names.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));

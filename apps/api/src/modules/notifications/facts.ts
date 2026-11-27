@@ -112,7 +112,7 @@ export async function orderFacts(db: Db, id: string, s: Settings, expensesOn: bo
           contact: { select: { name: true, phone: true, whatsapp: true, email: true } },
         },
       },
-      lines: { where: { supplierId: { not: null } }, select: { factory: { select: { name: true } } } },
+      lines: { where: { supplierId: { not: null } }, select: { supplier: { select: { name: true } } } },
     },
   });
   if (!o) return null;
@@ -122,7 +122,7 @@ export async function orderFacts(db: Db, id: string, s: Settings, expensesOn: bo
   const parts = planStatus(plan.items, pos.settledMinor, today, s.reminders.dueSoonDays);
   const next = parts.find((p) => p.status !== "paid") ?? null;
   const contact = o.inquiry.contact ?? o.customer.contacts[0] ?? null;
-  const suppliers = [...new Set(o.lines.map((l) => l.factory?.name).filter((n): n is string => !!n))];
+  const suppliers = [...new Set(o.lines.map((l) => l.supplier?.name).filter((n): n is string => !!n))];
   const totalMinor = toMinor(o.total.toString());
   return {
     ...o,

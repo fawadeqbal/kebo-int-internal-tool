@@ -24,7 +24,7 @@ export const planDatesSelect = {
 } satisfies Prisma.OrderSelect;
 
 type DatesOrder = {
-  factories: { supplierId: string | null; readyOn: Date | null }[];
+  suppliers: { supplierId: string | null; readyOn: Date | null }[];
   lines: { supplierId: string | null }[];
   shipments: { departedOn: Date | null }[];
   bankSteps: { doneOn: Date }[];

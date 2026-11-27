@@ -502,7 +502,7 @@ export class AccountsService {
       recordedById: true,
       orderId: true,
       customerId: true,
-      factory: { select: { id: true, name: true } },
+      supplier: { select: { id: true, name: true } },
       customer: { select: { id: true, name: true } },
       inquiry: { select: { id: true, stage: true, lostReason: true, orders: { where: { status: { not: "cancelled" } }, select: { id: true }, take: 1 } } },
     } as const;
@@ -551,11 +551,11 @@ export class AccountsService {
         r.spent += v;
         reasons.set(key, r);
       }
-      if (e.factory && VISITS.has(e.category)) {
-        const f = suppliers.get(e.factory.id) ?? { factory: e.factory, visits: 0, spent: 0 };
+      if (e.supplier && VISITS.has(e.category)) {
+        const f = suppliers.get(e.supplier.id) ?? { factory: e.supplier, visits: 0, spent: 0 };
         f.visits += 1;
         f.spent += v;
-        suppliers.set(e.factory.id, f);
+        suppliers.set(e.supplier.id, f);
       }
       if (!toSell(e)) continue;
       p.toSell += v;
