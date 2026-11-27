@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import known from "./boundaries.known.json";
+import { MODULES, tsFiles } from "./source-files";
 
 /**
  * Module boundaries (architecture review §7.2). Today's imports from one module
@@ -9,21 +10,12 @@ import known from "./boundaries.known.json";
  * A new line there means new coupling: use the other module's interface or an
  * event instead, or add the line on purpose in the same change.
  */
-const MODULES = resolve(__dirname, "../src/modules");
-
-function files(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    return statSync(path).isDirectory() ? files(path) : path.endsWith(".ts") ? [path] : [];
-  });
-}
-
 const moduleOf = (path: string) => {
   const rel = relative(MODULES, path);
   return rel.startsWith("..") ? null : rel.split("/")[0]!;
 };
 
-const all = files(MODULES);
+const all = tsFiles(MODULES);
 
 function edges(): string[] {
   const found = new Set<string>();

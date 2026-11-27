@@ -49,7 +49,7 @@ import {
   warrantyLine,
 } from "@kebo/shared";
 import { fromMinor } from "@kebo/money";
-import { addDays, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
+import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
 import { setPaymentTerms } from "../orders/payment-terms";
 import { AuditService } from "../../common/audit/audit.service";
@@ -977,7 +977,7 @@ export class FlowService {
     if ((changed.clearedOn || changed.arrivedOn || changed.departedOn) && next.clearedOn && came && next.clearedOn < came)
       seen.push(`Customs cleared it on ${next.clearedOn}, before it ${next.arrivedOn ? "arrived" : "sailed"} on ${came}.`);
     if (changed.departedOn && next.departedOn && shipBy && next.departedOn > shipBy) {
-      const days = Math.round((Date.parse(next.departedOn) - Date.parse(shipBy)) / 86_400_000);
+      const days = daysBetween(shipBy, next.departedOn);
       seen.push(`It sails ${days} day${days === 1 ? "" : "s"} after the ship-by date (${shipBy}).`);
     }
     return seen;
