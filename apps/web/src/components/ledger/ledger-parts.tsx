@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { CURRENCIES, LEDGER_ENTRY_TYPE_LABEL, LEDGER_ENTRY_TYPES, type LedgerEntryType, type LedgerPartyKind } from "@kebo/shared";
 import { Badge, buildHref, cn, FactsLine, FilterChip, Dash } from "@kebo/ui";
 import { AutoSelect } from "@kebo/ui/client";
-import { addDays } from "@kebo/utils";
+import { monthEnd, monthStart } from "@kebo/utils";
 import { date, money, dayMonth } from "@/lib/format";
 import type { AgeingBucketView, LedgerListRow } from "@/lib/types-ledger";
 
@@ -49,8 +49,6 @@ export const PERIODS = [
   { key: "all", label: "All time" },
 ] as const;
 
-const first = (d: string) => `${d.slice(0, 8)}01`;
-const prevMonth = (d: string) => first(addDays(first(d), -1));
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The days a period covers (custom: ?from&to), and its words ("1 Oct – 4 Nov 2026"). */
@@ -63,16 +61,16 @@ export function periodOf(sp: { period?: string; from?: string; to?: string }, to
   const y = today.slice(0, 4);
   const range =
     key === "month"
-      ? { from: first(today), to: today }
+      ? { from: monthStart(today), to: today }
       : key === "last-month"
-        ? { from: prevMonth(today), to: addDays(first(today), -1) }
+        ? { from: monthStart(today, -1), to: monthEnd(monthStart(today, -1)) }
         : key === "year"
           ? { from: `${y}-01-01`, to: today }
           : key === "last-year"
             ? { from: `${Number(y) - 1}-01-01`, to: `${Number(y) - 1}-12-31` }
             : key === "all"
               ? { from: "2000-01-01", to: today }
-              : { from: prevMonth(today), to: today };
+              : { from: monthStart(today, -1), to: today };
   return { key, ...range, label: key === "all" ? "All time" : span(range.from, range.to) };
 }
 

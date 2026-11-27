@@ -72,6 +72,38 @@ export function addMonths(date: ISODate, months: number): ISODate {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * The first day of the month `months` after `date`'s month: 27 Nov 2026 → 1 Nov 2026; with 2, 1 Jan 2027;
+ * with −1, 1 Oct 2026. A month ("2026-11") is read as any day in it. Given something that is not a day or a month
+ * ("2026-13"), this and the three below throw a RangeError, as a date does.
+ */
+export function monthStart(date: ISODate, months = 0): ISODate {
+  const d = new Date(`${date.slice(0, 7)}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The last day of `date`'s month (28, 29, 30 or 31). A month ("2026-11") is read as any day in it. */
+export const monthEnd = (date: ISODate): ISODate => addDays(monthStart(date, 1), -1);
+
+/** "2026-11": the month `months` after `date`'s. */
+export const monthOf = (date: ISODate, months = 0): string => monthStart(date, months).slice(0, 7);
+
+/** The `count` months ending with `to`'s, oldest first: ["2025-12", …, "2026-11"]. */
+export const lastMonths = (to: ISODate, count = 12): string[] => Array.from({ length: count }, (_, i) => monthOf(to, i - (count - 1)));
+
+/**
+ * The months from `from`'s to `to`'s, both in, oldest first: ["2026-09", "2026-10", "2026-11"]. None when `to` is
+ * in an earlier month. Counted first, then listed: stepping until the month passes `to` never ends at the last
+ * month a date can name (December 9999 has no month after it to compare with).
+ */
+export function monthsBetween(from: ISODate, to: ISODate): string[] {
+  const first = monthOf(from);
+  const last = monthOf(to);
+  const count = (Number(last.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + Number(last.slice(5, 7)) - Number(first.slice(5, 7)) + 1;
+  return count > 0 ? Array.from({ length: count }, (_, i) => monthOf(first, i)) : [];
+}
+
 /** Whole days from `from` to `to` (negative when `to` is earlier). */
 export function daysBetween(from: ISODate, to: ISODate): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);

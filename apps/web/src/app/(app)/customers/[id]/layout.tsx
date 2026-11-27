@@ -14,7 +14,7 @@ import { removeCustomerAction } from "../actions";
 import { late } from "./shared";
 
 /** "Mar 2025" */
-const monthOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: currentZone() }); // "since Nov 2026", company time
+const monthYear = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: currentZone() }); // "since Nov 2026", company time
 
 /**
  * Every page of a customer shares one top (design: Record): ← Customers, the name with a status worked out
@@ -54,7 +54,7 @@ export default async function CustomerLayout({ children, params }: { children: R
                 {" · "}
                 {countryKnown ? countryName(c.country) : <span className="text-warn">Country not set</span>}
                 {c.defaultCurrency && ` · ${c.defaultCurrency}`}
-                {` · since ${monthOf(c.createdAt)}`}
+                {` · since ${monthYear(c.createdAt)}`}
               </>
             ),
             papers: (

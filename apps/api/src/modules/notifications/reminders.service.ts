@@ -4,7 +4,7 @@ import { ModuleRef } from "@nestjs/core";
 import { claimOnce, livePart, fromDbDate, fromDbDateOrNull, toDbDate } from "@kebo/database";
 import { orderNeeds, partToChase, PERMISSIONS, planStatus, REMINDER_HOUR, rowsOf, shippedOnOf, type Message, type MessageListRow } from "@kebo/shared";
 import { formatMinor } from "@kebo/money";
-import { addDays, dateIn, daysBetween } from "@kebo/utils";
+import { addDays, dateIn, daysBetween, monthEnd, monthStart } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
 import { Clock } from "../../common/time/clock.service";
@@ -357,10 +357,9 @@ export class RemindersService {
 
   /** Last month in numbers, against the month before, with a link to the full picture. */
   private async monthly(month: string) {
-    const [y, mo] = month.split("-").map(Number) as [number, number];
-    const to = `${month}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0")}`;
-    const prevTo = new Date(Date.UTC(y, mo - 1, 0)).toISOString().slice(0, 10);
-    const i = await this.insights(`${month}-01`, to, { from: `${prevTo.slice(0, 7)}-01`, to: prevTo });
+    const to = monthEnd(month);
+    const prevTo = monthEnd(monthStart(month, -1));
+    const i = await this.insights(monthStart(month), to, { from: monthStart(prevTo), to: prevTo });
     if (!i) return;
     const name = new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
     const m = (v: unknown) => (v === null || v === undefined ? null : `${i.currency} ${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);

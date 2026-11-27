@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
 import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button, linkClass, CountDot } from "@kebo/ui";
+import { monthOf } from "@kebo/utils";
 import { useFocusTrap } from "./dialog";
 import { FloatingMenu, useIsPhone } from "./floating";
 
@@ -40,12 +41,6 @@ export interface FilterMonth {
  * letters (a phone's keyboard too), short enough to feel at once when the typing stops. Enter looks at once. */
 export const SEARCH_PAUSE_MS = 600;
 
-/** A month and the one before or after it ("2026-11" → "2026-10"). */
-const step = (month: string, by: number) => {
-  const [y, m] = month.split("-").map(Number) as [number, number];
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-};
 const isMonth = (v: string) => /^\d{4}-\d{2}$/.test(v);
 
 /** A choice in a filter's menu: a tick on the one chosen now. */
@@ -168,8 +163,8 @@ function MonthStep({ m, onPick }: { m: FilterMonth; onPick: (name: string, value
   const button = useRef<HTMLButtonElement>(null);
   const go = (value: string) => onPick(m.name, value === m.base ? undefined : value || undefined);
   const month = isMonth(m.current) ? m.current : null;
-  const prev = month ? step(month, -1) : null;
-  const next = month && month < m.thisMonth ? step(month, 1) : null;
+  const prev = month ? monthOf(month, -1) : null;
+  const next = month && month < m.thisMonth ? monthOf(month, 1) : null;
   const arrow = "grid w-9 place-items-center text-text-2 outline-none hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-35";
   return (
     <span className="inline-flex h-10 shrink-0 items-stretch overflow-hidden rounded-[10px] border border-line-strong bg-surface text-md font-semibold max-sm:h-11">
