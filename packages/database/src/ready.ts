@@ -28,4 +28,5 @@ export const readyOnOf = (o: ReadyOrder): ISODate | null => orderReadyOn(idsOf(o
 export const readyByOf = (o: ReadyOrder) => readyBySupplier(idsOf(o), rowsOf(o));
 
 /** One supplier's ready date (no supplier: the order's). */
-export const supplierReadyOf = (o: ReadyOrder, supplierId: string | null): ISODate | null => supplierReadyOn(idsOf(o), rowsOf(o), supplierId);
+export const supplierReadyOf = (o: ReadyOrder, supplierId: string | null): ISODate | null =>
+  supplierReadyOn(idsOf(o), rowsOf(o), supplierId);

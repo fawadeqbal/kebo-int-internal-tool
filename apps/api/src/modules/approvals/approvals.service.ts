@@ -19,6 +19,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { day, money } from "../notifications/facts";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { customerAccess } from "../parties/customers.service";
+import { withNewNames } from "../../common/names/old-names";
 
 export const SUBMISSION_KINDS = ["payment", "expense"] as const;
 export type SubmissionKind = (typeof SUBMISSION_KINDS)[number];
@@ -49,6 +50,9 @@ const include = {
   files: liveFile,
 } satisfies Prisma.MoneySubmissionInclude;
 type Row = Prisma.MoneySubmissionGetPayload<{ include: typeof include }>;
+
+/** A submission's body as it was saved: one sent before "factory" became "supplier" says `factoryId`. */
+const saved = (body: Prisma.JsonValue): Record<string, unknown> => withNewNames((body ?? {}) as Record<string, unknown>);
 
 /** A body that failed its check: the same 422 and field errors the usual endpoint gives. */
 const parseBody = <S extends z.ZodType>(schema: S, body: unknown): z.infer<S> => schema.parse(body ?? {});
@@ -165,7 +169,7 @@ export class ApprovalsService {
   /* ---------------------------------------------------------------- the view */
 
   private summary(kind: string, body: Prisma.JsonValue) {
-    const b = (body ?? {}) as Record<string, unknown>;
+    const b = saved(body);
     const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : null);
     if (kind === "payment") {
       const amount = num(b.receivedAmount) ?? num(b.amount);
@@ -199,7 +203,7 @@ export class ApprovalsService {
     const inquiries = new Set<string>();
     for (const r of rows) {
       if (r.order) continue;
-      const b = (r.body ?? {}) as Record<string, unknown>;
+      const b = saved(r.body);
       if (typeof b.customerId === "string") ids.add(b.customerId);
       else if (typeof b.inquiryId === "string") inquiries.add(b.inquiryId);
     }
@@ -226,7 +230,7 @@ export class ApprovalsService {
     const kinds = await this.kindsFor(user);
     const { customers, byInquiry } = await this.customersOf(rows);
     return rows.map((r) => {
-      const b = (r.body ?? {}) as Record<string, unknown>;
+      const b = saved(r.body);
       const deal = !r.order && typeof b.inquiryId === "string" ? (byInquiry.get(b.inquiryId) ?? null) : null;
       const customer =
         r.order?.customer ??
@@ -379,7 +383,7 @@ export class ApprovalsService {
     summary: string,
     extra: { reason?: string | null; newValues?: Record<string, unknown> } = {},
   ) {
-    const b = (row.body ?? {}) as Record<string, unknown>;
+    const b = saved(row.body);
     await this.audit.record(tx, {
       userId: user.id,
       action: row.kind === "payment" ? "payment_approval" : "expense_approval",
@@ -549,7 +553,7 @@ export class ApprovalsService {
     const row = await this.forApprover(user, id);
     if (row.status !== "pending") throw new ConflictError(this.closedMessage(row.status));
     const kind = row.kind as SubmissionKind;
-    let body = row.body as Record<string, unknown>;
+    let body = saved(row.body);
     let orderId = row.orderId;
     if (input.body !== undefined)
       ({ body, orderId } = await this.checked(

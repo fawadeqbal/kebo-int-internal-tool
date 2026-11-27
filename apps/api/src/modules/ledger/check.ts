@@ -62,7 +62,8 @@ export async function ledgerCheck(db: Db, fx: MoneyCtx): Promise<LedgerCheck> {
   // Supplier parts of orders not cancelled: what we owe each supplier in each currency (paid-only parts too).
   const parts = await supplierPositionsSql(db, fx);
   const expected = new Map<string, Minor>();
-  for (const r of parts) expected.set(`${r.orderId}:${r.supplierId}:${r.currency}`, Math.round(r.owedMinor - r.paidMinor - r.takenOffMinor));
+  for (const r of parts)
+    expected.set(`${r.orderId}:${r.supplierId}:${r.currency}`, Math.round(r.owedMinor - r.paidMinor - r.takenOffMinor));
   const paidOnly = await db.$queryRaw<{ orderId: string; supplierId: string; currency: string; paid: string }[]>`
     select a.purchase_order_id as "orderId", m.party_id as "supplierId", m.currency::text, sum(a.share)::text as paid
       from allocations a join money_movements m on m.id = a.movement_id

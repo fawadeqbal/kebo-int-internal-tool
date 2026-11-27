@@ -4,6 +4,7 @@ import { z } from "zod";
 import { can, FLOW_STEPS, STEP_OF_ACTION } from "@kebo/shared";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import { changesOf } from "../../common/audit/changes";
+import { savedHistory } from "../../common/names/old-names";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
@@ -101,7 +102,7 @@ export class HistoryService {
     const paged = q.page !== undefined;
     const skip = paged && !q.step ? (q.page! - 1) * q.pageSize : 0;
     const [rows, counted] = await Promise.all([
-      this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: paged ? (q.step ? 2000 : q.pageSize) : 100 }),
+      this.prisma.db.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: paged ? (q.step ? 2000 : q.pageSize) : 100 }).then((all) => all.map(savedHistory)),
       paged && !q.step ? this.prisma.db.auditLog.count({ where }) : null,
     ]);
     const ids = [...new Set(rows.map((r) => r.userId).filter((v): v is string => !!v))];

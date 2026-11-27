@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { Request, Response } from "express";
 import { from, lastValueFrom, type Observable } from "rxjs";
 import { PrismaService } from "../../database/prisma.service";
+import { withNewNames } from "../names/old-names";
 
 /**
  * One-time keys for money saves. A client sends `Idempotency-Key: <key>` with a save (the web's forms one per
@@ -68,7 +69,8 @@ export class OnceInterceptor implements NestInterceptor {
       }
       if (row.answered_at) {
         res.setHeader("Idempotent-Replayed", "true");
-        return row.answer ?? undefined;
+        // An answer remembered before "factory" became "supplier" is given with today's names.
+        return withNewNames(row.answer) ?? undefined;
       }
       if (Date.now() - row.created_at.getTime() > LOST_MS) {
         throw new HttpException({ message: "We could not confirm that this went through. Check the list before saving it again." }, HttpStatus.CONFLICT);

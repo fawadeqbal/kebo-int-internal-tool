@@ -29,6 +29,7 @@ import { LimitsService } from "../../common/company/limits.service";
 import { companySnapshot, SettingsService } from "../settings/settings.service";
 import { orderAccess } from "../../common/auth/order-access";
 import { customerAccess } from "../parties/customers.service";
+import { savedHistory } from "../../common/names/old-names";
 
 export interface PaymentsQuery {
   from?: ISODate;
@@ -557,11 +558,13 @@ export class TreasuryService {
       : null;
     const detail = await this.detail(user, kind, id);
     // Each change made to it since it was recorded, with its reason (review 24 Nov: the page said only "Recorded").
-    const edits = await this.prisma.db.auditLog.findMany({
-      where: { action: { in: ["payment_edit", "payment_out_edit"] }, newValues: { path: ["paymentId"], equals: id } },
-      orderBy: { createdAt: "asc" },
-      select: { createdAt: true, reason: true, oldValues: true, newValues: true, user: { select: { name: true } } },
-    });
+    const edits = (
+      await this.prisma.db.auditLog.findMany({
+        where: { action: { in: ["payment_edit", "payment_out_edit"] }, newValues: { path: ["paymentId"], equals: id } },
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true, reason: true, oldValues: true, newValues: true, user: { select: { name: true } } },
+      })
+    ).map(savedHistory);
     return {
       ...row,
       // Its name in words (design rule 3: a title is never a number).

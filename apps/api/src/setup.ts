@@ -3,6 +3,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { ErrorFilter } from "./common/http/error.filter";
+import { oldPhoneNames } from "./common/names/old-names";
 import { ReadCache } from "./common/cache/read-cache";
 import { CompanyResolver } from "./common/company/company-resolver";
 import { CompanyContext } from "./common/company/company-context";
@@ -30,6 +31,8 @@ export function configureApp(app: INestApplication, env: Env) {
   // Room for the company stamp image in the settings (a data URL of up to ~400 KB).
   // The browser's Content-Security-Policy reports come as JSON of their own types (POST /api/telemetry/csp).
   (app as NestExpressApplication).useBodyParser("json", { limit: "1mb", type: ["application/json", "application/csp-report", "application/reports+json"] });
+  // A phone app from before "factory" became "supplier" still sends and reads the old field names (after the body is read).
+  app.use(oldPhoneNames());
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });
   app.useGlobalFilters(new ErrorFilter());
   // Which company the request works in; everything after runs inside it (see CompanyResolver).

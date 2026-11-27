@@ -11,6 +11,7 @@ import { CurrentUser, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
 import { inquiryAccess } from "../inquiries/inquiries.service";
 import { orderAccess } from "../../common/auth/order-access";
+import { newNames, savedHistory } from "../../common/names/old-names";
 
 /** The records whose cards count their edits (their history shows them too). */
 const EDIT_TYPES = ["inquiry", "factory_quote", "quotation", "order", "customer", "factory"] as const;
@@ -102,11 +103,13 @@ export class EditsService {
   /** Each card of the record: how often it was edited, the last edit, every edit (newest first), and how often each line was. */
   async of(user: SessionUser, type: EditType, id: string) {
     await this.check(user, type, id);
-    const rows = await this.prisma.db.auditLog.findMany({
+    const rows = (
+      await this.prisma.db.auditLog.findMany({
       where: { entityType: type, entityId: id, action: { in: [FIRST, EDIT] } },
       orderBy: { createdAt: "desc" },
       include: { user: { select: { id: true, name: true } } },
-    });
+    })
+    ).map(savedHistory);
     const cards: Record<
       string,
       {
@@ -125,8 +128,11 @@ export class EditsService {
         continue;
       }
       c.count += 1;
-      c.edits.push({ n: v.n ?? c.count, by: r.user?.name ?? null, at: r.createdAt.toISOString(), reason: r.reason, changes: v.changes ?? [], keys: v.keys ?? [], lines: v.lines ?? {} });
-      for (const k of v.keys ?? []) c.keys[k] = (c.keys[k] ?? 0) + 1;
+      // Field names saved before "factory" became "supplier" are read as today's.
+      const keys = newNames(v.keys ?? []);
+      const lines = Object.fromEntries(Object.entries(v.lines ?? {}).map(([line, fields]) => [line, newNames(fields)]));
+      c.edits.push({ n: v.n ?? c.count, by: r.user?.name ?? null, at: r.createdAt.toISOString(), reason: r.reason, changes: v.changes ?? [], keys, lines });
+      for (const k of keys) c.keys[k] = (c.keys[k] ?? 0) + 1;
     }
     return { cards };
   }
