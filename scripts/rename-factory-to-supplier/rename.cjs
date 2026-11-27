@@ -66,7 +66,7 @@ const prose = (text) =>
       // A file that moved is named by its new name (a route's folder is an address: it stays).
       const fileName = (t.slice(at).match(/^[A-Za-z0-9_.-]+/) || [""])[0];
       if (/\.(tsx?|mjs|cjs|json)$/.test(fileName.replace(/[.,;:)]+$/, ""))) return renIdent(w);
-      if (/[\/?&.\-`"'#[=]/.test(before)) return w;
+      if (/[\/?&.\-`"'#[=|]/.test(before) || after === "|") return w;
       const possessive = after === "'" && ((next === "s" && !/[A-Za-z0-9_]/.test(t[at + w.length + 2] || "")) || (/s$/.test(w) && !/[A-Za-z0-9_`"]/.test(next)));
       if (/[\-/=`"'\]]/.test(after) && !possessive) return w;
       if (after === "." && /[A-Za-z_]/.test(next)) return w;
