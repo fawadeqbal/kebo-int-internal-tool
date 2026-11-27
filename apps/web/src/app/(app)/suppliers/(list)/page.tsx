@@ -68,7 +68,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
         )
       : null,
     money
-      ? part("this year's buying", () =>
+      ? part("last year's buying", () =>
           api.get<SupplierGroups>("/insights/facts/factories/groups", {
             period: "all",
             by: "factory",

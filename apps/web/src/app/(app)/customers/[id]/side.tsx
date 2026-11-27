@@ -28,7 +28,7 @@ export async function CustomerSide({ id }: { id: string }) {
     customerOf(id),
     customerPaymentsOf(id),
     partyNotesOf("customers", id),
-    seesCosts ? part("what was spent on them", () => api.get<CustomerAccount>(`/customers/${id}/account`)) : null,
+    seesCosts ? part("where their money went", () => api.get<CustomerAccount>(`/customers/${id}/account`)) : null,
     // For "@" in a note: who can be told.
     part("the people to tell", () => getPeople()),
   ]);

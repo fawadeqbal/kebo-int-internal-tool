@@ -37,7 +37,8 @@ export default async function DealLayout({ children, params }: { children: React
   const base = `/inquiries/${d.id}`;
   const managers = can(me, "expenses.manage") && (await hasFeature("expenses"));
   const status = statusWords(d, facts, companyToday());
-  const next = inquiryNext(d, facts);
+  // The offers could not be read: no next step on a guess (the frame says what it could not load).
+  const next = isFailed(factsPart) ? null : inquiryNext(d, facts);
   const meta = [
     <span key="st" className={cn("font-semibold sm:whitespace-nowrap", TONE[status.tone])}>
       {status.text}

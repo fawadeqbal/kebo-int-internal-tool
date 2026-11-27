@@ -104,8 +104,9 @@ export default async function FollowUpsPage({
     part("the suppliers", () => allPages<{ id: string; name: string }>("/factories", {})),
     // The other of Mine / Everyone, for its tab's count (the same search).
     viewAll
-      ? part("the other tab's count", () => api
-          .get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 }))
+      ? part("the other tab's count", () =>
+          api.get<FollowUpList>("/follow-ups", { mine: everyone ? "true" : undefined, open: "true", ...filters, page: 1, pageSize: 1 }),
+        )
       : null,
   ]);
   const people = dataOf(peoplePart) ?? [];

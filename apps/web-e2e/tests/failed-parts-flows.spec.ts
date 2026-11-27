@@ -101,9 +101,12 @@ test.describe("an inquiry and the orders with their side reads failing", () => {
     expect(await accessibilityProblems(page), "the inquiry with failed parts meets WCAG 2.2 AA").toEqual([]);
   });
 
-  test("the orders list and board say the customers to choose from could not be read, and list the orders", async ({ page }) => {
+  test("the orders list and board say the customers to choose from could not be read, and show the orders", async ({ page }) => {
     await page.goto("/orders");
     await expect(page.getByText("Could not load the customers to choose from")).toBeVisible();
     await expect(page.locator("tr[data-href]").first()).toBeVisible();
+    await page.goto("/orders/board");
+    await expect(page.getByText("Could not load the customers to choose from")).toBeVisible();
+    await expect(page.getByText("This page could not load")).toHaveCount(0);
   });
 });

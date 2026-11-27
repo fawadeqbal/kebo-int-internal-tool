@@ -105,7 +105,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         )
       : null,
     insights
-      ? part("this year's sales", () =>
+      ? part("last year's sales", () =>
           api.get<OrderGroups>("/insights/facts/orders/groups", {
             period: "all",
             by: "company",
