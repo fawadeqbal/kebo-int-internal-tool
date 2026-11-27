@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Injectable, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { DomainError, monthEnd, monthStart, type ISODate } from "@kebo/utils";
+import { DomainError, isMonth, monthEnd, monthStart, type ISODate } from "@kebo/utils";
 import { fromDbDate, toDbDate } from "@kebo/database";
 import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -24,7 +24,7 @@ const closeInput = z.object({
   /** "2026-10": close through the end of that month; null: reopen every month. */
   month: z
     .string()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Choose a month")
+    .refine(isMonth, "Choose a month")
     .nullable(),
   reason: z.string().trim().max(500).optional(),
 });

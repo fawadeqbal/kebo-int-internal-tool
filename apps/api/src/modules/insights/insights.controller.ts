@@ -7,8 +7,9 @@ import type { SessionUser } from "../../common/auth/session-user";
 import { InsightsService } from "./insights.service";
 import { RemindersListService } from "./reminders-list.service";
 import { HomeService } from "./home.service";
+import { isMonth } from "@kebo/utils";
 
-const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Use a month like 2026-10");
+const month = z.string().refine(isMonth, "Use a month like 2026-10");
 const key = z.object({ key: z.string().min(1).max(120) });
 
 @ApiTags("insights")

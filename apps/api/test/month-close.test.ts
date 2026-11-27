@@ -31,6 +31,9 @@ describe("closing the books", () => {
     const sana = await signIn(app, "sana@example.com");
     await api(app, sana).put("/books/close", { month: latest.slice(0, 7) }).expect(403);
     await api(app, admin).put("/books/close", { month: today.slice(0, 7) }).expect(400);
+    // A month that does not exist is refused by the form's rule (isMonth), as it was by its pattern.
+    const bad = await api(app, admin).put("/books/close", { month: "2026-13" }).expect(422);
+    expect(bad.body.fieldErrors?.month).toEqual(["Choose a month"]);
     const made = await api(app, manager).post("/expenses", expense(latest));
     if (made.status !== 201) console.log("expense:", made.status, JSON.stringify(made.body));
     const before = made.body;

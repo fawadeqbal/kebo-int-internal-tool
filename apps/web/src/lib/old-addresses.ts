@@ -1,5 +1,6 @@
 import { buildHref } from "@kebo/ui";
 import { sectionOfTab } from "./insights-period";
+import { isMonth } from "@kebo/utils";
 
 /**
  * Where the old addresses go now that every tab is its own page (design page 33). Old links,
@@ -52,7 +53,8 @@ export function paymentsTabTarget(q: Query): string | null {
 
 /** Expenses was one list of every cost: what is not a cost of one order is Expenses, month by month (a year or a customer's filter is dropped). */
 export function companyCostsTarget(q: Query = {}): string {
-  const month = /^\d{4}-\d{2}$/.test(q.p ?? q.month ?? "") ? (q.p ?? q.month) : undefined;
+  const asked = q.p ?? q.month;
+  const month = isMonth(asked) ? asked : undefined;
   return buildHref("/money/company-costs", {}, { p: month, kind: q.category });
 }
 

@@ -12,6 +12,7 @@ import {
   startOfDayIn,
   formatReference,
   isISODate,
+  isMonth,
   parseReference,
   todayIn,
   ForbiddenError,
@@ -19,6 +20,26 @@ import {
 } from "../src";
 
 describe("dates", () => {
+  it("knows a month as an address writes it: 01 to 12 only", () => {
+    for (const m of ["2026-01", "2026-10", "2026-11", "2026-12", "1999-09"]) expect(isMonth(m)).toBe(true);
+    for (const m of [
+      "2025-13",
+      "2025-00",
+      "2026-20",
+      "2026-19",
+      "2025-1",
+      "2025-011",
+      "25-11",
+      "2025-11-01",
+      "2025",
+      "",
+      " 2025-11",
+      undefined,
+      null,
+      202511,
+    ])
+      expect(isMonth(m)).toBe(false);
+  });
   it("gives today in the business time zone", () => {
     const lateUtc = new Date("2026-10-26T20:30:00Z"); // already the 27th in Shanghai
     expect(todayIn("Asia/Shanghai", lateUtc)).toBe("2026-10-27");
