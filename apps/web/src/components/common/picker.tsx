@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Loader2, Plus, Search } from "lucide-react";
 import { Button, cn, controlClass, controlSizes, capsClass } from "@kebo/ui";
+import { failedWhenRejected, isFailed, type Failed } from "@/lib/failed";
 
 /** What a picker shows for one choice: its name, a grey line under it, and a short word at the end (a country). */
 export type PickerOption = { id: string; name: string };
@@ -56,9 +57,10 @@ export function Picker<T extends PickerOption>({
   /** Change on the card: back to the search. */
   onClear: () => void;
   onPick: (row: T) => void;
-  search: (q: string) => Promise<T[]>;
+  /** The rows found, or a Failed: the list says it could not search (never "no results"). */
+  search: (q: string) => Promise<T[] | Failed>;
   /** Shown before anything is typed. */
-  recent?: () => Promise<T[]>;
+  recent?: () => Promise<T[] | Failed>;
   recentTitle?: string;
   /** A group shown first (filtered by what is typed); its rows are left out of the results. */
   first?: PickerGroup<T>;
@@ -82,6 +84,8 @@ export function Picker<T extends PickerOption>({
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
+  // What could not be read (said in the list in place of "nothing found"), or null.
+  const [failed, setFailed] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -96,16 +100,18 @@ export function Picker<T extends PickerOption>({
     const t = setTimeout(
       async () => {
         setLoading(true);
-        const found = showRecent ? await recent!() : await search(q);
+        // A dropped connection is a failed search too (the call rejects), said in the list.
+        const found: T[] | Failed = await (showRecent ? recent!() : search(q)).catch(failedWhenRejected(`the ${listLabel.toLowerCase()}`));
         if (n !== call.current) return;
-        setRows(found);
+        setFailed(isFailed(found) ? found.what : null);
+        setRows(isFailed(found) ? [] : found);
         setActive(0);
         setLoading(false);
       },
       showRecent ? 0 : 200,
     );
     return () => clearTimeout(t);
-  }, [q, open, search, recent, showRecent]);
+  }, [q, open, search, recent, showRecent, listLabel]);
 
   useEffect(() => {
     if (!open) return;
@@ -147,7 +153,8 @@ export function Picker<T extends PickerOption>({
   const results = first ? rows.filter((r) => !first.rows.some((f) => f.id === r.id)) : rows;
   const all = [...firstRows, ...results];
   const exact = [...(first?.rows ?? []), ...rows].some((r) => r.name.toLowerCase() === low);
-  const offerNew = !!onNew && (!newOnlyWhenTyped || (!!typed && !exact));
+  // Not while the search failed: "+ New" could make a second of one that exists.
+  const offerNew = !failed && !!onNew && (!newOnlyWhenTyped || (!!typed && !exact));
   const count = all.length + (offerNew ? 1 : 0);
   const listId = `${id}-list`;
   const optionId = (i: number) => (i < all.length ? `${id}-${all[i]!.id}` : `${id}-new`);
@@ -201,7 +208,7 @@ export function Picker<T extends PickerOption>({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-invalid={!!error || undefined}
-        aria-activedescendant={open && active < count ? optionId(active) : undefined}
+        aria-activedescendant={open && active >= 0 && active < count ? optionId(active) : undefined}
         autoComplete="off"
         value={q}
         placeholder={placeholder}
@@ -216,13 +223,14 @@ export function Picker<T extends PickerOption>({
           if (e.key === "ArrowDown") {
             e.preventDefault();
             setOpen(true);
-            setActive((a) => Math.min(a + 1, count - 1));
+            // Never below 0: an empty list (a failed search, nothing found without "+ New") has no row to go to.
+            setActive((a) => Math.max(0, Math.min(a + 1, count - 1)));
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setActive((a) => Math.max(a - 1, 0));
           } else if (e.key === "Enter") {
             e.preventDefault();
-            if (open && active < count) take(active);
+            if (open && active >= 0 && active < count) take(active);
           } else if (e.key === "Escape") setOpen(false);
         }}
       />
@@ -235,7 +243,12 @@ export function Picker<T extends PickerOption>({
             {/* "Other suppliers" only after a first group: alone it named nothing (e2e 24 Nov). */}
             {results.length > 0 && (showRecent || typed || firstRows.length > 0) && group(showRecent ? recentTitle : typed ? `Results for “${typed}”` : othersTitle)}
             {results.map((r, k) => option(r, firstRows.length + k, line(r)))}
-            {!loading && all.length === 0 && (
+            {!loading && failed && (
+              <li role="presentation" className="px-2.5 py-3 text-sm text-bad">
+                Could not load {failed}. Type again to try once more.
+              </li>
+            )}
+            {!loading && !failed && all.length === 0 && (
               <li role="presentation" className="px-2.5 py-3 text-sm text-text-2">
                 {empty(typed)}
               </li>

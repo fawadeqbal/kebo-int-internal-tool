@@ -11,6 +11,7 @@ import type { ActionState } from "@/lib/actions";
 import { money } from "@/lib/format";
 import type { OptionView, QuoteOffers, RevisionDraft } from "@/lib/types-deals";
 import { RevisionEditor, type QuoteStep } from "./revision-editor";
+import type { Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -36,7 +37,7 @@ export function TermsPanel({
   number: number;
   initial: RevisionDraft;
   offers: QuoteOffers;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   showCosts: boolean;
   action: Action;
   /** A new revision ("Save draft"); else an edit of the draft ("Save changes"). */
@@ -88,7 +89,7 @@ export function QuoteStepsPanel({
   number: number;
   initial: RevisionDraft;
   offers: QuoteOffers;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   showCosts: boolean;
   action: Action;
   step: QuoteStep;
@@ -152,7 +153,7 @@ export function QuoteEdit({
   number: number;
   initial: RevisionDraft;
   offers: QuoteOffers;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   showCosts: boolean;
   action: Action;
 }) {

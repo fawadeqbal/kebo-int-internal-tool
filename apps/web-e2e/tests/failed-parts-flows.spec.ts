@@ -241,3 +241,21 @@ test.describe("reports' counts and the books' order list failing", () => {
     await expect(page.getByText("No orders yet")).toHaveCount(0);
   });
 });
+
+test.describe("a picker's search failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/customers" });
+
+  test("the customer picker says it could not search, never 'No customer matches', and offers no '+ New' (a second of one that exists)", async ({
+    page,
+  }) => {
+    await page.goto("/inquiries?panel=new-inquiry");
+    const win = page.getByRole("dialog", { name: "New inquiry" });
+    await win.locator("#customer").click();
+    const list = win.getByRole("listbox", { name: "Customers" });
+    await expect(list.getByText("Could not load the recent customers. Type again to try once more.")).toBeVisible();
+    await win.locator("#customer").fill("Medipharm");
+    await expect(list.getByText("Could not load the customers. Type again to try once more.")).toBeVisible();
+    await expect(list.getByText(/No customer matches/)).toHaveCount(0);
+    await expect(list.getByRole("option", { name: /New customer/ })).toHaveCount(0);
+  });
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChoiceChips } from "@/components/common/choice-chips";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Plus } from "lucide-react";
 import { fromMinor, priceForMargin, toMinor } from "@kebo/money";
@@ -15,6 +15,7 @@ import { date, money } from "@/lib/format";
 import type { OptionView, QuoteOffers } from "@/lib/types-deals";
 import { AcceptForm, ExpiredForm } from "./quotation-step";
 import { shortName } from "./offer-facts";
+import { failedWhenRejected, isFailed, type Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -44,7 +45,7 @@ export function NewQuotationsButton({
   only?: string | null;
   action: Action;
   offers: QuoteOffers | null;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   defaults: { currency: string; validUntil: string; margin: number };
   /** The letters of the quotations already made from each offer (by offer id). */
   usedIn: Record<string, string[]>;
@@ -89,7 +90,7 @@ function NewQuotationsForm({
   only: string | null;
   action: Action;
   first: QuoteOffers | null;
-  loadOffers: (currency: string) => Promise<QuoteOffers | null>;
+  loadOffers: (currency: string) => Promise<QuoteOffers | Failed | null>;
   defaults: { currency: string; validUntil: string; margin: number };
   usedIn: Record<string, string[]>;
   letters: string[];
@@ -122,10 +123,17 @@ function NewQuotationsForm({
     if (o.lines.some((l) => l.unitCost === null)) return null;
     return o.lines.reduce((t, l) => t + Number(fromMinor(priceForMargin(toMinor(l.unitCost!), m))) * Number(l.quantity), 0);
   };
+  // The offers' costs in the new currency; not read: the costs stay in the old one, and the field says so.
+  const [offersFailed, setOffersFailed] = useState<string | null>(null);
+  // The currency asked for last: a slower answer for an earlier one is not taken.
+  const askedFor = useRef(defaults.currency);
   const changeCurrency = async (c: string) => {
     setCurrency(c);
-    const more = await loadOffers(c);
-    if (more) setOffers(more);
+    askedFor.current = c;
+    const more = await loadOffers(c).catch(failedWhenRejected(`the offers' costs in ${c}`));
+    if (askedFor.current !== c) return;
+    setOffersFailed(isFailed(more) ? `Could not load ${more.what}: the costs shown are still in ${offers?.currency ?? "the old currency"}.` : null);
+    if (more && !isFailed(more)) setOffers(more);
   };
   const rows = [...(offers?.offers ?? []).map((o) => o.supplierQuoteId), "own"].filter((id) => ticked.includes(id));
   return (
@@ -184,7 +192,7 @@ function NewQuotationsForm({
                             </span>
                             {usedIn[o.supplierQuoteId]?.length ? <span className="mt-1 block text-xs font-semibold text-text-2 sm:hidden">In {usedIn[o.supplierQuoteId]!.join(" · ")}</span> : null}
                           </td>
-                          <td className="border-b border-line px-3 py-2.5 text-right align-top whitespace-nowrap tabular max-sm:pl-1">{o.totalCost === null ? "—" : money(o.totalCost, currency)}</td>
+                          <td className="border-b border-line px-3 py-2.5 text-right align-top whitespace-nowrap tabular max-sm:pl-1">{o.totalCost === null ? "—" : money(o.totalCost, offers?.currency ?? currency)}</td>
                           <td className="border-b border-line px-3 py-2.5 max-sm:hidden">
                             {usedIn[o.supplierQuoteId]?.length ? (
                               <span className="inline-flex rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-text-2">
@@ -215,7 +223,7 @@ function NewQuotationsForm({
             <fieldset className="flex flex-col gap-3">
               <legend className="mb-2 text-md font-semibold">Drafts</legend>
               <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Currency" htmlFor="nq-currency" error={s.errors?.currency}>
+                <Field label="Currency" htmlFor="nq-currency" error={s.errors?.currency ?? (offersFailed ? [offersFailed] : undefined)}>
                   <Select id="nq-currency" name="currency" value={currency} onChange={(e) => void changeCurrency(e.target.value)}>
                     {CURRENCIES.map((c) => (
                       <option key={c} value={c}>
@@ -256,7 +264,7 @@ function NewQuotationsForm({
                             <td className="border-b border-line px-3 py-2 font-semibold">{next[i]}</td>
                             <td className="border-b border-line px-3 py-2">{o ? shortName(o.factory.name) : "Own prices"}</td>
                             <td className="border-b border-line px-3 py-2 text-right whitespace-nowrap tabular">
-                              {id === "own" ? "To price" : total === null ? "—" : money(total, currency)}
+                              {id === "own" ? "To price" : total === null ? "—" : money(total, offers?.currency ?? currency)}
                             </td>
                           </tr>
                         );

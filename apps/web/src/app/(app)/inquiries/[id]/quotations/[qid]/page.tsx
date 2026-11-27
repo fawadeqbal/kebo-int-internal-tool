@@ -26,7 +26,7 @@ import { deleteDraftAction, emailRevisionAction, moveRevisionAction, offerPrices
 import { ActionForm } from "@/components/common/action-form";
 import { SubmitButton } from "@kebo/ui/client";
 import { inquiryTitle } from "@/lib/titles";
-import { dataOf, failedWhat, part } from "@/lib/part";
+import { dataOf, failedWhat, isFailed, part } from "@/lib/part";
 import { CouldNotLoad } from "@/components/common/could-not-load";
 
 export const generateMetadata = inquiryTitle("Quotation");
@@ -78,10 +78,11 @@ export default async function QuotationOwnPage({
   ]);
   const draftValues = dataOf(draftValuesPart);
   const startValues = dataOf(startValuesPart);
-  // The parts that could not be read, said once at the top (the rest works).
-  const failed = failedWhat(draftValuesPart, startValuesPart);
   const loadOffers = offersAction.bind(null, d.id);
-  const offers: QuoteOffers | null = manage || showCosts ? await loadOffers(draftValues?.currency ?? startValues?.currency ?? r.currency) : null;
+  const offersRead = manage || showCosts ? await loadOffers(draftValues?.currency ?? startValues?.currency ?? r.currency) : null;
+  const offers: QuoteOffers | null = isFailed(offersRead) ? null : offersRead;
+  // The parts that could not be read, said once at the top (the rest works).
+  const failed = failedWhat(draftValuesPart, startValuesPart, offersRead);
   const edit = isDraft && manage && !!draftValues && !!offers;
 
   // Send: the inquiry's drafts that are ready (every option priced) can go together.

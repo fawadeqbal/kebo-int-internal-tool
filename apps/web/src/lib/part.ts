@@ -1,15 +1,10 @@
 import "server-only";
 import { unstable_rethrow } from "next/navigation";
 import { ApiError } from "./api";
+import { isFailed, type Failed } from "./failed";
 
-/**
- * A part of a page that could not be read (Fawad, 27 Nov: "only the failed part says Could not load, the rest of
- * the page works"). Plain data, so it can be handed to a client component.
- */
-export type Failed = { readonly failed: true; readonly what: string };
-
-export const isFailed = (v: unknown): v is Failed =>
-  !!v && typeof v === "object" && (v as { failed?: unknown }).failed === true && typeof (v as { what?: unknown }).what === "string";
+// What a failed part is lives in lib/failed.ts, which client components may import too.
+export { isFailed, type Failed };
 
 /** Not there for this person: 403 (they may not see it) or 404 (it is not there). Left out, never a failure. */
 const missing = (e: unknown) => e instanceof ApiError && (e.status === 403 || e.status === 404);

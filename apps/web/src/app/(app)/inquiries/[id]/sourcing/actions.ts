@@ -7,6 +7,7 @@ import { attempt, formBody, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import { requireUser } from "@/lib/session";
 import type { SupplierOption, SupplierQuoteView } from "@/lib/types-deals";
+import { isFailed, part, type Failed } from "@/lib/part";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -50,13 +51,10 @@ export async function quickSupplierAction(v: QuickSupplier): Promise<QuickSuppli
 }
 
 /** Supplier picker: search the supplier list by name or contact person. */
-export async function searchSuppliersAction(q: string): Promise<SupplierOption[]> {
-  try {
-    const res = await api.get<Paged<SupplierOption>>("/factories", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
-    return res.rows.map((f) => ({ id: f.id, name: f.name, contactPerson: f.contactPerson }));
-  } catch {
-    return [];
-  }
+export async function searchSuppliersAction(q: string): Promise<SupplierOption[] | Failed> {
+  // Not read (logged): a Failed, and the picker says it could not search, never "none found".
+  const res = await part("the suppliers", () => api.get<Paged<SupplierOption>>("/factories", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 }));
+  return isFailed(res) ? res : (res?.rows ?? []).map((f) => ({ id: f.id, name: f.name, contactPerson: f.contactPerson }));
 }
 
 /**

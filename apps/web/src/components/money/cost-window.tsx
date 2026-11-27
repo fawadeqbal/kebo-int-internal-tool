@@ -35,6 +35,7 @@ import type { ExpenseView } from "@/lib/types-money";
 import { AccountSelect, RecordedBy, useMe } from "./accounts";
 import { useSaveThenSend } from "./attachment";
 import { COMPANY, costKind } from "./cost-kinds";
+import { failedWhenRejected, isFailed } from "@/lib/failed";
 
 /*
  * The one cost window (design "spending", board CostWindow): every place that adds or changes a cost opens it,
@@ -200,11 +201,14 @@ export function CostForm({
     send ? { customers: [], deals: [], orders: send.orders.map((o) => ({ id: o.id, refNo: o.refNo, dealId: "", customerId: "", customer: o.customer })), factories: [] } : (s0.choices ?? null),
   );
   const [loading, startLoading] = useTransition();
+  // Not read: said where the loading line was (the cost can still go on the company).
+  const [choicesFailed, setChoicesFailed] = useState<string | null>(null);
   useEffect(() => {
     if (choices || send) return;
     startLoading(async () => {
-      const c = await costChoicesAction();
-      if (c) setChoices(s0.choices?.customerId ? { ...c, customerId: s0.choices.customerId } : c);
+      const c = await costChoicesAction().catch(failedWhenRejected("the customers, inquiries, orders and suppliers"));
+      if (isFailed(c)) setChoicesFailed(c.what);
+      else if (c) setChoices(s0.choices?.customerId ? { ...c, customerId: s0.choices.customerId } : c);
     });
     // Once, when the window opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -373,6 +377,8 @@ export function CostForm({
           {/* For */}
           <div className="flex flex-col gap-2">
             <GroupLabel id="cost-for-label">For</GroupLabel>
+            {/* Every place and every way in (from a record too): the suppliers visited come with them. */}
+            {choicesFailed && <p className="text-xs text-bad">Could not load {choicesFailed}: close the window and open it again to try once more.</p>}
             {forLabel ? (
               <div className="flex items-center justify-between gap-3 rounded-[10px] border border-line bg-surface-2 px-3 py-2 text-sm">
                 <span className="min-w-0 truncate font-medium" aria-labelledby="cost-for-label">

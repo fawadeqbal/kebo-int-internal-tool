@@ -6,6 +6,7 @@ import { todayIn } from "@kebo/utils";
 import { attempt, formBody, formValues, reasonOf, type ActionState, onceOf } from "@/lib/actions";
 import { companyZone } from "@/lib/session";
 import type { ExpenseTargets } from "@/lib/types-money";
+import { part, type Failed } from "@/lib/part";
 import { EXPENSE_CATEGORY_LABEL } from "@kebo/shared";
 import { money } from "@/lib/format";
 
@@ -236,13 +237,12 @@ export async function expenseAction(
   };
 }
 
-/** What a cost can be for (customers, inquiries, orders) and the suppliers one visits: the cost window loads it when it opens. Null when this person may not see them. */
-export async function costChoicesAction(): Promise<ExpenseTargets | null> {
-  try {
-    return await api.get<ExpenseTargets>("/expenses/targets");
-  } catch {
-    return null;
-  }
+/**
+ * What a cost can be for (customers, inquiries, orders) and the suppliers one visits: the cost window loads it when
+ * it opens. Null when this person may not see them; a Failed when they could not be read (the window says so).
+ */
+export async function costChoicesAction(): Promise<ExpenseTargets | Failed | null> {
+  return part("the customers, inquiries, orders and suppliers", () => api.get<ExpenseTargets>("/expenses/targets"));
 }
 
 /** Removes the proof kept with a payment: `in` from a customer, `out` to a supplier. */
