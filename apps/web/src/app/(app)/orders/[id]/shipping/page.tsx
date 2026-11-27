@@ -14,6 +14,8 @@ import {
   trackingLink,
   type FreightTerms,
   type OrderSection,
+  shipmentIn,
+  shipmentLeft,
 } from "@kebo/shared";
 import { Badge, buttonClass, ButtonLink, cn, linkClass, Dash } from "@kebo/ui";
 import { date, money } from "@/lib/format";
@@ -411,14 +413,16 @@ export default async function OrderShipping({ params }: { params: Promise<{ id: 
             files: row("arrival"),
           },
         ];
-        // Where the shipment stands, in a word: the furthest part it has got to.
-        const word = s.clearedOn
-          ? { text: `Cleared ${dayMonth(s.clearedOn)}`, tone: "ok" as const }
-          : s.arrivedOn
-            ? { text: `Arrived ${dayMonth(s.arrivedOn)}`, tone: "ok" as const }
-            : s.departedOn
-              ? { text: `${leaves} ${dayMonth(s.departedOn)}`, tone: "info" as const }
-              : s.bookingNo
+        // Where the shipment stands, in a word: the furthest it has got, as its status says (the order's word reads
+        // the same: shipmentLeft, shipmentIn), with the day it happened. Cleared is a day typed on an arrived one.
+        const on = (d: string | null | undefined) => (d ? ` ${dayMonth(d)}` : "");
+        const word = shipmentIn(s.status ?? "planned")
+          ? s.clearedOn || s.status === "cleared"
+            ? { text: `Cleared${on(s.clearedOn)}`, tone: "ok" as const }
+            : { text: `Arrived${on(s.arrivedOn)}`, tone: "ok" as const }
+          : shipmentLeft(s.status ?? "planned")
+            ? { text: `${leaves}${on(s.departedOn)}`, tone: "info" as const }
+            : s.bookingNo
                 ? { text: "Booked", tone: "info" as const }
                 : { text: "Not booked yet", tone: "neutral" as const };
         return (

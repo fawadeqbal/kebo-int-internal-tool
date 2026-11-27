@@ -47,6 +47,8 @@ import {
   type SupplierTermsInput,
   leadWords,
   warrantyLine,
+  shipmentIn,
+  shipmentLeft,
 } from "@kebo/shared";
 import { fromMinor } from "@kebo/money";
 import { addDays, daysBetween, DomainError, ForbiddenError, GateError, NotFoundError } from "@kebo/utils";
@@ -138,8 +140,8 @@ export function factsOf(o: FlowRows, depositIn: boolean, papersOff: readonly str
     readyOn: readyOnOf(o),
     shipments: {
       total: o.shipments.length,
-      departed: o.shipments.filter((s) => ["departed", "arrived", "cleared"].includes(s.status)).length,
-      arrived: o.shipments.filter((s) => s.status === "arrived" || s.status === "cleared").length,
+      departed: o.shipments.filter((s) => shipmentLeft(s.status)).length,
+      arrived: o.shipments.filter((s) => shipmentIn(s.status)).length,
     },
     documents: { required: required.length, ready },
     bankSteps: { required: bankKinds.length, done: o.bankSteps.filter((b) => bankKinds.includes(b.step)).length },
@@ -1100,7 +1102,7 @@ export class FlowService {
     status: ShipmentStatus,
     departedOn: string | null | undefined,
   ): Promise<DomainEvent | null> {
-    if (status !== "departed" && status !== "arrived" && status !== "cleared") return null;
+    if (!shipmentLeft(status)) return null;
     if (!departedOn && !(await tx.shipment.findFirst({ where: { orderId, departedOn: { not: null } }, select: { id: true } })))
       await tx.shipment.update({ where: { id: shipmentId }, data: { departedOn: toDbDate(this.clock.today()) } });
     return this.orders.followFlow(tx, user, orderId, "shipped", "a shipment left");

@@ -5,6 +5,7 @@ import type { LcCheck } from "./money-route";
 import { daysBetween } from "@kebo/utils";
 import { documentDone, FLOW_STEP_LABEL, FLOW_STEPS, PAYMENT_ROUTE_LABEL, type FlowStep } from "./flow";
 import { documentsInUse } from "./papers";
+import { shipmentIn, shipmentLeft } from "./progress";
 
 /**
  * The order without checklists: an order's page is nine tabs, and each stage is
@@ -254,8 +255,6 @@ export interface StageWord {
   tab: string;
 }
 
-const LEFT = ["departed", "arrived", "cleared"];
-const IN = ["arrived", "cleared"];
 const OPEN_AT_BANK = ["opened", "amended", "documents_presented"];
 const latest = (days: (ISODate | null | undefined)[]): ISODate | null => days.filter((d): d is ISODate => !!d).sort().at(-1) ?? null;
 const earliest = (days: (ISODate | null | undefined)[]): ISODate | null => days.filter((d): d is ISODate => !!d).sort()[0] ?? null;
@@ -301,9 +300,9 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
   const leftOn = earliest(ships.map((s) => s.departedOn));
   const arrivedOn = latest(ships.map((s) => s.arrivedOn));
   const shipping: StageWord =
-    ships.length > 0 && ships.every((s) => IN.includes(s.status) || !!s.arrivedOn)
+    ships.length > 0 && ships.every((s) => shipmentIn(s.status))
       ? { word: arrivedOn ? `Arrived ${dayMonth(arrivedOn)}` : "Arrived", tone: "ok", tab: "arrived" }
-      : ships.some((s) => LEFT.includes(s.status) || !!s.departedOn)
+      : ships.some((s) => shipmentLeft(s.status))
         ? { word: `${sea ? "Sailed" : "Left"}${leftOn ? ` ${dayMonth(leftOn)}` : ""}`, tone: "info", tab: sea ? "sailed" : "left" }
         : ships.some((s) => !!s.bookingNo || !!s.forwarder)
           ? { word: "Booked", tone: "info", tab: "booked" }
@@ -465,7 +464,6 @@ export interface SectionReminderFacts {
   goods: { lines: number; received: number };
   fat?: SectionFacts["fat"];
   shipments: { status: string; departedOn: ISODate | null }[];
-  shippedOn?: ISODate | null;
   shipBy?: ISODate | null;
 }
 
@@ -493,7 +491,7 @@ export function sectionReminders(f: SectionReminderFacts, today: ISODate): Secti
     if (t.plannedOn && !t.doneOn && t.plannedOn < today)
       out.push({ key: "fat_late", tab: "production", due: t.plannedOn, text: `Factory test planned ${dayMonth(t.plannedOn)}${t.factory ? ` at ${t.factory}` : ""}: no result yet` });
   }
-  const left = f.shipments.some((s) => LEFT.includes(s.status) || !!s.departedOn) || !!f.shippedOn;
+  const left = f.shipments.some((s) => shipmentLeft(s.status));
   if (f.shipBy && f.shipBy < today && !left) out.push({ key: "ship_late", tab: "shipping", due: f.shipBy, text: `Ship by ${dayMonth(f.shipBy)} has passed: nothing has left yet` });
   return out;
 }

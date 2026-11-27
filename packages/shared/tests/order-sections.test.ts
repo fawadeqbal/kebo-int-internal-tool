@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { orderWord } from "../src/workflows/progress";
 import { editCardLabel, ORDER_SECTIONS, ORDER_SECTION_LABEL, ORDER_SECTION_TAB, ORDER_FLOW_STAGES, ORDER_TABS, orderSteps, sectionReminders, sectionStep, stageStands, stageWords, STEP_OF_ACTION, type SectionFacts } from "../src/workflows/order-sections";
 
 /** An order just made: bank transfer, 30% deposit, nothing done. */
@@ -252,6 +253,35 @@ describe("what the sections say is late", () => {
   it("our ship-by date passed and nothing has left", () => {
     expect(sectionReminders(fresh({ shipBy: "2026-11-24" }), TODAY).map((x) => x.key)).toEqual(["ship_late"]);
     expect(sectionReminders(fresh({ shipBy: "2026-11-24", shipments: [ship({ status: "departed", departedOn: "2026-11-23" })] }), TODAY)).toEqual([]);
+  });
+
+  it("the order's word, the Shipping tab's line and the reminders agree on whether the goods have left", () => {
+    const word = (status: string, departedOn: string | null) =>
+      orderWord({ status: "open", ordered: true, shipments: [{ status, left: !!departedOn }], delivered: false }, null);
+    const cases: [string, string | null, boolean][] = [
+      ["booked", null, false],
+      ["departed", "2026-11-23", true],
+      ["arrived", "2026-11-20", true],
+      // Set back to booked (a mistake corrected): the day it left is kept, and the goods have not left.
+      ["booked", "2026-11-23", false],
+    ];
+    for (const [status, departedOn, gone] of cases) {
+      const f = fresh({ shipBy: "2026-11-24", shipments: [ship({ status: status as never, departedOn })] });
+      expect(word(status, departedOn) === "Shipped" || word(status, departedOn) === "Arrived", `word for ${status}, ${departedOn}`).toBe(gone);
+      expect(["sailed", "left", "arrived"].includes(stageWords(f, TODAY).shipping.tab), `tab line for ${status}, ${departedOn}`).toBe(gone);
+      expect(sectionReminders(f, TODAY).some((r) => r.key === "ship_late"), `reminder for ${status}, ${departedOn}`).toBe(!gone);
+    }
+  });
+
+  it("and on whether they are in: an arrival day on a shipment still departed is not 'Arrived'; two shipments, one at sea", () => {
+    const words = (ships: { status: string; arrivedOn: string | null }[]) => ({
+      word: orderWord({ status: "open", ordered: true, shipments: ships.map((x) => ({ status: x.status, left: true })), delivered: false }, null),
+      tab: stageWords(fresh({ shipments: ships.map((x) => ship({ status: x.status as never, departedOn: "2026-11-10", arrivedOn: x.arrivedOn })) }), TODAY).shipping.tab,
+    });
+    expect(words([{ status: "arrived", arrivedOn: "2026-11-20" }])).toEqual({ word: "Arrived", tab: "arrived" });
+    expect(words([{ status: "departed", arrivedOn: "2026-11-20" }])).toEqual({ word: "Shipped", tab: "sailed" });
+    expect(words([{ status: "arrived", arrivedOn: "2026-11-20" }, { status: "departed", arrivedOn: null }])).toEqual({ word: "Shipped", tab: "sailed" });
+    expect(words([{ status: "arrived", arrivedOn: "2026-11-20" }, { status: "cleared", arrivedOn: "2026-11-21" }])).toEqual({ word: "Arrived", tab: "arrived" });
   });
 
   it("a closed order reminds of nothing", () => {
