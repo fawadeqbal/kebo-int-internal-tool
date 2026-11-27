@@ -98,9 +98,9 @@ export function periodOf(q: { period?: string; from?: string; to?: string }, tod
   return { kind, from, to, prevFrom, prevTo, label: spanLabel(from, to), vsLabel: shortSpan(prevFrom, prevTo), name };
 }
 
-/** The change from `before` to `now` in percent (null when there was nothing before). */
-export function change(now: number, before: number): number | null {
-  if (!Number.isFinite(now) || !Number.isFinite(before) || before === 0) return null;
+/** The change from `before` to `now` in percent (null when there was nothing before, or it could not be read). */
+export function change(now: number, before: number | null): number | null {
+  if (before === null || !Number.isFinite(now) || !Number.isFinite(before) || before === 0) return null;
   return Math.round(((now - before) / Math.abs(before)) * 100);
 }
 

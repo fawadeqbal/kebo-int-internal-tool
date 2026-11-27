@@ -1,5 +1,5 @@
 import "server-only";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { countryName } from "./countries";
 import { can, EXPENSE_CATEGORY_LABEL, type Permission } from "@kebo/shared";
 import { addDays, isMonth, lastMonths, monthEnd, monthsBetween, monthStart } from "@kebo/utils";
@@ -63,7 +63,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
     money ? maybe("what is due to suppliers", () => api.get<ToPayList>("/billing/to-pay", { dueBy: addDays(companyToday(), 7) })) : null,
     money ? maybe("the open bills", () => api.get<OpenBills>("/money/bills")) : null,
     money ? maybe("the cash", () => api.get<CashReport>("/money/cash-report", span)) : null,
-    money ? maybe("the cash", () => api.get<CashReport>("/money/cash-report", prev)) : null,
+    money ? maybe("the cash of the period before", () => api.get<CashReport>("/money/cash-report", prev)) : null,
     facts<Funnel>("funnel", span),
     facts<Funnel>("funnel", prev),
     drill ? facts<FactOrders>("orders", { ...drill, limit: 200 }) : Promise.resolve(null),
@@ -76,8 +76,13 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const company = (x: CashFacts) => sum(x.months, (m) => n(m.company));
   const profitOf = (g: OrderGroupRow | null, x: CashFacts) => (seeProfit ? n(g?.profitExpected) - company(x) : n(g?.profitQuote));
   // Managers: the money that moved (Reports › Cash). Others: what was paid on orders.
-  const collected = { now: report ? n(report.in.amount) : sum(cashNow.months, (m) => n(m.in)), before: reportBefore ? n(reportBefore.in.amount) : sum(cashBefore.months, (m) => n(m.in)) };
-  const paidOut = report ? { now: n(report.out.amount), before: reportBefore ? n(reportBefore.out.amount) : 0 } : null;
+  // The period before measured as now is; its report not read (named in `failed`): no comparison, never one
+  // against another figure or against 0.
+  const collected = {
+    now: report ? n(report.in.amount) : sum(cashNow.months, (m) => n(m.in)),
+    before: report ? (reportBefore ? n(reportBefore.in.amount) : null) : sum(cashBefore.months, (m) => n(m.in)),
+  };
+  const paidOut = report ? { now: n(report.out.amount), before: reportBefore ? n(reportBefore.out.amount) : null } : null;
   const months = lastMonths(p.to).map((m) => {
     const r = monthly.rows.find((x) => x.period === m);
     const own = n(monthlyCash.months.find((x) => x.month === m)?.company);
@@ -542,7 +547,8 @@ export async function loadPeople(p: Period, today: string) {
   ]);
   const targets = dataOf(targetsPart) ?? ({ people: [], targets: [] } as PeopleTargets);
   const companyTargets = dataOf(companyTargetsPart) ?? [];
-  const failed = failedWhat(targetsPart, companyTargetsPart);
+  // The parts that could not be read, for the page to name once with its own (failedWhat).
+  const failedParts = [targetsPart, companyTargetsPart].filter(isFailed);
   const c = ord.currency;
   const ym = today.slice(0, 7);
   const keys = new Set([
@@ -614,7 +620,7 @@ export async function loadPeople(p: Period, today: string) {
       ]),
     },
   ];
-  return { ...data, sheets, failed };
+  return { ...data, sheets, failedParts };
 }
 
 /* ------------------------------------------------------------------------------------------- Funnel */
@@ -640,12 +646,13 @@ export async function loadSpending(p: Period) {
   const leaks = dataOf(leaksPart);
   const soldBy = new Map((byPerson?.rows ?? []).map((r) => [r.key, n(r.sales)]));
   const soldIn = new Map((byMonth?.rows ?? []).map((r) => [r.period.slice(0, 7), n(r.sales)]));
-  const sold = [...soldIn.values()].reduce((t, v) => t + v, 0);
+  // What was sold, beside what was spent: null where it could not be read (a dash and the notice, never "0 sold").
+  const sold = byMonth ? [...soldIn.values()].reduce((t, v) => t + v, 0) : null;
   return {
     ...s,
     sold,
-    people: s.people.map((x) => ({ ...x, sold: soldBy.get(x.person.id) ?? 0 })),
-    months: s.months.map((m) => ({ ...m, sold: soldIn.get(m.month) ?? 0 })),
+    people: s.people.map((x) => ({ ...x, sold: byPerson ? (soldBy.get(x.person.id) ?? 0) : null })),
+    months: s.months.map((m) => ({ ...m, sold: byMonth ? (soldIn.get(m.month) ?? 0) : null })),
     costing: leaks?.customers.costing ?? null,
     failed: failedWhat(byPersonPart, byMonthPart, leaksPart),
   };
@@ -725,29 +732,42 @@ export async function loadFunnel(p: Period) {
 /* ------------------------------------------------------------------------------------------- Excel */
 
 /** "Excel" on an Insights section: the tables that section shows, for the same period (one tab each). */
+/**
+ * An export is the whole report or none: a part that could not be read stops it with what failed (the export
+ * route says it, as any refusal), since a workbook missing a sheet or a figure looks complete.
+ */
+function allOrNothing(d: { sheets: SheetSpec[]; failed?: string | null; failedParts?: unknown[] }): SheetSpec[] {
+  const failed = d.failed ?? failedWhat(...(d.failedParts ?? []));
+  if (failed) throw new ApiError(503, `Could not load ${failed}, so the file was not made. Try again in a minute.`);
+  return d.sheets;
+}
+
 export async function insightsSheets(q: Record<string, string | undefined>): Promise<SheetSpec[]> {
   const me = await api.get<{ permissions: Permission[] }>("/auth/me");
   const today = companyToday();
   const p = periodOf(q, today);
   // The Spending report, as the other reports (review 24 Nov, M-32: it had no Excel).
-  if (q.report === "spending") return spendingSheets(await loadSpending(p));
+  if (q.report === "spending") {
+    const s = await loadSpending(p);
+    return allOrNothing({ sheets: spendingSheets(s), failed: s.failed });
+  }
   const section: Section = (SECTIONS as readonly string[]).includes(q.section ?? "") ? (q.section as Section) : "overview";
   const money = can(me, "expenses.manage");
   switch (section) {
     case "overview":
-      return (await loadOverview(p, money)).sheets;
+      return allOrNothing(await loadOverview(p, money));
     case "money":
-      return (await loadProfit(p)).sheets;
+      return allOrNothing(await loadProfit(p));
     case "cash":
-      return (await loadCash(p)).sheets;
+      return allOrNothing(await loadCash(p));
     case "customers":
-      return (await loadCustomers(p, today)).sheets;
+      return allOrNothing(await loadCustomers(p, today));
     case "factories":
-      return (await loadSuppliers(p)).sheets;
+      return allOrNothing(await loadSuppliers(p));
     case "people":
-      return (await loadPeople(p, today)).sheets;
+      return allOrNothing(await loadPeople(p, today));
     case "funnel":
-      return (await loadFunnel(p)).sheets;
+      return allOrNothing(await loadFunnel(p));
   }
 }
 

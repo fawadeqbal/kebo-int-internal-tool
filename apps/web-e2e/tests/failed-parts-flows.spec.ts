@@ -140,3 +140,60 @@ test.describe("reports, the account and settings with a read failing", () => {
     await expect(page.getByText(/Only a Super Admin can see/)).toHaveCount(0);
   });
 });
+
+test.describe("money accounts, money waiting and a ledger entry failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/money/accounts,/submissions,/ledger/entries" });
+
+  test("Payments says the money waiting to be verified could not be read, not that none waits", async ({ page }) => {
+    await page.goto("/payments");
+    await expect(page.getByText("Could not load the money accounts to choose from")).toBeVisible();
+    await expect(page.getByText("Could not load the money waiting to be verified")).toBeVisible();
+    await expect(page.locator("tr[data-href]").first()).toBeVisible();
+  });
+
+  test("a ledger entry that could not be read still opens its window, and says so inside", async ({ page }) => {
+    await page.goto("/finance/ledger?panel=entry&id=00000000-0000-4000-8000-000000000001");
+    const entry = page.getByRole("dialog", { name: "Entry" });
+    await expect(entry).toBeVisible();
+    await expect(entry.getByText("Could not load the entry")).toBeVisible();
+  });
+});
+
+test.describe("staff's money form with the accounts failing", () => {
+  test.use({ storageState: { cookies: [], origins: [] }, userAgent: "Mozilla/5.0 (failed parts check) fail-api:/money/accounts" });
+
+  test("the form says the accounts could not be read, and offers no 'Add one' (there may well be one)", async ({ page }) => {
+    await page.goto("/login");
+    await page.locator("#email").fill("bilal@example.com");
+    await page.locator("#password").fill("Demo@12345");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL(/dashboard/);
+    await expect(page.getByText("Could not load the money accounts to choose from")).toBeVisible();
+    await page.getByRole("button", { name: "Add a cost" }).click();
+    const panel = page.getByRole("dialog", { name: /New cost/ });
+    // The account is asked for once it was paid from one.
+    await panel.getByRole("radio", { name: "Paid now" }).check();
+    await expect(panel.getByText("Could not load the accounts. It can still be recorded without one.")).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Add one" })).toHaveCount(0);
+  });
+});
+
+test.describe("Reports with the sales and the cash failing", () => {
+  test.use({ userAgent: "Mozilla/5.0 (failed parts check) fail-api:/insights/facts/orders/groups,/money/cash-report" });
+
+  test("Spending shows a dash for what was sold, never '0 sold' beside its notice", async ({ page }) => {
+    await page.goto("/reports/spending");
+    test.skip((await page.getByText(/Expenses are not switched on/).count()) > 0, "expenses are off in the demo data");
+    await expect(page.getByText("Could not load what each person sold and the sales by month")).toBeVisible();
+    await expect(page.getByText("the sales could not be read")).toBeVisible();
+    await expect(page.getByText(/on \S+ 0 sold/)).toHaveCount(0);
+  });
+
+  test("an Excel export is the whole report or none: it says what could not be read", async ({ page }) => {
+    await page.goto("/reports/cash");
+    const res = await page.request.get("/sheets/export/insights?section=cash");
+    test.skip(res.status() === 403, "Excel is not in the demo company's plan");
+    expect(res.status()).toBe(503);
+    expect(await res.text()).toContain("Could not load the cash report, so the file was not made");
+  });
+});

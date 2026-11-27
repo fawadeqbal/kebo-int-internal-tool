@@ -9,8 +9,8 @@ import { BarList, Delta, Tiles } from "./frame";
 import { how, reportSpan } from "@/lib/figures";
 
 const dash = <Dash />;
-/** Spent for every 100 sold, two decimals; a dash with nothing sold. */
-const per100 = (spent: number, sold: number) => (sold > 0 ? ((spent / sold) * 100).toFixed(2) : null);
+/** Spent for every 100 sold, two decimals; a dash with nothing sold, or the sales not read. */
+const per100 = (spent: number, sold: number | null) => (sold !== null && sold > 0 ? ((spent / sold) * 100).toFixed(2) : null);
 const MONTH = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 
 /**
@@ -24,14 +24,14 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
   const toSell = Number(d.toSell);
   const owing = d.people.filter((x) => Number(x.owed) > 0).sort((a, b) => Number(b.owed) - Number(a.owed));
   const everyone = d.people.reduce(
-    (t, x) => ({ spent: t.spent + Number(x.spent), toSell: t.toSell + Number(x.toSell), lost: t.lost + Number(x.lost), owed: t.owed + Number(x.owed), sold: t.sold + x.sold }),
-    { spent: 0, toSell: 0, lost: 0, owed: 0, sold: 0 },
+    (t, x) => ({ spent: t.spent + Number(x.spent), toSell: t.toSell + Number(x.toSell), lost: t.lost + Number(x.lost), owed: t.owed + Number(x.owed) }),
+    { spent: 0, toSell: 0, lost: 0, owed: 0 },
   );
   const lostDeals = d.lostReasons.reduce((t, r) => t + r.deals, 0);
   // What each figure counts, behind its ⓘ (lib/figures.ts).
   const span = reportSpan(p);
   // Months before anything was spent or sold are left out (the last three stay).
-  const firstBusy = d.months.findIndex((m) => Number(m.toSell) > 0 || m.sold > 0);
+  const firstBusy = d.months.findIndex((m) => Number(m.toSell) > 0 || (m.sold ?? 0) > 0);
   const months = d.months.slice(Math.min(firstBusy < 0 ? d.months.length : firstBusy, Math.max(0, d.months.length - 3)));
 
   return (
@@ -54,7 +54,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
         <StatTile
           label={`Per ${c} 100 sold`}
           value={per100(toSell, d.sold) === null ? "—" : `${c} ${per100(toSell, d.sold)}`}
-          sub={`on ${bigMoney(d.sold, c)} sold`}
+          sub={d.sold === null ? "the sales could not be read" : `on ${bigMoney(d.sold, c)} sold`}
           how={how.per100(span, c)}
         />
         <StatTile
@@ -101,7 +101,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                   <Td className="text-right tabular">{n0(x.spent)}</Td>
                   <Td className="text-right tabular">{Number(x.toSell) > 0 ? n0(x.toSell) : dash}</Td>
                   <Td className="text-right tabular">{Number(x.lost) > 0 ? n0(x.lost) : dash}</Td>
-                  <Td className="text-right tabular">{x.sold > 0 ? n0(x.sold) : dash}</Td>
+                  <Td className="text-right tabular">{x.sold ? n0(x.sold) : dash}</Td>
                   <Td className="text-right tabular">{per100(Number(x.toSell), x.sold) ?? dash}</Td>
                   <Td className={Number(x.owed) > 0 ? "text-right font-semibold text-warn tabular" : "text-right tabular"}>{Number(x.owed) > 0 ? n0(x.owed) : dash}</Td>
                 </Tr>
@@ -113,7 +113,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                 <td className="px-3.5 py-3 text-right tabular">{n0(everyone.spent)}</td>
                 <td className="px-3.5 py-3 text-right tabular">{n0(everyone.toSell)}</td>
                 <td className="px-3.5 py-3 text-right tabular">{n0(everyone.lost)}</td>
-                <td className="px-3.5 py-3 text-right tabular">{n0(d.sold)}</td>
+                <td className="px-3.5 py-3 text-right tabular">{d.sold === null ? "—" : n0(d.sold)}</td>
                 <td className="px-3.5 py-3 text-right tabular">{per100(everyone.toSell, d.sold) ?? "—"}</td>
                 <td className="px-3.5 py-3 text-right tabular">{n0(everyone.owed)}</td>
               </tr>
@@ -250,7 +250,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                 <Tr key={m.month}>
                   <Td>{MONTH.format(new Date(`${m.month}-01T00:00:00Z`))}</Td>
                   <Td className="text-right tabular">{n0(m.toSell)}</Td>
-                  <Td className="text-right tabular">{m.sold > 0 ? n0(m.sold) : dash}</Td>
+                  <Td className="text-right tabular">{m.sold ? n0(m.sold) : dash}</Td>
                   <Td className="text-right tabular">{per100(Number(m.toSell), m.sold) ?? dash}</Td>
                 </Tr>
               ))}

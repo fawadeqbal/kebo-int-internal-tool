@@ -23,8 +23,10 @@ interface Desk {
   meId: string;
   /** Whether this person may add an account (managers, with the cash book). */
   canAdd: boolean;
+  /** The accounts could not be read: each field says so, and offers no "Add one" (there may well be one). */
+  failed: boolean;
 }
-const DeskContext = createContext<Desk>({ accounts: [], me: "", meId: "", canAdd: false });
+const DeskContext = createContext<Desk>({ accounts: [], me: "", meId: "", canAdd: false, failed: false });
 
 /** Our accounts and the person signed in, for every money form on the page (loaded once by the app layout). */
 export function AccountsProvider({
@@ -32,15 +34,17 @@ export function AccountsProvider({
   me = "",
   meId = "",
   canAdd = false,
+  failed = false,
   children,
 }: {
   accounts: AccountOption[];
   me?: string;
   meId?: string;
   canAdd?: boolean;
+  failed?: boolean;
   children: ReactNode;
 }) {
-  return <DeskContext.Provider value={{ accounts, me, meId, canAdd }}>{children}</DeskContext.Provider>;
+  return <DeskContext.Provider value={{ accounts, me, meId, canAdd, failed }}>{children}</DeskContext.Provider>;
 }
 
 /** The person signed in: { id, name }. */
@@ -109,7 +113,7 @@ export function AccountSelect({
   /** The payment's method: a cash account for a bank transfer (or the other way round) is questioned. */
   method?: string | null;
 }) {
-  const { accounts, canAdd } = useContext(DeskContext);
+  const { accounts, canAdd, failed } = useContext(DeskContext);
   const fits = accounts.filter((a) => a.currency === currency && (!a.archived || a.id === defaultValue));
   const given = fits.some((a) => a.id === defaultValue) ? (defaultValue ?? "") : "";
   // The account used last for this currency on this computer (the browser's storage, read after the page is drawn).
@@ -140,7 +144,9 @@ export function AccountSelect({
       error={error}
       className={className}
       hint={
-        adding ? undefined : fits.length === 0 ? (
+        adding ? undefined : failed ? (
+          "Could not load the accounts. It can still be recorded without one."
+        ) : fits.length === 0 ? (
           <>
             No {currency} account yet.{" "}
             {canAdd ? (

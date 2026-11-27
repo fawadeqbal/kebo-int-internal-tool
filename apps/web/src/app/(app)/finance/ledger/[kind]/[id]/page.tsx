@@ -307,7 +307,12 @@ export default async function PartyLedgerPage({
           {sp.removed === "1" ? "Hide removed" : "Show removed"}
         </Link>
       </p>
-      {isFailed(entryPart) && <CouldNotLoad what={entryPart.what} />}
+      {/* Not read: its window still opens (a click on a row that does nothing looks broken), and says so inside. */}
+      {isFailed(entryPart) && (
+        <EntryPanel title="Entry" description="From the books">
+          <CouldNotLoad what={entryPart.what} />
+        </EntryPanel>
+      )}
       {entry && (
         <EntryPanel
           title={`${entry.ref || `Entry ${entry.entryNo}`} · ${entry.typeLabel}`}

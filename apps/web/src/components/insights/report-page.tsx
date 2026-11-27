@@ -251,7 +251,7 @@ async function Body({
       const [d, sPart] = await Promise.all([loadPeople(p, today), seeMoney ? spendingOf(p) : null]);
       const s = dataOf(sPart);
       // The spending beside it, and the targets inside it.
-      const failed = [failedWhat(sPart), d.failed].filter(Boolean).join(" and ") || null;
+      const failed = failedWhat(sPart, ...d.failedParts);
       const spend = s ? new Map(s.people.map((x) => [x.person.id, { spent: Number(x.spent), owed: Number(x.owed) }])) : null;
       return (
         <>

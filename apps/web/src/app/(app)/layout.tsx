@@ -100,7 +100,7 @@ export default async function AppLayout({ children, window: win }: { children: R
             </button>
           </form>
         )}
-        {isFailed(accountsPart) && <CouldNotLoad what={accountsPart.what} />}
+        {isFailed(accountsPart) && <CouldNotLoad what={accountsPart.what} className="no-print" />}
         {company?.notices.map((n) => (
           <Notice key={n.text} tone={n.tone === "danger" ? "bad" : n.tone === "warn" ? "todo" : "info"} className="no-print">
             {n.text}
@@ -112,7 +112,13 @@ export default async function AppLayout({ children, window: win }: { children: R
           </Notice>
         )}
         <FeaturesProvider features={company?.features ?? null}>
-          <AccountsProvider accounts={accounts} me={me.name} meId={me.id} canAdd={has("expenses.manage") && feature("cash_book")}>
+          <AccountsProvider
+            accounts={accounts}
+            failed={isFailed(accountsPart)}
+            me={me.name}
+            meId={me.id}
+            canAdd={has("expenses.manage") && feature("cash_book")}
+          >
             {children}
             {win}
           </AccountsProvider>

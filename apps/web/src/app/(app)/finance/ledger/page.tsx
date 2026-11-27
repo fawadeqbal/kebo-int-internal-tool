@@ -107,7 +107,12 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       ) : (
         <Parties side={view === "customers" ? "receivable" : view === "factories" ? "payable" : "staff"} />
       )}
-      {isFailed(entryPart) && <CouldNotLoad what={entryPart.what} />}
+      {/* Not read: its window still opens (a click on a row that does nothing looks broken), and says so inside. */}
+      {isFailed(entryPart) && (
+        <EntryPanel title="Entry" description="From the books">
+          <CouldNotLoad what={entryPart.what} />
+        </EntryPanel>
+      )}
       {entry && (
         <EntryPanel
           title={`${entry.ref || `Entry ${entry.entryNo}`} · ${entry.typeLabel}`}

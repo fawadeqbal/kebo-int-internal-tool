@@ -125,7 +125,8 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
     transfer: <>Both accounts change at once; a transfer between currencies keeps the rate you enter.</>,
   };
   const planPart = orderId && (kind === "in" || kind === "out") ? await part("the order's payment plan", () => orderMoneyOf(orderId)) : null;
-  // Not read: the payment can still be recorded; what is due on the order is not shown, and it says so.
+  // Not read: what is due on the order is not shown here, and it says so. (The form beside it reads the same plan,
+  // cached once per request, so a failed plan is that page's error page as well, as before.)
   const plan = dataOf(planPart);
   return (
     <>

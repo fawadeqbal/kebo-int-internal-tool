@@ -143,7 +143,6 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   return (
     <div>
       <RecordLanding />
-        {failed && <CouldNotLoad what={failed} />}
         <RecordShell
           top={
             <RecordTop
@@ -190,6 +189,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
         >
           <>
             <RecordSection id="overview" className={RULES.page.stack}>
+              {failed && <CouldNotLoad what={failed} />}
               <PerformanceCard kind="user" id={u.id} me={me} />
               <DetailsCard
                 flash={sp.saved === u.id}
