@@ -146,8 +146,9 @@ export async function shareSentAction(dealId: string, revisionId: string, via: S
 /** The offers with costs in another currency (the editor asks when the quotation currency changes). */
 export async function offersAction(dealId: string, currency: string): Promise<QuoteOffers | Failed | null> {
   // A Failed: the editor says the costs are still in the old currency (they were kept silently before).
-  return part("the offers' costs in that currency", () =>
-    api.get<QuoteOffers>(`/inquiries/${dealId}/quotation/offers`, { currency: currency.trim().toUpperCase().slice(0, 3) }),
+  const code = currency.trim().toUpperCase().slice(0, 3);
+  return part(`the offers' costs in ${code}`, () =>
+    api.get<QuoteOffers>(`/inquiries/${dealId}/quotation/offers`, { currency: code }),
   );
 }
 

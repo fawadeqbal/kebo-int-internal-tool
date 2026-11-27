@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { Button, capsClass, cn, Field, Input, Notice, Textarea, linkClass } from "@kebo/ui";
 import type { SupplierOption } from "@/lib/types-deals";
 import type { QuickSupplier, QuickSupplierResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
-import { isFailed, type Failed } from "@/lib/failed";
+import { failedWhenRejected, isFailed, type Failed } from "@/lib/failed";
 
 /** Enter in these small inputs must not save the whole offer. */
 const noSubmit = (e: KeyboardEvent) => {
@@ -48,7 +48,7 @@ export function NewSupplierForm({
     if (name.length < 3) return;
     let live = true;
     const t = setTimeout(async () => {
-      const list = await search(name);
+      const list = await search(name).catch(failedWhenRejected("the suppliers"));
       const words = name
         .toLowerCase()
         .split(/\s+/)

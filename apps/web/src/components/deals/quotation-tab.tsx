@@ -1,7 +1,7 @@
 "use client";
 
 import { ChoiceChips } from "@/components/common/choice-chips";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Plus } from "lucide-react";
 import { fromMinor, priceForMargin, toMinor } from "@kebo/money";
@@ -15,7 +15,7 @@ import { date, money } from "@/lib/format";
 import type { OptionView, QuoteOffers } from "@/lib/types-deals";
 import { AcceptForm, ExpiredForm } from "./quotation-step";
 import { shortName } from "./offer-facts";
-import { isFailed, type Failed } from "@/lib/failed";
+import { failedWhenRejected, isFailed, type Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -125,9 +125,13 @@ function NewQuotationsForm({
   };
   // The offers' costs in the new currency; not read: the costs stay in the old one, and the field says so.
   const [offersFailed, setOffersFailed] = useState<string | null>(null);
+  // The currency asked for last: a slower answer for an earlier one is not taken.
+  const askedFor = useRef(defaults.currency);
   const changeCurrency = async (c: string) => {
     setCurrency(c);
-    const more = await loadOffers(c);
+    askedFor.current = c;
+    const more = await loadOffers(c).catch(failedWhenRejected(`the offers' costs in ${c}`));
+    if (askedFor.current !== c) return;
     setOffersFailed(isFailed(more) ? `Could not load ${more.what}: the costs shown are still in ${offers?.currency ?? "the old currency"}.` : null);
     if (more && !isFailed(more)) setOffers(more);
   };
@@ -188,7 +192,7 @@ function NewQuotationsForm({
                             </span>
                             {usedIn[o.supplierQuoteId]?.length ? <span className="mt-1 block text-xs font-semibold text-text-2 sm:hidden">In {usedIn[o.supplierQuoteId]!.join(" · ")}</span> : null}
                           </td>
-                          <td className="border-b border-line px-3 py-2.5 text-right align-top whitespace-nowrap tabular max-sm:pl-1">{o.totalCost === null ? "—" : money(o.totalCost, currency)}</td>
+                          <td className="border-b border-line px-3 py-2.5 text-right align-top whitespace-nowrap tabular max-sm:pl-1">{o.totalCost === null ? "—" : money(o.totalCost, offers?.currency ?? currency)}</td>
                           <td className="border-b border-line px-3 py-2.5 max-sm:hidden">
                             {usedIn[o.supplierQuoteId]?.length ? (
                               <span className="inline-flex rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-text-2">

@@ -78,10 +78,10 @@ export default async function QuotationOwnPage({
   ]);
   const draftValues = dataOf(draftValuesPart);
   const startValues = dataOf(startValuesPart);
-  // The parts that could not be read, said once at the top (the rest works).
   const loadOffers = offersAction.bind(null, d.id);
   const offersRead = manage || showCosts ? await loadOffers(draftValues?.currency ?? startValues?.currency ?? r.currency) : null;
   const offers: QuoteOffers | null = isFailed(offersRead) ? null : offersRead;
+  // The parts that could not be read, said once at the top (the rest works).
   const failed = failedWhat(draftValuesPart, startValuesPart, offersRead);
   const edit = isDraft && manage && !!draftValues && !!offers;
 

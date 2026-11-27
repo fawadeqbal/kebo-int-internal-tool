@@ -43,7 +43,7 @@ import type { EditCard, EditRef } from "@/lib/types-edits";
 import { ITEM_COLUMNS, itemsBody, useItemRows } from "./items-sheet";
 import { rowKey } from "./form-bits";
 import { useFileViewer } from "@/components/files/viewer";
-import { isFailed, type Failed } from "@/lib/failed";
+import { failedWhenRejected, isFailed, type Failed } from "@/lib/failed";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
 
@@ -146,6 +146,7 @@ export function DealForm({
   const [v, setV] = useState<DealFormValues>(initial);
   const [contacts, setContacts] = useState<ContactOption[]>(initialContacts);
   const [contactsFailed, setContactsFailed] = useState<string | null>(null);
+  const chosenNow = useRef<string | null>(null);
   const [otherCategory, setOtherCategory] = useState(
     () => !!initial.category && !categories.some((c) => c.toLowerCase() === initial.category.toLowerCase()),
   );
@@ -192,8 +193,12 @@ export function DealForm({
     set("customer", c);
     set("contactId", "");
     setContacts([]);
+    setContactsFailed(null);
+    chosenNow.current = c?.id ?? null;
     if (!c) return;
-    const read = known ?? (await loadContacts(c.id));
+    const read = known ?? (await loadContacts(c.id).catch(failedWhenRejected("their contacts")));
+    // Another customer chosen meanwhile: its own read answers for it.
+    if (chosenNow.current !== c.id) return;
     // Not read: no contact to choose, and the field says why (never "no contacts").
     setContactsFailed(isFailed(read) ? read.what : null);
     const list = isFailed(read) ? [] : read;
@@ -1114,7 +1119,7 @@ function NewCustomerForm({
     if (name.length < 3) return;
     let live = true;
     const t = setTimeout(async () => {
-      const list = await search(name);
+      const list = await search(name).catch(failedWhenRejected("the customers"));
       const words = name
         .toLowerCase()
         .split(/\s+/)
@@ -1151,7 +1156,7 @@ function NewCustomerForm({
   }, [onReady]);
 
   const use = async (m: { id: string; label: string }) => {
-    const read = await search(m.label);
+    const read = await search(m.label).catch(failedWhenRejected("the customers"));
     const found = isFailed(read) ? undefined : read.find((c) => c.id === m.id);
     onUse(found ?? { id: m.id, name: m.label, country: UNKNOWN_COUNTRY, primaryContact: null });
   };

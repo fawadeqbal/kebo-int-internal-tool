@@ -242,7 +242,7 @@ export async function expenseAction(
  * it opens. Null when this person may not see them; a Failed when they could not be read (the window says so).
  */
 export async function costChoicesAction(): Promise<ExpenseTargets | Failed | null> {
-  return part("the customers, inquiries and orders", () => api.get<ExpenseTargets>("/expenses/targets"));
+  return part("the customers, inquiries, orders and suppliers", () => api.get<ExpenseTargets>("/expenses/targets"));
 }
 
 /** Removes the proof kept with a payment: `in` from a customer, `out` to a supplier. */

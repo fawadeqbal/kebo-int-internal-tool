@@ -43,7 +43,7 @@ describe("a picker whose search failed", () => {
     fireEvent.focus(screen.getByRole("combobox"));
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "Medi" } });
     expect(await screen.findByText("Could not load the customers. Type again to try once more.", {}, { timeout: 2000 })).toBeTruthy();
-    expect(warn.mock.calls[0]?.[0]).toBe("[picker] could not search Customers: Failed to fetch");
+    expect(warn.mock.calls[0]?.[0]).toBe("[failed] could not load the customers: Failed to fetch");
   });
 
   it("nothing found is still 'none', with '+ New'", async () => {
@@ -52,5 +52,20 @@ describe("a picker whose search failed", () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "Medi" } });
     expect(await screen.findByText("No customer matches “Medi”", {}, { timeout: 2000 })).toBeTruthy();
     expect(screen.getByRole("option", { name: /New customer/ })).toBeTruthy();
+  });
+});
+
+describe("the keys on an empty list", () => {
+  it("↓ and Enter after a failed search do nothing (they crashed the page: no row -1)", async () => {
+    picker(async () => failed);
+    const box = screen.getByRole("combobox");
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: "Medi" } });
+    await screen.findByText("Could not load the customers. Type again to try once more.", {}, { timeout: 2000 });
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(box.getAttribute("aria-activedescendant")).toBeNull();
+    expect(screen.getByText("Could not load the customers. Type again to try once more.")).toBeTruthy();
   });
 });

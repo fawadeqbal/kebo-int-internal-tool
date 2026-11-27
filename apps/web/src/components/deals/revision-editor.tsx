@@ -49,7 +49,7 @@ import { PANEL_FORM, PanelSection, useReportDirty, WindowFooter } from "@/compon
 import { StepsFooter, StepsFrame, type StepInfo } from "@/components/common/steps-frame";
 import { PriceSheet, PriceTotals } from "./price-editor";
 import { shortName } from "./offer-facts";
-import { isFailed, type Failed } from "@/lib/failed";
+import { failedWhenRejected, isFailed, type Failed } from "@/lib/failed";
 import {
   CheckNote,
   LeadInputs,
@@ -525,6 +525,12 @@ export function RevisionEditor({
     setMargin(text);
     const m = marginOf(text);
     if (m === null) return;
+    // The offers' costs still in another currency (their read in this one failed): a margin on them would save
+    // prices in the wrong currency, so none are set, and the note says why.
+    if (offers.currency !== s.currency) {
+      setConverted({ ok: false, text: `The offers' costs are still in ${offers.currency}, so the margin cannot price them in ${s.currency}. Change the currency again to try once more.` });
+      return;
+    }
     setS((st) => ({ ...st, options: pricedAll(st, offers, m) }));
     setPricedAt(m);
   };
@@ -540,7 +546,8 @@ export function RevisionEditor({
   const addOption = (supplierQuoteId: string | null) => {
     const offer = offers.offers.find((o) => o.supplierQuoteId === supplierQuoteId);
     const lines = offer?.lines ?? offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
-    const prices = priced(lines, {}, marginOk ? marginNumber : offers.defaultMargin);
+    // Costs still in another currency (see priceEveryOffer): added without prices, to be typed.
+    const prices = offers.currency !== s.currency ? {} : priced(lines, {}, marginOk ? marginNumber : offers.defaultMargin);
     setS((st) => ({ ...st, options: [...st.options, offer ? newOption(offer, prices) : { ...newOption(null, prices) }] }));
   };
 
@@ -548,6 +555,7 @@ export function RevisionEditor({
   /** The note under the currency after a change: what was converted, or why the numbers were kept. */
   const [converted, setConverted] = useState<{ text: string; ok: boolean } | null>(null);
   const typedIn = useRef<{ currency: string; options: OptionState[]; shown: string } | null>(null);
+  const offersFor = useRef<string | null>(null);
   /**
    * Another currency: every price, discount and charge is converted at the
    * Settings rates (USD 1,000 → PKR 280,000), and the supplier costs are
@@ -583,8 +591,11 @@ export function RevisionEditor({
           }
         : { ok: false, text: `No exchange rate between ${now} and ${to} in Settings: the numbers were kept as they are.` },
     );
+    offersFor.current = to;
     if (loadOffers && to !== offers.currency) {
-      const next = await loadOffers(to);
+      const next = await loadOffers(to).catch(failedWhenRejected(`the offers' costs in ${to}`));
+      // Another currency chosen meanwhile: its own read answers for it.
+      if (offersFor.current !== to) return;
       // Not read: the costs shown are still in the old currency, and the note says so.
       if (isFailed(next))
         setConverted((c) => ({ ok: false, text: `${c ? `${c.text} ` : ""}Could not load ${next.what}: the costs shown are still in ${offers.currency}.` }));
