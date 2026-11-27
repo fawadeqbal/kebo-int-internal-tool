@@ -5,15 +5,6 @@
  * screens cannot say different things about the same order.
  */
 export type OrderWord = "Confirmed" | "In production" | "Shipped" | "Arrived" | "Delivered" | "Done" | "Cancelled";
-export const ORDER_WORD_TONE: Record<OrderWord, "ok" | "info" | "warn" | "neutral"> = {
-  Confirmed: "warn",
-  "In production": "info",
-  Shipped: "info",
-  Arrived: "info",
-  Delivered: "ok",
-  Done: "ok",
-  Cancelled: "neutral",
-};
 
 /** The board's column (and the list's chip) a word falls under: arrived and delivered orders are still under Shipped until closed. */
 export const orderWordColumn = (w: OrderWord): "confirmed" | "in_production" | "shipped" | "done" =>

@@ -31,7 +31,8 @@ const next = (f: Partial<OrderStepFacts>) => orderNextStep({ ...base, ...f }, to
 describe("the order record type", () => {
   it("has the pill the lists and the board show for every state", () => {
     for (const [w, s] of Object.entries(ORDER.states)) expect(s.words).toBe(w);
-    expect(ORDER.states.Confirmed.tone).toBe(ORDER_WORD_TONE.Confirmed);
+    // Today's colours, word by word (ORDER_WORD_TONE is made from ORDER.states, so this pins both).
+    expect(ORDER_WORD_TONE).toEqual({ Confirmed: "warn", "In production": "info", Shipped: "info", Arrived: "info", Delivered: "ok", Done: "ok", Cancelled: "neutral" });
     expect(ORDER.states.Delivered.tone).toBe("ok");
   });
 });
