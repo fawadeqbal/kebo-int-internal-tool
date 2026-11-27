@@ -487,10 +487,11 @@ export class AccountsService {
   async spendingReport(user: SessionUser, q: { from?: ISODate; to?: ISODate; prevFrom?: ISODate; prevTo?: ISODate }) {
     this.assertManager(user);
     const today = this.clock.today();
-    // Never past today (as the cash report): an end far ahead only made a months list of every month up to it.
+    // Never past today: an end far ahead only made a months list of every month up to it. A period that starts
+    // after its end (one wholly ahead of today, or typed backwards) has nothing in it, as before: no costs, no months.
+    // The period to compare with (prevFrom, prevTo) is only summed, so it is read as asked.
     const to = q.to && q.to < today ? q.to : today;
-    const asked = q.from ?? `${to.slice(0, 4)}-01-01`;
-    const from = asked <= to ? asked : to;
+    const from = q.from ?? `${to.slice(0, 4)}-01-01`;
     const { sales } = await this.settings.get();
     const select = {
       category: true,
