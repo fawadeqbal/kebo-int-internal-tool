@@ -63,7 +63,7 @@ export interface ExpenseChoices {
   customers: { id: string; name: string }[];
   deals: { id: string; refNo: string; title: string; stage: InquiryStage; customerId: string; customer: string }[];
   orders: { id: string; refNo: string; dealId: string; customerId: string; customer: string }[];
-  factories: { id: string; name: string }[];
+  suppliers: { id: string; name: string }[];
   /** On a customer's page: the cost is always on this customer (or one of their inquiries or orders). */
   customerId?: string;
 }
@@ -88,7 +88,7 @@ export interface CostSetup {
 /** A cost being changed, or copied ("Add again"): the order's view and the general one both carry these. */
 export type CostToChange = Pick<
   ExpenseView,
-  "id" | "category" | "description" | "amount" | "currency" | "rate" | "spentOn" | "paidBy" | "reference" | "note" | "receipt" | "borneBy" | "ownMoney" | "payLater" | "payee" | "repaid" | "factory" | "account" | "updatedAt"
+  "id" | "category" | "description" | "amount" | "currency" | "rate" | "spentOn" | "paidBy" | "reference" | "note" | "receipt" | "borneBy" | "ownMoney" | "payLater" | "payee" | "repaid" | "supplier" | "account" | "updatedAt"
 > & { repeats?: boolean };
 
 /** A month of a cost that comes every month, to confirm with what was paid. */
@@ -198,7 +198,7 @@ export function CostForm({
   const [dealId, setDealId] = useState(start?.place === "deal" ? (start.id ?? "") : "");
   const [orderId, setOrderId] = useState(start?.place === "order" ? (start.id ?? "") : "");
   const [choices, setChoices] = useState<ExpenseChoices | null>(
-    send ? { customers: [], deals: [], orders: send.orders.map((o) => ({ id: o.id, refNo: o.refNo, dealId: "", customerId: "", customer: o.customer })), factories: [] } : (s0.choices ?? null),
+    send ? { customers: [], deals: [], orders: send.orders.map((o) => ({ id: o.id, refNo: o.refNo, dealId: "", customerId: "", customer: o.customer })), suppliers: [] } : (s0.choices ?? null),
   );
   const [loading, startLoading] = useTransition();
   // Not read: said where the loading line was (the cost can still go on the company).
@@ -242,7 +242,7 @@ export function CostForm({
   // On an order: who bears it, and the supplier (visited, or the one that bears it).
   const onSetupOrder = place === "order" && !!s0.order && orderId === (s0.for?.place === "order" ? s0.for.id : null);
   const [bearer, setBearer] = useState<ExpenseBearer>(from?.borneBy ?? "us");
-  const [supplierId, setSupplierId] = useState(from?.factory?.id ?? "");
+  const [supplierId, setSupplierId] = useState(from?.supplier?.id ?? "");
   const [repeats, setRepeats] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -286,10 +286,10 @@ export function CostForm({
 
   const suppliers = (() => {
     if (bearer === "factory" && onSetupOrder) return s0.order!.factories;
-    const all = choices?.factories ?? s0.order?.factories ?? [];
-    return from?.factory && !all.some((f) => f.id === from.factory!.id) ? [from.factory, ...all] : all;
+    const all = choices?.suppliers ?? s0.order?.factories ?? [];
+    return from?.supplier && !all.some((f) => f.id === from.supplier!.id) ? [from.supplier, ...all] : all;
   })();
-  const asksSupplier = !send && (bearer === "factory" || VISITS.includes(category) || !!from?.factory) && (suppliers.length > 0 || bearer === "factory");
+  const asksSupplier = !send && (bearer === "factory" || VISITS.includes(category) || !!from?.supplier) && (suppliers.length > 0 || bearer === "factory");
 
   const base = send ? submitCostAction : expenseAction.bind(null, null, expense?.id ?? null, expense?.updatedAt ?? null);
   const save = useSaveThenSend(

@@ -217,7 +217,7 @@ function lineView(l: LineRow, no: string, show: LineShows) {
     unit: l.unit,
     unitPrice: l.unitPrice.toFixed(2),
     lineTotal: l.lineTotal.toFixed(2),
-    factory: l.supplier ?? null,
+    supplier: l.supplier ?? null,
     /** The papers' customs side: the customer's and China's HS codes, the item in Chinese and who wrote it. */
     customs: { hsCode: l.hsCode, hsCodeCn: l.hsCodeCn, descriptionZh: l.descriptionZh, zhBy: (l.zhBy as "machine" | "staff" | null) ?? null },
     receivedQty: trimQty(l.receivedQty),
@@ -906,7 +906,7 @@ export class OrdersService {
       const po = pos.find((p) => p.supplierId === q.supplierId);
       const terms = offerTermsOf(q, sales.supplierAdvancePercent);
       return {
-        factory: q.supplier,
+        supplier: q.supplier,
         offer: { id: q.id, reference: q.reference, receivedOn: fromDbDate(q.receivedOn) },
         basis: po ? po.basis : q.basis,
         basisPlace: po ? po.basisPlace : q.basisPlace,
@@ -1062,7 +1062,7 @@ export class OrdersService {
       kind: f.kind,
       note: f.note,
       uploadedOn: f.createdAt.toISOString(),
-      factory: quotes.find((q) => q.id === f.supplierQuoteId)!.supplier.name,
+      supplier: quotes.find((q) => q.id === f.supplierQuoteId)!.supplier.name,
     }));
   }
 
@@ -1236,7 +1236,7 @@ export class OrdersService {
         for (const p of plans.get(i.id) ?? []) {
           const n = p.next;
           if (!n?.due || (n.status !== "due" && n.status !== "late")) continue;
-          if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.factory.name}: ${n.label} ${formatMinor(toMinor(n.open), p.currency)}`, due: n.due, late: n.due < today };
+          if (!i.needs || n.due < i.needs.due) i.needs = { title: `Pay ${p.supplier.name}: ${n.label} ${formatMinor(toMinor(n.open), p.currency)}`, due: n.due, late: n.due < today };
         }
       }
     }

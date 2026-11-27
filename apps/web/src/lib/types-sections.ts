@@ -25,7 +25,7 @@ export interface OrderSectionsView {
 }
 
 export interface SupplierProduction {
-  factory: { id: string; name: string } | null;
+  supplier: { id: string; name: string } | null;
   readyOn: string | null;
   readyToldOn: string | null;
   readyToldVia: RequestChannel | null;

@@ -20,7 +20,7 @@ export function owedBySupplier<F extends SupplierRef>(
   // The one formula (supplierPosition), without payments or expenses: only what the lines owe.
   const rows = supplierPositionOf({ lines: lines.map((l) => ({ ...l, supplierId: l.supplier?.id ?? null })), supplierPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
   const suppliers = new Map(lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : [])));
-  return new Map(rows.map((r) => [r.key, { factory: suppliers.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
+  return new Map(rows.map((r) => [r.key, { supplier: suppliers.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
 }
 
 const planLines = {
@@ -106,14 +106,14 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
   for (const l of o.lines) if (l.supplier) names.set(l.supplier.id, l.supplier);
   for (const r of o.payables) names.set(r.supplier!.id, r.supplier!);
   const positions = supplierPositionOf(o, fx).filter((r) => r.lines > 0);
-  const owed = new Map(positions.map((r) => [r.key, { factory: names.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));
+  const owed = new Map(positions.map((r) => [r.key, { supplier: names.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));
   for (const r of o.payables) {
     const key = `${r.supplierId}:${r.currency}`;
     if (!owed.has(key)) {
       const paid = o.supplierPaid
         .filter((p) => `${p.movement.partyId}:${p.movement.currency}` === key)
         .reduce((t, p) => t + decimalToMinor(p.share), 0);
-      owed.set(key, { factory: r.supplier!, currency: r.currency!, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
+      owed.set(key, { supplier: r.supplier!, currency: r.currency!, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
     }
   }
   const orderedOn = fromDbDateOrNull(o.supplierOrderedOn);
@@ -131,11 +131,11 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
           dueOn: fromDbDateOrNull(r.dueOn),
           dueDays: r.dueDays,
         }))
-      : startingPlan(o.lines, f.factory.id, advancePercent, f.owedMinor).map((r) => ({ ...r, id: null, supplierRef: null }));
+      : startingPlan(o.lines, f.supplier.id, advancePercent, f.owedMinor).map((r) => ({ ...r, id: null, supplierRef: null }));
     const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
     // This supplier's own ready date (one per supplier; the order's is the latest).
-    const readyOn = supplierReadyOf(o, f.factory.id);
+    const readyOn = supplierReadyOf(o, f.supplier.id);
     const status = supplierPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays, shippedOn);
     const paidBy = paymentsOnParts(
       rows,
@@ -143,7 +143,7 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
     );
     const next = status.find((r) => r.status !== "paid") ?? null;
     return {
-      factory: f.factory,
+      supplier: f.supplier,
       currency: f.currency,
       /** The supplier's ready date ("on the ready date" rows fall due then). */
       readyOn,
@@ -217,9 +217,9 @@ export async function seedSupplierPlans(tx: Tx, orderId: string, advancePercent:
   for (const [key, f] of owedBySupplier(o.lines)) {
     if (f.owedMinor <= 0 || o.payables.some((r) => `${r.supplierId}:${r.currency}` === key)) continue;
     await tx.invoice.createMany({
-      data: startingPlan(o.lines, f.factory.id, advancePercent, f.owedMinor).map((r, i) => ({
+      data: startingPlan(o.lines, f.supplier.id, advancePercent, f.owedMinor).map((r, i) => ({
         purchaseOrderId: orderId,
-        supplierId: f.factory.id,
+        supplierId: f.supplier.id,
         label: r.label,
         percent: r.percent,
         amount: fromMinor(r.amountMinor),

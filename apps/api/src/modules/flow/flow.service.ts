@@ -414,7 +414,7 @@ export class FlowService {
         readyOn: readyOnOf(o),
         /** Each supplier's own ready date (the order's is the latest of them). */
         readyBy: readyByOf(o).map((r) => ({ supplierId: r.supplierId, name: suppliers.find((f) => f.id === r.supplierId)?.name ?? null, readyOn: r.readyOn })),
-        factories: suppliers,
+        suppliers: suppliers,
       },
       shipping: has("shipping") ? { shipments } : null,
       documents: has("bank_documents") ? { set: documents, bankSteps } : null,
@@ -741,7 +741,7 @@ export class FlowService {
         const sentOn = p.sentOn ? fromDbDate(p.sentOn) : o.supplierOrderedOn ? fromDbDate(o.supplierOrderedOn) : null;
         const offer = lines.map((l) => l.quoteLine?.supplierQuoteLine?.supplierQuote).find((q) => !!q) ?? null;
         const agreed = supplierAgreed(p, offer);
-        const plan = plans.find((pl) => pl.factory.id === p.supplier.id);
+        const plan = plans.find((pl) => pl.supplier.id === p.supplier.id);
         return {
           id: p.id,
           number: p.number,

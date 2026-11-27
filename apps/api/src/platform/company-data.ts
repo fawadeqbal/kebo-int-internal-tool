@@ -232,9 +232,9 @@ export class CompanyDataService {
       >`select count(*) as total, count(*) filter (where created_at >= ${since}) as recent from inquiries where company_id = ${companyId}::uuid and deleted_at is null`,
       db.$queryRaw<{ n: bigint; open: bigint }[]>`
         select count(*) as n, count(*) filter (where status = 'open') as open from orders where company_id = ${companyId}::uuid and status <> 'cancelled'`,
-      db.$queryRaw<{ customers: bigint; factories: bigint }[]>`
+      db.$queryRaw<{ customers: bigint; suppliers: bigint }[]>`
         select (select count(*) from parties p join party_roles r on r.party_id = p.id and r.role = 'customer' where p.company_id = ${companyId}::uuid and p.deleted_at is null) as customers,
-               (select count(*) from parties p join party_roles r on r.party_id = p.id and r.role = 'supplier' where p.company_id = ${companyId}::uuid and p.deleted_at is null) as factories`,
+               (select count(*) from parties p join party_roles r on r.party_id = p.id and r.role = 'supplier' where p.company_id = ${companyId}::uuid and p.deleted_at is null) as suppliers`,
       db.$queryRaw<
         {
           id: string;
@@ -264,7 +264,7 @@ export class CompanyDataService {
       orders: Number(orders[0]?.n ?? 0),
       openOrders: Number(orders[0]?.open ?? 0),
       customers: Number(records[0]?.customers ?? 0),
-      factories: Number(records[0]?.factories ?? 0),
+      suppliers: Number(records[0]?.suppliers ?? 0),
       /** People who can sign in without two-step sign-in. */
       twoStepOff: people.filter((p) => p.is_active && !p.two_step).length,
       people: people.map((p) => ({

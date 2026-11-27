@@ -274,7 +274,7 @@ export class FactsService implements OnModuleDestroy {
       const ids = orders.slice(i, i + BATCH);
       const rows = await orderFactsOf(tx, ids, ctx);
       await this.sync(tx, ORDER, rows.orders, Prisma.sql`order_id = any(${ids}::uuid[])`);
-      await this.sync(tx, SUPPLIER, rows.factories, Prisma.sql`order_id = any(${ids}::uuid[])`);
+      await this.sync(tx, SUPPLIER, rows.suppliers, Prisma.sql`order_id = any(${ids}::uuid[])`);
     }
     const inquiries = [...new Set(inquiryIds)];
     for (let i = 0; i < inquiries.length; i += BATCH) {
@@ -299,9 +299,9 @@ export class FactsService implements OnModuleDestroy {
       const ids = orderIds.slice(i, i + BATCH);
       await this.locked(async (tx) => {
         const rows = await orderFactsOf(tx, ids, await this.ctx(tx));
-        supplierRows += rows.factories.length;
+        supplierRows += rows.suppliers.length;
         differences.push(...(await this.sync(tx, ORDER, rows.orders, Prisma.sql`order_id = any(${ids}::uuid[])`)));
-        differences.push(...(await this.sync(tx, SUPPLIER, rows.factories, Prisma.sql`order_id = any(${ids}::uuid[])`)));
+        differences.push(...(await this.sync(tx, SUPPLIER, rows.suppliers, Prisma.sql`order_id = any(${ids}::uuid[])`)));
       });
     }
     for (let i = 0; i < inquiryIds.length; i += BATCH) {
@@ -321,7 +321,7 @@ export class FactsService implements OnModuleDestroy {
       if (orphans.length) {
         const rows = await orderFactsOf(tx, orphans, await this.ctx(tx));
         differences.push(...(await this.sync(tx, ORDER, rows.orders, Prisma.sql`order_id = any(${orphans}::uuid[])`)));
-        differences.push(...(await this.sync(tx, SUPPLIER, rows.factories, Prisma.sql`order_id = any(${orphans}::uuid[])`)));
+        differences.push(...(await this.sync(tx, SUPPLIER, rows.suppliers, Prisma.sql`order_id = any(${orphans}::uuid[])`)));
       }
       if (started !== null) await tx.$executeRaw`delete from facts_queue where seq <= ${started}`;
     });

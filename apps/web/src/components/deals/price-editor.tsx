@@ -95,7 +95,7 @@ export function PriceSheet({
 
   const priceAll = () => marginOk && setS((st) => ({ ...st, options: pricedAll(st, offers, marginNumber) }));
 
-  const nameOf = (o: OptionState) => (o.supplierQuoteId ? (offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.factory.name ?? "a removed offer") : "the customer's items");
+  const nameOf = (o: OptionState) => (o.supplierQuoteId ? (offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.supplier.name ?? "a removed offer") : "the customer's items");
 
   /* ---------- the lines */
   const priceKeys = (i: number, attr: string) => (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -203,7 +203,7 @@ export function PriceSheet({
       >
         <span className="flex items-baseline justify-between gap-3">
           <span className="min-w-0 truncate text-sm font-semibold" title={nameOf(o)}>
-            {optionLetter(i)} · {off ? shortName(off.factory.name) : o.supplierQuoteId ? "removed offer" : "by hand"}
+            {optionLetter(i)} · {off ? shortName(off.supplier.name) : o.supplierQuoteId ? "removed offer" : "by hand"}
           </span>
           <span className="shrink-0 text-sm font-semibold tabular">{fmt(t.totals.total)}</span>
         </span>
@@ -242,7 +242,7 @@ export function PriceSheet({
           <Card aria-label={`Option ${letter} items`}>
             <div className="border-b border-line px-4 py-3">
               <h3 className={cn(subTitleClass, "max-sm:hidden")}>
-                Option {letter} · {opt.supplierQuoteId ? (offer ? `items from ${offer.factory.name}'s offer` : "an offer that was removed") : "the customer's items"}
+                Option {letter} · {opt.supplierQuoteId ? (offer ? `items from ${offer.supplier.name}'s offer` : "an offer that was removed") : "the customer's items"}
               </h3>
               <h3 className={cn(subTitleClass, "sm:hidden")}>Items</h3>
               <p className="mt-0.5 text-xs text-muted max-sm:hidden">

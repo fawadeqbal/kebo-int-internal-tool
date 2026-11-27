@@ -367,7 +367,7 @@ export class RemindersListService {
           {
             readyOn: readyOnOf(o),
             goods: { lines: o.lines.length, received: o.lines.filter((l) => Number(l.receivedQty) >= Number(l.quantity)).length },
-            fat: o.suppliers.map((f) => ({ factory: f.supplier?.name ?? null, plannedOn: fromDbDateOrNull(f.fatPlannedOn), doneOn: fromDbDateOrNull(f.fatDoneOn), result: null })),
+            fat: o.suppliers.map((f) => ({ supplier: f.supplier?.name ?? null, plannedOn: fromDbDateOrNull(f.fatPlannedOn), doneOn: fromDbDateOrNull(f.fatDoneOn), result: null })),
             shipments: o.shipments.map((sh) => ({ status: sh.status, departedOn: fromDbDateOrNull(sh.departedOn) })),
             shipBy: fromDbDateOrNull(o.shipBy),
           },

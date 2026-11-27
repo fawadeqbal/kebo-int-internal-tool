@@ -208,7 +208,7 @@ export function AcceptForm({
   const [optionId, setOptionId] = useState(options.length === 1 ? options[0]!.id : (options[0]?.id ?? ""));
   const chosen = options.find((o) => o.id === optionId);
   const rest = options.filter((o) => o.id !== optionId);
-  const suppliers = chosen?.factory ? [chosen.factory.name] : [];
+  const suppliers = chosen?.supplier ? [chosen.supplier.name] : [];
   return (
     <ActionForm
       action={action}
@@ -240,7 +240,7 @@ export function AcceptForm({
                   <span className="min-w-0 flex-1">
                     <strong className="block text-base">
                       Option {o.letter}
-                      {o.factory ? ` · ${o.factory.name}` : ""}
+                      {o.supplier ? ` · ${o.supplier.name}` : ""}
                     </strong>
                     <span className="block text-xs text-muted">
                       {[`${o.lines.length} item${o.lines.length === 1 ? "" : "s"}`, o.leadTime, o.costing?.marginPercent != null ? `margin ${o.costing.marginPercent.toFixed(1)}%` : null].filter(Boolean).join(" · ")}

@@ -216,7 +216,7 @@ export class QuotationsService {
       });
       return {
         supplierQuoteId: q.id,
-        factory: q.supplier,
+        supplier: q.supplier,
         currency: q.currency,
         /** What the supplier's prices already pay for (EXW, FOB…), and where. */
         basis: q.basis,
@@ -287,7 +287,7 @@ export class QuotationsService {
       letter: o.letter,
       status: o.status,
       /** The supplier whose offer this is (internal; null when priced from the customer's items). */
-      factory: seeCosts ? (o.supplierQuote?.supplier ?? null) : null,
+      supplier: seeCosts ? (o.supplierQuote?.supplier ?? null) : null,
       supplierQuoteId: seeCosts ? o.supplierQuoteId : null,
       leadTime: o.leadTime,
       /** The lead time we promise as days from a moment (null: only its words, an older option). */
@@ -683,7 +683,7 @@ export class QuotationsService {
           action: "create",
           entityType: "quotation",
           entityId: rev.id,
-          summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} from ${offer ? `${offer.factory.name}'s offer` : "own prices"} — ${formatMinor(toMinor(built[0]!.option.total), input.currency)}`,
+          summary: `${q.refNo} R${number} drafted for ${inquiry.refNo} from ${offer ? `${offer.supplier.name}'s offer` : "own prices"} — ${formatMinor(toMinor(built[0]!.option.total), input.currency)}`,
         });
         out.push({ id: q.id, refNo: q.refNo, letter: q.letter, revisionId: rev.id, number });
       }

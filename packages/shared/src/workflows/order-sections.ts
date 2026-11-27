@@ -175,7 +175,7 @@ export interface StoredFacts {
    * Money owed to the suppliers, or null when the person may not see supplier money; `plan`: its payment
    * plan's parts (advance when ordered, balance on the ready date) with where each stands.
    */
-  factories:
+  suppliers:
     | {
         name: string;
         currency: string;
@@ -192,7 +192,7 @@ export interface StoredFacts {
   /** The order's ready date: the latest of its suppliers', once each has given one. */
   readyOn: ISODate | null;
   /** Each supplier's own ready date (one per supplier; one row, supplier null, when the lines name none). */
-  readyBy?: { factory: string | null; readyOn: ISODate | null }[];
+  readyBy?: { supplier: string | null; readyOn: ISODate | null }[];
   goods: { lines: number; received: number };
   packedAt: ISODate | null;
   packing: { packages: number; grossKg: string | null; cbm: string | null } | null;
@@ -239,7 +239,7 @@ export interface SectionFacts extends StoredFacts {
   /** Our promise to the customer. */
   shipBy?: ISODate | null;
   /** Each supplier's test: planned, done, how it went. */
-  fat?: { factory: string | null; plannedOn: ISODate | null; doneOn: ISODate | null; result: FatResult | null }[];
+  fat?: { supplier: string | null; plannedOn: ISODate | null; doneOn: ISODate | null; result: FatResult | null }[];
 }
 
 /** "5 Dec": a day without its year, for a word on a tab. */
@@ -279,7 +279,7 @@ export function stageWords(f: SectionFacts, today: ISODate): Record<(typeof ORDE
           : { word: "Nothing in", tone: "warn", tab: "nothing in" };
 
   // Supplier order: sent, then paid (the money only for people who may see it).
-  const supplierPaid = !!f.factories?.length && f.factories.every((x) => Number(x.toPay) === 0 && Number(x.paid) > 0);
+  const supplierPaid = !!f.suppliers?.length && f.suppliers.every((x) => Number(x.toPay) === 0 && Number(x.paid) > 0);
   const supplier: StageWord = !f.supplierOrderedOn
     ? { word: "Not sent", tone: "neutral", tab: "not sent" }
     : supplierPaid
@@ -381,7 +381,7 @@ export function stageStands(f: SectionFacts, today: ISODate): StageStand[] {
         );
 
   // Supplier order
-  const fac = f.factories ?? [];
+  const fac = f.suppliers ?? [];
   const names = list(fac.map((x) => x.name));
   const supplier = !f.supplierOrderedOn
     ? join(names || "Not ordered from the supplier yet", fac.length === 1 ? amount(fac[0]!.currency, fac[0]!.owed) : null)
@@ -489,7 +489,7 @@ export function sectionReminders(f: SectionReminderFacts, today: ISODate): Secti
     out.push({ key: "goods_late", tab: "production", due: f.readyOn, text: `Goods were to be ready ${dayMonth(f.readyOn)}: ${f.goods.received} of ${f.goods.lines} received` });
   for (const t of f.fat ?? []) {
     if (t.plannedOn && !t.doneOn && t.plannedOn < today)
-      out.push({ key: "fat_late", tab: "production", due: t.plannedOn, text: `Factory test planned ${dayMonth(t.plannedOn)}${t.factory ? ` at ${t.factory}` : ""}: no result yet` });
+      out.push({ key: "fat_late", tab: "production", due: t.plannedOn, text: `Factory test planned ${dayMonth(t.plannedOn)}${t.supplier ? ` at ${t.supplier}` : ""}: no result yet` });
   }
   const left = f.shipments.some((s) => shipmentLeft(s.status));
   if (f.shipBy && f.shipBy < today && !left) out.push({ key: "ship_late", tab: "shipping", due: f.shipBy, text: `Ship by ${dayMonth(f.shipBy)} has passed: nothing has left yet` });

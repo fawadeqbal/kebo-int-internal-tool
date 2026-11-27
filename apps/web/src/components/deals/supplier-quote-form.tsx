@@ -130,7 +130,7 @@ function initialState(quote: SupplierQuoteView | null, today: string, usualAdvan
       ? { months: quote.warrantyMonths, from: quote.warrantyFrom ?? "shipment", rest: quote.warranty }
       : parseWarranty(quote?.warranty);
   return {
-    factory: quote ? { id: quote.factory.id, name: quote.factory.name } : null,
+    factory: quote ? { id: quote.supplier.id, name: quote.supplier.name } : null,
     reference: quote?.reference ?? "",
     currency: quote?.currency ?? "CNY",
     convertPrices: true,

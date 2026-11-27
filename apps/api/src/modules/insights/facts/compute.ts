@@ -159,8 +159,8 @@ function orderMoneyOf(o: OrderData, ctx: FactsCtx) {
 }
 
 /** Order and order × supplier rows for these orders (orders that are gone simply have none). */
-export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promise<{ orders: FactRow[]; factories: FactRow[] }> {
-  if (!ids.length) return { orders: [], factories: [] };
+export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promise<{ orders: FactRow[]; suppliers: FactRow[] }> {
+  if (!ids.length) return { orders: [], suppliers: [] };
   const orders = await db.order.findMany({ where: { id: { in: ids } }, select: orderSelect });
   // One after the other: inside a transaction they share one connection.
   const plans = await livePlansOf(db, orders.map((o) => o.id));
@@ -251,7 +251,7 @@ export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promis
       const toPayMain = mine.reduce((t, r) => t + toMain(r.toPayMinor, r.currency), 0);
       // Its plan's open parts in the main currency; what the plan does not date (prices changed since): no date.
       const parts: OpenPart[] = [];
-      for (const fp of supplierPlans.filter((p) => p.factory.id === supplierId))
+      for (const fp of supplierPlans.filter((p) => p.supplier.id === supplierId))
         for (const r of fp.rows) if (toMinor(r.open) > 0) parts.push({ dueOn: r.due, open: money(toMain(toMinor(r.open), fp.currency)) });
       const undated = toPayMain - sumOpen(parts);
       if (undated > 0) parts.push({ dueOn: null, open: money(undated) });
@@ -286,7 +286,7 @@ export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promis
       });
     }
   }
-  return { orders: out, factories: supplierRows };
+  return { orders: out, suppliers: supplierRows };
 }
 
 /** Of the open parts, what was due before `today` (minor units of the main currency). */

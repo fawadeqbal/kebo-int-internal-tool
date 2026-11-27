@@ -56,8 +56,8 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
   ]);
   const canEdit = can(me, "orders.update") && d.open;
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
-  const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
-  const canPay = !!m.factories?.canRecord && owing.length > 0 && o.status !== "cancelled";
+  const owing = m.suppliers?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
+  const canPay = !!m.suppliers?.canRecord && owing.length > 0 && o.status !== "cancelled";
   const orderedOn = flow?.factory.orderedOn ?? null;
   const orderNo = flow?.factory.orderNo ?? null;
   const basis = defaults.priceBasis
@@ -65,22 +65,22 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
     : null;
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const priced = goodsLines.some((l) => l.supplierPrice) ? goodsLines : [];
-  const payments = m.factories?.payments ?? [];
+  const payments = m.suppliers?.payments ?? [];
   const live = payments.filter((x) => !x.voided);
-  const plans = m.factories?.plans ?? [];
+  const plans = m.suppliers?.plans ?? [];
   const byId = new Map(payments.map((x) => [x.id, x]));
   // What each payment paid: the parts of the plans it went to ("Advance 30%"), as a customer's payment says.
   const paidFor = new Map<string, string[]>();
   for (const plan of plans)
     for (const r of plan.rows) for (const x of r.payments) paidFor.set(x.id, [...(paidFor.get(x.id) ?? []), r.label]);
-  const manySuppliers = new Set(payments.map((x) => x.factory.id)).size > 1 || plans.length > 1;
+  const manySuppliers = new Set(payments.map((x) => x.supplier.id)).size > 1 || plans.length > 1;
   const madeFor = (x: (typeof payments)[number]) => {
     const parts = paidFor.get(x.id)?.join(", ") ?? null;
     if (!manySuppliers) return parts;
     return (
       <>
         {parts ?? <Dash />}
-        <span className="block text-xs font-normal text-muted">{x.factory.name}</span>
+        <span className="block text-xs font-normal text-muted">{x.supplier.name}</span>
       </>
     );
   };
@@ -90,7 +90,7 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
     for (const x of xs) by.set(x.currency, (by.get(x.currency) ?? 0) + Number(x.amount));
     return by.size ? [...by].map(([cur, v]) => money(v.toFixed(2), cur)).join(" + ") : money(0, plans[0]?.currency ?? o.currency);
   };
-  const sub = `${o.refNo} · ${(flow?.factory.factories ?? []).map((f) => f.name).join(", ") || "the supplier"}`;
+  const sub = `${o.refNo} · ${(flow?.factory.suppliers ?? []).map((f) => f.name).join(", ") || "the supplier"}`;
   const pay = (
     label: string,
     main: boolean,
@@ -114,27 +114,27 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
     ) : null;
   // Pay is on each plan's next part, as Record payment is on the customer's; Payments made offers "Pay the
   // factory" only for a supplier owed money with no part left to pay it on (prices changed since the plan).
-  const onAPart = (f: { factory: { id: string }; currency: string }) =>
+  const onAPart = (f: { supplier: { id: string }; currency: string }) =>
     plans.some(
-      (p) => p.factory.id === f.factory.id && p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0),
+      (p) => p.supplier.id === f.supplier.id && p.currency === f.currency && p.rows.some((r) => r.status !== "paid" && Number(r.open) > 0),
     );
   const payAny = owing.some((f) => !onAPart(f)) ? pay("Pay the supplier", true) : null;
   const editPlan = (plan: (typeof plans)[number], label: string) =>
-    m.factories?.canPlan &&
+    m.suppliers?.canPlan &&
     d.open && (
       <SupplierPlanWindow
         label={label}
-        sub={`${o.refNo} · ${plan.factory.name} · ${money(plan.owed, plan.currency)}`}
+        sub={`${o.refNo} · ${plan.supplier.name} · ${money(plan.owed, plan.currency)}`}
         action={supplierPlanAction.bind(null, o.id)}
         plan={plan}
         orderedOn={orderedOn}
       />
     );
-  const customerLine = m.factories && (
+  const customerLine = m.suppliers && (
     <CustomerMoneyLine
       orderId={o.id}
-      state={m.factories.customer.state}
-      warn={m.factories.customer.warn}
+      state={m.suppliers.customer.state}
+      warn={m.suppliers.customer.warn}
       route={m.route.route}
       deposit={o.money.depositPercent > 0}
       received={m.received}
@@ -147,7 +147,7 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
   const agreedOf = (po: PurchaseOrderView, many: boolean) => {
     const a = po.agreed;
     if (!a) return null;
-    const plan = plans.find((p) => p.factory.id === po.supplier.id);
+    const plan = plans.find((p) => p.supplier.id === po.supplier.id);
     const r = a.readyBy;
     const readyNote = !r
       ? null
@@ -408,17 +408,17 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
       )}
 
       {plans.map((plan, n) => {
-        const owed = m.factories!.rows.find((r) => r.factory.id === plan.factory.id && r.currency === plan.currency);
+        const owed = m.suppliers!.rows.find((r) => r.supplier.id === plan.supplier.id && r.currency === plan.currency);
         const toPay = Number(owed?.toPay ?? 0);
         const paidInOrder = live
-          .filter((x) => x.factory.id === plan.factory.id && x.currency === plan.currency)
+          .filter((x) => x.supplier.id === plan.supplier.id && x.currency === plan.currency)
           .reduce((t, x) => t + Number(x.inOrderCurrency), 0);
         const done = !!owed && toPay <= 0 && Number(owed.paid) > 0;
         return (
           <Section
-            key={`${plan.factory.id}:${plan.currency}`}
-            title={plans.length > 1 ? `Payment plan · ${plan.factory.name}` : "Payment plan"}
-            titleMore={plans.length > 1 ? undefined : plan.factory.name}
+            key={`${plan.supplier.id}:${plan.currency}`}
+            title={plans.length > 1 ? `Payment plan · ${plan.supplier.name}` : "Payment plan"}
+            titleMore={plans.length > 1 ? undefined : plan.supplier.name}
             state={owed ? (done ? "Paid in full" : `${money(owed.toPay, plan.currency)} to pay`) : supplierPlanWords(plan)}
             tone={done ? "ok" : toPay > 0 ? "warn" : "neutral"}
             actions={editPlan(plan, "Edit plan")}
@@ -435,7 +435,7 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
                 payments={byId}
                 pay={(r) =>
                   pay("Pay", true, {
-                    supplierId: plan.factory.id,
+                    supplierId: plan.supplier.id,
                     amount: r.open,
                     kind: r.dueRule === "on_order" ? "deposit" : "balance",
                     reference: r.supplierRef,
@@ -451,7 +451,7 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
         );
       })}
 
-      {m.factories &&
+      {m.suppliers &&
         (payments.length === 0 ? (
           <EmptySection title="Payments made" text="No payment yet." action={payAny} />
         ) : (
@@ -482,14 +482,14 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
                     <Link href={`/payments/supplier/${x.id}`} className={ROW_LINK}>
                       Receipt
                     </Link>
-                    {m.factories!.canRecord && o.status !== "cancelled" && (
+                    {m.suppliers!.canRecord && o.status !== "cancelled" && (
                       <ChangeSupplierPaymentWindow
-                        sub={`${o.refNo} · ${x.factory.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
+                        sub={`${o.refNo} · ${x.supplier.name} · ${date(x.paidOn)} · ${money(x.amount, x.currency)}`}
                         payment={x}
                         save={supplierPaymentAction.bind(null, o.id, x.id, x.updatedAt)}
                         remove={voidSupplierPaymentAction.bind(null, o.id, x.id)}
                         removeFile={removePaymentFileAction.bind(null, "out", x.id, o.id)}
-                        factories={m.factories!.rows}
+                        factories={m.suppliers!.rows}
                         people={people ?? []}
                         orderCurrency={o.currency}
                         fx={fx}

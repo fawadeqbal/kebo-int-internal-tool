@@ -303,11 +303,11 @@ export function SupplierPaymentForm({
   /** A part of the supplier's payment plan to pay (its amount, what for, and their invoice for it). */
   prefill?: { supplierId: string; amount: string; kind: PaymentKind; reference?: string | null };
 }) {
-  const first = (prefill && suppliers.find((f) => f.factory.id === prefill.supplierId)) ?? suppliers.find((f) => Number(f.toPay) > 0) ?? suppliers[0];
+  const first = (prefill && suppliers.find((f) => f.supplier.id === prefill.supplierId)) ?? suppliers.find((f) => Number(f.toPay) > 0) ?? suppliers[0];
   const [supplierKey, setSupplierKey] = useState(
-    payment ? `${payment.factory.id}:${payment.currency}` : first ? `${first.factory.id}:${first.currency}` : "",
+    payment ? `${payment.supplier.id}:${payment.currency}` : first ? `${first.supplier.id}:${first.currency}` : "",
   );
-  const chosen = suppliers.find((f) => `${f.factory.id}:${f.currency}` === supplierKey);
+  const chosen = suppliers.find((f) => `${f.supplier.id}:${f.currency}` === supplierKey);
   const m = useMoneyFields(fx, orderCurrency, {
     currency: payment?.currency ?? chosen?.currency ?? orderCurrency,
     amount: payment?.amount ?? prefill?.amount ?? "",
@@ -315,7 +315,7 @@ export function SupplierPaymentForm({
   });
   // We owe each supplier in its offer's currency, and only a payment in that currency counts against it.
   const owedIn = chosen && Number(chosen.owed) > 0 ? chosen.currency : null;
-  const kept = !!payment && payment.factory.id === chosen?.factory.id && payment.currency === m.currency;
+  const kept = !!payment && payment.supplier.id === chosen?.supplier.id && payment.currency === m.currency;
   const mismatch = !!owedIn && m.currency !== owedIn && !kept;
   const left = chosen && Number(chosen.toPay) > 0 && m.currency === chosen.currency ? chosen.toPay : null;
   const [file, setFile] = useState<File | null>(null);
@@ -334,8 +334,8 @@ export function SupplierPaymentForm({
     <ActionForm action={save} onDone={done} className={bare ? "flex flex-col gap-3" : framed}>
       {(s) => (
         <>
-          {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.factory.name}` : "Payment to a supplier"}</p>}
-          <input type="hidden" name="supplierId" value={chosen?.factory.id ?? payment?.factory.id ?? ""} />
+          {!bare && <p className="text-sm font-medium">{payment ? `Change the payment to ${payment.supplier.name}` : "Payment to a supplier"}</p>}
+          <input type="hidden" name="supplierId" value={chosen?.supplier.id ?? payment?.supplier.id ?? ""} />
           <div className={RULES.form.fields}>
             <Field
               label="Supplier"
@@ -349,14 +349,14 @@ export function SupplierPaymentForm({
                 onChange={(e) => {
                   setSupplierKey(e.target.value);
                   // The currency follows the supplier: what we owe them is in their offer's currency.
-                  const f = suppliers.find((x) => `${x.factory.id}:${x.currency}` === e.target.value);
+                  const f = suppliers.find((x) => `${x.supplier.id}:${x.currency}` === e.target.value);
                   if (f && f.currency !== m.currency) m.setCurrency(f.currency, false);
                 }}
               >
                 {suppliers.map((f) => (
-                  <option key={`${f.factory.id}:${f.currency}`} value={`${f.factory.id}:${f.currency}`}>
-                    {f.factory.name}
-                    {suppliers.filter((x) => x.factory.id === f.factory.id).length > 1 ? ` (${f.currency})` : ""}
+                  <option key={`${f.supplier.id}:${f.currency}`} value={`${f.supplier.id}:${f.currency}`}>
+                    {f.supplier.name}
+                    {suppliers.filter((x) => x.supplier.id === f.supplier.id).length > 1 ? ` (${f.currency})` : ""}
                     {Number(f.toPay) > 0 ? "" : " · paid"}
                   </option>
                 ))}
@@ -424,7 +424,7 @@ export function SupplierPaymentForm({
           {mismatch && (
             <Notice tone="todo">
               <p className="font-medium">
-                We owe {chosen!.factory.name} in {owedIn}, so a payment in {m.currency} would not count against it.
+                We owe {chosen!.supplier.name} in {owedIn}, so a payment in {m.currency} would not count against it.
               </p>
               <p className="mt-0.5 text-text-2">
                 Record the payment in {owedIn}: if you sent {m.currency}, enter the {owedIn} amount the supplier received (on their receipt or the bank advice).

@@ -63,7 +63,7 @@ export class SupplierRequestsService {
       const replyBy = fromDbDateOrNull(r.replyBy);
       return {
         id: r.id,
-        factory: r.supplier,
+        supplier: r.supplier,
         status,
         statusLabel: SUPPLIER_REQUEST_STATUS_LABEL[status],
         sentOn: fromDbDate(r.sentOn),
@@ -146,7 +146,7 @@ export class SupplierRequestsService {
         entityType: "inquiry",
         entityId: inquiryId,
         summary: `${i.refNo}: asked ${fresh.length === 1 ? fresh[0].name : `${fresh.length} suppliers`} for a price`,
-        newValues: { factories: fresh.map((f) => f.name), replyBy: input.replyBy },
+        newValues: { suppliers: fresh.map((f) => f.name), replyBy: input.replyBy },
       });
     });
     return this.list(user, inquiryId);

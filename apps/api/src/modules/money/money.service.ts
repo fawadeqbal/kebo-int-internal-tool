@@ -188,7 +188,7 @@ export class MoneyService {
 
     // Suppliers: owed from the order's lines (with tax), less what we paid them and the expenses they bear: supplierPosition.
     // Each supplier payment as the order shows it (its part; the money facts from its entry).
-    const supplierPaid = o.supplierPaid.map((a) => ({ ...asSupplierPayment(a), factory: a.movement.party!, paidBy: a.movement.paidBy, account: a.movement.account }));
+    const supplierPaid = o.supplierPaid.map((a) => ({ ...asSupplierPayment(a), supplier: a.movement.party!, paidBy: a.movement.paidBy, account: a.movement.account }));
     const livePaid = supplierPaid.filter((p) => !p.voidedAt);
     const supplierRows = supplierPositionOf(o, fx);
     const supplierOf = new Map<string, SupplierRow>(o.lines.flatMap((l) => (l.supplier ? [[l.supplier.id, l.supplier] as const] : [])));
@@ -216,7 +216,7 @@ export class MoneyService {
     const suppliers = supplierRows.map((r) => {
       const f = supplierOf.get(r.supplierId)!;
       return {
-        factory: { id: f.id, name: f.name },
+        supplier: { id: f.id, name: f.name },
         lookedAfterBy: f.owner,
         currency: r.currency,
         lines: r.lines,
@@ -322,14 +322,14 @@ export class MoneyService {
         next: next && { label: next.label, open: fromMinor(next.openMinor), dueOn: next.dueOn, status: next.status },
         canEdit: can(user, "orders.update") && o.status !== "cancelled",
       },
-      factories: seeCosts
+      suppliers: seeCosts
         ? {
             rows: suppliers,
             /** Where the customer's money for this order stands, for the person paying its suppliers (by the route). */
             customer: customerMoney({ totalMinor: position.owedMinor, receivedMinor: position.settledMinor, depositMinor: position.depositMinor, route: terms.route }),
             payments: supplierPaid.map((p) => ({
               id: p.id,
-              factory: p.factory,
+              supplier: p.supplier,
               recordedBy: recorders.get(p.recordedById) ?? null,
               recordedAt: p.createdAt,
               /** Set when it was changed after it was recorded. */
@@ -418,7 +418,7 @@ export class MoneyService {
       orderId: e.orderId,
       customer: e.customer ?? null,
       deal: e.inquiry ?? null,
-      factory: e.supplier ?? null,
+      supplier: e.supplier ?? null,
       account: e.account ?? null,
       category: e.category,
       description: e.description,
@@ -769,7 +769,7 @@ export class MoneyService {
           order: e.order?.refNo ?? null,
           deal: e.inquiry?.refNo ?? null,
           customer: e.customer?.name ?? null,
-          factory: e.supplier?.name ?? null,
+          supplier: e.supplier?.name ?? null,
           description: e.description,
           borneBy: e.borneBy,
         },
@@ -782,7 +782,7 @@ export class MoneyService {
           order: order?.refNo ?? null,
           deal: updated.inquiry?.refNo ?? null,
           customer: updated.customer?.name ?? null,
-          factory: updated.supplier?.name ?? null,
+          supplier: updated.supplier?.name ?? null,
           description: data.description,
         },
       });
@@ -1104,7 +1104,7 @@ export class MoneyService {
         orders: 0,
         uncostedRevenue: 0,
       },
-      cash: { in: 0, factories: 0, expenses: 0 },
+      cash: { in: 0, suppliers: 0, expenses: 0 },
     }));
     const rowOf = (d: Date) => months[d.getUTCMonth()]!;
     const profitOf = (e: (typeof months)[number]["earned"]) =>
@@ -1183,7 +1183,7 @@ export class MoneyService {
       if (p.order.status === "cancelled")
         rowOf(p.paidOn).earned.bankCharges += fx.order(decimalToMinor(p.bankCharges), p.order);
     }
-    for (const p of supplierPaid) rowOf(p.paidOn).cash.factories += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
+    for (const p of supplierPaid) rowOf(p.paidOn).cash.suppliers += fx.order(convert(decimalToMinor(p.amount), Number(p.rate)), p.order);
 
     const money = (n: number) => fromMinor(n);
     const earnedView = (e: (typeof months)[number]["earned"]) => ({
@@ -1207,9 +1207,9 @@ export class MoneyService {
       earned: earnedView(m.earned),
       cash: {
         in: money(m.cash.in),
-        factories: money(m.cash.factories),
+        suppliers: money(m.cash.suppliers),
         expenses: money(m.cash.expenses),
-        net: money(m.cash.in - m.cash.factories - m.cash.expenses),
+        net: money(m.cash.in - m.cash.suppliers - m.cash.expenses),
       },
     }));
     const total = months.reduce(
@@ -1230,7 +1230,7 @@ export class MoneyService {
           orders: 0,
           uncostedRevenue: 0,
         },
-        cash: { in: 0, factories: 0, expenses: 0 },
+        cash: { in: 0, suppliers: 0, expenses: 0 },
       },
     );
     return {
@@ -1241,9 +1241,9 @@ export class MoneyService {
         earned: earnedView(total.earned),
         cash: {
           in: money(total.cash.in),
-          factories: money(total.cash.factories),
+          suppliers: money(total.cash.suppliers),
           expenses: money(total.cash.expenses),
-          net: money(total.cash.in - total.cash.factories - total.cash.expenses),
+          net: money(total.cash.in - total.cash.suppliers - total.cash.expenses),
         },
       },
       orders: orderRows

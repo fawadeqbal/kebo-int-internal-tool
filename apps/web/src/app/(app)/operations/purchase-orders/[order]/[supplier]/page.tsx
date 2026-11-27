@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: { params: Promise<{ order: st
 }
 
 /** The supplier's items on the order, at its prices: what this purchase order buys. */
-const linesOf = (o: OrderView, supplier: string) => o.lines.filter((l) => l.type === "goods" && l.supplierPrice && l.factory?.id === supplier);
+const linesOf = (o: OrderView, supplier: string) => o.lines.filter((l) => l.type === "goods" && l.supplierPrice && l.supplier?.id === supplier);
 
 /**
  * A purchase order's own page (board PDetail): what it says, shown. Its terms, the lines at the supplier's
@@ -65,12 +65,12 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const row = rows?.find((r) => r.supplier.id === supplier) ?? null;
   const status = row ? PURCHASE_ORDER_STATUS[row.status] : null;
   const lines = linesOf(o, supplier);
-  const plans = (m.factories?.plans ?? []).filter((p) => p.factory.id === supplier);
-  const owed = (m.factories?.rows ?? []).filter((r) => r.factory.id === supplier);
+  const plans = (m.suppliers?.plans ?? []).filter((p) => p.supplier.id === supplier);
+  const owed = (m.suppliers?.rows ?? []).filter((r) => r.supplier.id === supplier);
   const owing = owed.filter((r) => Number(r.toPay) > 0);
-  const payments = (m.factories?.payments ?? []).filter((x) => x.factory.id === supplier);
+  const payments = (m.suppliers?.payments ?? []).filter((x) => x.supplier.id === supplier);
   const live = payments.filter((x) => !x.voided);
-  const canPay = !!m.factories?.canRecord && owing.length > 0 && o.status !== "cancelled";
+  const canPay = !!m.suppliers?.canRecord && owing.length > 0 && o.status !== "cancelled";
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   // What was agreed with the supplier first (as the order's Purchase order tab shows it), else the usual basis.
   const basis = po.agreed?.basis
@@ -288,16 +288,16 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
                   <SupplierPlanTable
                     plan={plan}
                     payments={byId}
-                    pay={(r) => pay("Pay", true, { supplierId: plan.factory.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance", reference: r.supplierRef })}
+                    pay={(r) => pay("Pay", true, { supplierId: plan.supplier.id, amount: r.open, kind: r.dueRule === "on_order" ? "deposit" : "balance", reference: r.supplierRef })}
                     orderCurrency={o.currency}
                     paidInOrder={paidInOrder ? paidInOrder.toFixed(2) : null}
                     overpaid={of?.overpaid ?? null}
                     after={
-                      m.factories && (
+                      m.suppliers && (
                         <CustomerMoneyLine
                           orderId={o.id}
-                          state={m.factories.customer.state}
-                          warn={m.factories.customer.warn}
+                          state={m.suppliers.customer.state}
+                          warn={m.suppliers.customer.warn}
                           route={m.route.route}
                           deposit={o.money.depositPercent > 0}
                           received={m.received}

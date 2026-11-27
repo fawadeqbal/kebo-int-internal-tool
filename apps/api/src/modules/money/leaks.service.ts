@@ -317,10 +317,10 @@ export class LeaksService {
       });
 
     /* ----- suppliers: what visits and costs there came to */
-    const suppliers = new Map<string, { factory: { id: string; name: string }; spent: number; count: number }>();
+    const suppliers = new Map<string, { supplier: { id: string; name: string }; spent: number; count: number }>();
     for (const e of periodExpenses) {
       if (!e.supplier) continue;
-      const f = suppliers.get(e.supplier.id) ?? { factory: e.supplier, spent: 0, count: 0 };
+      const f = suppliers.get(e.supplier.id) ?? { supplier: e.supplier, spent: 0, count: 0 };
       f.spent += inMain(e);
       f.count += 1;
       suppliers.set(e.supplier.id, f);
@@ -416,9 +416,9 @@ export class LeaksService {
         amount: fromMinor(s.stuckMinor),
         days: s.days,
       })),
-      factories: [...suppliers.values()]
+      suppliers: [...suppliers.values()]
         .sort((a, b) => b.spent - a.spent)
-        .map((f) => ({ factory: f.factory, spent: fromMinor(f.spent), count: f.count })),
+        .map((f) => ({ supplier: f.supplier, spent: fromMinor(f.spent), count: f.count })),
       warnings: warnings.sort((a, b) => (a.level === b.level ? 0 : a.level === "bad" ? -1 : 1)),
       missingRates: [...new Set([...monthly.missingRates, ...cash.missingRates])].sort(),
     };

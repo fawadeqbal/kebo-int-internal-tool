@@ -81,7 +81,7 @@ export interface OrderMoney {
     next: { label: string; open: string; dueOn: string | null; status: InstalmentStatus } | null;
     canEdit: boolean;
   };
-  factories: {
+  suppliers: {
     rows: SupplierOwed[];
     /** Where the customer's money for this order stands, for the person paying its suppliers. */
     customer: { state: CustomerMoneyState; words: string; warn: boolean };
@@ -126,7 +126,7 @@ export interface OrderMoney {
 }
 
 export interface SupplierOwed {
-  factory: { id: string; name: string };
+  supplier: { id: string; name: string };
   lookedAfterBy: Person | null;
   currency: string;
   lines: number;
@@ -141,7 +141,7 @@ export interface SupplierOwed {
 
 export interface SupplierPaymentView {
   id: string;
-  factory: { id: string; name: string };
+  supplier: { id: string; name: string };
   recordedBy: { id: string; name: string } | null;
   recordedAt: string;
   /** Set when it was changed after it was recorded. */
@@ -177,7 +177,7 @@ export interface ExpenseView {
   /** The deal it was spent on (won or lost); an order's expense is on its deal. */
   deal: { id: string; refNo: string; title: string; stage: InquiryStage } | null;
   /** The supplier visited or paid for. */
-  factory: { id: string; name: string } | null;
+  supplier: { id: string; name: string } | null;
   /** Which of our accounts it was paid from. */
   account: { id: string; name: string } | null;
   category: ExpenseCategory;
@@ -221,7 +221,7 @@ export interface CostExpense {
   spentOn: string;
   step: FlowStep | null;
   borneBy: ExpenseBearer;
-  factory: { id: string; name: string } | null;
+  supplier: { id: string; name: string } | null;
   paidBy: Person | null;
   account: { id: string; name: string } | null;
   ownMoney: boolean;
@@ -276,7 +276,7 @@ export interface OrderCosts {
   profit: {
     sale: string;
     uncosted: string;
-    factory: string;
+    supplier: string;
     /** What the suppliers charge (with tax) and what is still to pay them after payments and what they bear. */
     supplierOwed: { currency: string; amount: string; toPay?: string }[];
     planned: string;
@@ -350,7 +350,7 @@ export interface ExpenseList {
 
 /** GET /money/payables */
 export interface Payable {
-  factory: { id: string; name: string };
+  supplier: { id: string; name: string };
   lookedAfterBy: Person | null;
   currency: string;
   owed: string;
@@ -374,7 +374,7 @@ export interface ExpenseTargets {
   customers: { id: string; name: string }[];
   deals: { id: string; refNo: string; title: string; stage: InquiryStage; customerId: string; customer: string }[];
   orders: { id: string; refNo: string; dealId: string; customerId: string; customer: string }[];
-  factories: { id: string; name: string }[];
+  suppliers: { id: string; name: string }[];
 }
 
 /** GET /customers/:id/account (managers): in the main currency. */
@@ -520,7 +520,7 @@ export interface LeaksReport {
   customers: { best: LeakCustomer[]; costing: LeakCustomer[] };
   trend: { month: string; sales: string; expenses: string; percent: number | null }[];
   stuck: { id: string; refNo: string; customer: { id: string; name: string }; currency: string; amount: string; days: number }[];
-  factories: { factory: { id: string; name: string }; spent: string; count: number }[];
+  suppliers: { supplier: { id: string; name: string }; spent: string; count: number }[];
   warnings: { level: "bad" | "warn"; text: string; href: string | null }[];
   missingRates: string[];
 }
@@ -582,7 +582,7 @@ export interface CustomerPayments {
 }
 
 export interface SupplierPlanView {
-  factory: { id: string; name: string };
+  supplier: { id: string; name: string };
   currency: string;
   /** This supplier's own ready date (its "on the ready date" parts fall due then). */
   readyOn?: string | null;
@@ -797,7 +797,7 @@ export interface SpendingReport {
   people: { person: { id: string; name: string }; spent: string; toSell: string; lost: string; owed: string }[];
   kinds: { category: ExpenseCategory; amount: string }[];
   lostReasons: { reason: LostReason | "not_said"; deals: number; spent: string }[];
-  factories: { factory: { id: string; name: string }; visits: number; spent: string }[];
+  suppliers: { supplier: { id: string; name: string }; visits: number; spent: string }[];
   customers: { customer: { id: string; name: string }; spent: string }[];
   months: { month: string; toSell: string }[];
 }

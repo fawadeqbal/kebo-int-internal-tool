@@ -30,10 +30,10 @@ export class SectionsService {
   ) {}
 
   /** What the suppliers are owed and paid, for people who may see supplier money (null otherwise). */
-  private async suppliersOf(user: SessionUser, orderId: string): Promise<SectionFacts["factories"]> {
+  private async suppliersOf(user: SessionUser, orderId: string): Promise<SectionFacts["suppliers"]> {
     if (!can(user, "sourcing.manage")) return null;
     const m = await this.money.forOrder(user, orderId);
-    return m.factories ? m.factories.rows.map((r) => ({ name: r.factory.name, currency: r.currency, owed: r.owed, paid: r.paid, toPay: r.toPay })) : [];
+    return m.suppliers ? m.suppliers.rows.map((r) => ({ name: r.supplier.name, currency: r.currency, owed: r.owed, paid: r.paid, toPay: r.toPay })) : [];
   }
 
   /** The order's facts: what every section's word is read from. */
@@ -78,7 +78,7 @@ export class SectionsService {
     return slots.map((f) => {
       const r = rows.find((x) => x.supplierId === (f?.id ?? null));
       return {
-        factory: f,
+        supplier: f,
         readyOn: fromDbDateOrNull(r?.readyOn ?? null),
         readyToldOn: fromDbDateOrNull(r?.readyToldOn ?? null),
         readyToldVia: (r?.readyToldVia as RequestChannel | null) ?? null,

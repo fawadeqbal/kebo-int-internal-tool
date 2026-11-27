@@ -25,7 +25,7 @@ export function sheetRowOf(e: ExpenseView): CostSheetRow {
     kind: "cost",
     label: e.description,
     category: e.category,
-    owedTo: e.payee ?? e.factory?.name ?? (e.ownMoney ? (e.paidBy?.name ?? null) : null),
+    owedTo: e.payee ?? e.supplier?.name ?? (e.ownMoney ? (e.paidBy?.name ?? null) : null),
     from: "typed",
     amount: e.amount,
     currency: e.currency,

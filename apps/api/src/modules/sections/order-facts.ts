@@ -39,7 +39,7 @@ export type FactsOrderRow = Prisma.OrderGetPayload<{ include: typeof factsInclud
  * The facts of one order (what every section's word is read from). `factories` comes from the order's money
  * (null when the person may not see supplier money).
  */
-export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["factories"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
+export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["suppliers"], timeZone: string, fx: MoneyCtx, lcCourierDays = 4): SectionFacts {
   // Where the order stands with the customer, as everywhere: the plan's deposit, what was charged to them.
   const position = positionOf(o, fx);
   const percent = position.depositPercent;
@@ -74,12 +74,12 @@ export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["factorie
     paidInFullOn: position.dueMinor === 0 ? reachedOn(o.allocations, position.owedMinor) : null,
     supplierOrderedOn: fromDbDateOrNull(o.supplierOrderedOn),
     supplierOrderNo: o.supplierOrderNo,
-    factories: suppliers,
+    suppliers,
     lcChecks: lcChecksOf({ ...o, readyOn: readyOnOf(o) }, lcCourierDays),
     routeFromQuotation: routeFromQuotation(termsOf(o), o.balanceTerms),
     readyOn: readyOnOf(o),
     // Each supplier's own date (production items per supplier); one row when the lines name no supplier.
-    readyBy: readyByOf(o).map((r) => ({ factory: o.lines.find((l) => l.supplierId === r.supplierId)?.supplier?.name ?? null, readyOn: r.readyOn })),
+    readyBy: readyByOf(o).map((r) => ({ supplier: o.lines.find((l) => l.supplierId === r.supplierId)?.supplier?.name ?? null, readyOn: r.readyOn })),
     goods: { lines: goods.length, received },
     packedAt: o.packedAt ? dateIn(o.packedAt, timeZone) : null,
     packing: o.packedAt
@@ -125,7 +125,7 @@ export function orderFactsOf(o: FactsOrderRow, suppliers: SectionFacts["factorie
     fat: o.suppliers
       .filter((f) => f.fatPlannedOn || f.fatDoneOn || f.fatResult)
       .map((f) => ({
-        factory: f.supplier?.name ?? null,
+        supplier: f.supplier?.name ?? null,
         plannedOn: fromDbDateOrNull(f.fatPlannedOn),
         doneOn: fromDbDateOrNull(f.fatDoneOn),
         result: (f.fatResult as FatResult | null) ?? null,

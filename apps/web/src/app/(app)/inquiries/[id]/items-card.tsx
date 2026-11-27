@@ -139,7 +139,7 @@ export async function ItemsCard({ id }: { id: string }) {
                             <li key={`${t.q.id}-${k}`}>
                               <a href={`/inquiries/${id}/offers/${t.q.id}`} className="flex items-center gap-2 py-2 text-sm">
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate font-semibold">{t.q.factory.name}</span>
+                                  <span className="block truncate font-semibold">{t.q.supplier.name}</span>
                                   <span className="flex items-center gap-1.5 text-xs text-text-2">
                                     {low !== null && t.price === low && <span className="rounded bg-ok-soft px-1 text-2xs font-bold text-ok">Lowest</span>}
                                     {t.q.leadTime ?? "lead time not said"}

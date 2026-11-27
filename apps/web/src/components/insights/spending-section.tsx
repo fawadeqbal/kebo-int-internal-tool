@@ -206,7 +206,7 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
 
         <Card className="overflow-clip">
           <CardHeader title="Supplier visits" description="Trips, hotels, meals and checks with a supplier named" />
-          {d.factories.length === 0 ? (
+          {d.suppliers.length === 0 ? (
             <EmptyLine inset>No supplier visit {p.name}.</EmptyLine>
           ) : (
             <Table>
@@ -218,11 +218,11 @@ export function SpendingSection({ d, p }: { d: Awaited<ReturnType<typeof loadSpe
                 </tr>
               </THead>
               <tbody>
-                {d.factories.map((f) => (
-                  <Tr key={f.factory.id} href={`/suppliers/${f.factory.id}`}>
+                {d.suppliers.map((f) => (
+                  <Tr key={f.supplier.id} href={`/suppliers/${f.supplier.id}`}>
                     <Td className="font-semibold">
-                      <Link href={`/suppliers/${f.factory.id}`} className="hover:text-primary">
-                        {f.factory.name}
+                      <Link href={`/suppliers/${f.supplier.id}`} className="hover:text-primary">
+                        {f.supplier.name}
                       </Link>
                     </Td>
                     <Td className="text-right tabular">{f.visits}</Td>

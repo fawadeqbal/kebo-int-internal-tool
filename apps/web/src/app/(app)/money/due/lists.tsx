@@ -638,8 +638,8 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
 /** "Pay" on a supplier's part: the order's own Pay the supplier window, with the part filled in, open at once. */
 async function PayPart({ part, today }: { part: ToPayList["rows"][number]; today: string }) {
   const [m, people, settings] = await Promise.all([orderMoneyOf(part.order.id), optional(getPeople), getSettings()]);
-  const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
-  if (!m.factories?.canRecord || !owing.length) return null;
+  const owing = m.suppliers?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
+  if (!m.suppliers?.canRecord || !owing.length) return null;
   return (
     <PaySupplierInList
       label="Pay"

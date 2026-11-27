@@ -36,7 +36,7 @@ export default async function DealFiles({ params }: { params: Promise<{ id: stri
     describe: describeFileAction.bind(null, d.id, f.id),
     remove: removeFileAction.bind(null, d.id, f.id),
   }));
-  const quoteFiles = (s?.quotes ?? []).flatMap((q) => q.files.map((f) => ({ ...f, offer: [q.factory.name, q.reference].filter(Boolean).join(" · ") })));
+  const quoteFiles = (s?.quotes ?? []).flatMap((q) => q.files.map((f) => ({ ...f, offer: [q.supplier.name, q.reference].filter(Boolean).join(" · ") })));
   // Every quotation's revisions (A, B, C…), each named by its own number.
   const made = d.quotations.flatMap((q) => [...q.revisions].sort((a, b) => b.number - a.number).map((r) => ({ ...r, refNo: q.refNo })));
 

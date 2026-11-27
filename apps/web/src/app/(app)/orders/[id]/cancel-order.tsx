@@ -19,9 +19,9 @@ export async function CancelOrder({ id }: { id: string }) {
     o.quotation ? `The quotation R${o.quotation.number} becomes \u201cvoid\u201d` : null,
     pos?.items.length ? `${pos.items.map((x) => x.number).join(", ")} ${pos.items.length === 1 ? "is" : "are"} cancelled` : null,
   ].filter(Boolean);
-  const supplierPaid = (m?.factories?.rows ?? [])
+  const supplierPaid = (m?.suppliers?.rows ?? [])
     .filter((r) => Number(r.paid) > 0)
-    .map((r) => `${r.currency} ${Number(r.paid).toLocaleString("en-US", { minimumFractionDigits: 2 })} to ${r.factory.name}`);
+    .map((r) => `${r.currency} ${Number(r.paid).toLocaleString("en-US", { minimumFractionDigits: 2 })} to ${r.supplier.name}`);
   return (
     <CancelOrderForm
       action={cancelOrderAction.bind(null, o.id)}

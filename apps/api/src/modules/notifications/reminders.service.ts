@@ -247,14 +247,14 @@ export class RemindersService {
           if (r.status !== "due" && r.status !== "late") continue;
           const lateBy = r.status === "late" && r.due ? daysBetween(r.due, today) : null;
           const who = [facts.handlerId, ...managers].filter((u): u is string => !!u && costPeople.has(u));
-          const contact = await this.prisma.db.contact.findFirst({ where: { partyId: f.factory.id, deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { name: true, phone: true, whatsapp: true, wechat: true } });
+          const contact = await this.prisma.db.contact.findFirst({ where: { partyId: f.supplier.id, deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { name: true, phone: true, whatsapp: true, wechat: true } });
           const m = supplierPayment(
             facts,
-            { factory: f.factory.name, contact: contact ? [contact.name, contact.wechat ? `WeChat ${contact.wechat}` : contact.whatsapp || contact.phone].filter(Boolean).join(" · ") : null, currency: f.currency, owed: f.owed, paid: f.paid },
+            { factory: f.supplier.name, contact: contact ? [contact.name, contact.wechat ? `WeChat ${contact.wechat}` : contact.whatsapp || contact.phone].filter(Boolean).join(" · ") : null, currency: f.currency, owed: f.owed, paid: f.paid },
             { label: r.label, open: r.open, due: r.due, lateBy },
           );
-          await send(m, [{ ids: who.filter((u) => u === facts.handlerId), as: "who handles the order" }, { ids: who, as: "a manager" }], `fpay-${lateBy !== null ? "late" : "due"}:${id}:${f.factory.id}:${r.label}:${r.due}`);
-          book.add(who, "Pay the supplier", { ref: facts.refNo, party: f.factory.name, what: `${r.label} ${formatMinor(Math.round(Number(r.open) * 100), f.currency)}`, when: lateBy !== null ? `${lateBy} days late` : r.due === today ? "due today" : `due ${dayShort(r.due)}`, late: lateBy !== null || r.due === today });
+          await send(m, [{ ids: who.filter((u) => u === facts.handlerId), as: "who handles the order" }, { ids: who, as: "a manager" }], `fpay-${lateBy !== null ? "late" : "due"}:${id}:${f.supplier.id}:${r.label}:${r.due}`);
+          book.add(who, "Pay the supplier", { ref: facts.refNo, party: f.supplier.name, what: `${r.label} ${formatMinor(Math.round(Number(r.open) * 100), f.currency)}`, when: lateBy !== null ? `${lateBy} days late` : r.due === today ? "due today" : `due ${dayShort(r.due)}`, late: lateBy !== null || r.due === today });
         }
     }
 

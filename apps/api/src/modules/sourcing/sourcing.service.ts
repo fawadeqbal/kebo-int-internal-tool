@@ -134,7 +134,7 @@ export class SourcingService {
       });
       return {
         id: q.id,
-        factory: q.supplier,
+        supplier: q.supplier,
         reference: q.reference,
         receivedOn: fromDbDate(q.receivedOn),
         validUntil: fromDbDateOrNull(q.validUntil),
@@ -200,7 +200,7 @@ export class SourcingService {
       };
     });
     const rank = (cost: string | null) => (cost === null ? Number.MAX_VALUE : Number(cost) > 0 ? Number(cost) : Number.MAX_VALUE / 2);
-    const allLines = priced.flatMap((q) => q.lines.map((l) => ({ ...l, factory: q.factory, quoteId: q.id, currency: q.currency })));
+    const allLines = priced.flatMap((q) => q.lines.map((l) => ({ ...l, supplier: q.supplier, quoteId: q.id, currency: q.currency })));
     return {
       currency: sales.currency,
       missingRates: [...new Set(priced.filter((q) => q.fxRate === null).map((q) => q.currency))],
@@ -231,7 +231,7 @@ export class SourcingService {
       products: (() => {
         const groups = new Map<string, typeof allLines>();
         for (const q of [...priced].reverse())
-          for (const l of q.lines) groups.set(l.productKey, [...(groups.get(l.productKey) ?? []), { ...l, factory: q.factory, quoteId: q.id, currency: q.currency }]);
+          for (const l of q.lines) groups.set(l.productKey, [...(groups.get(l.productKey) ?? []), { ...l, supplier: q.supplier, quoteId: q.id, currency: q.currency }]);
         return [...groups.entries()]
           .filter(([, lines]) => new Set(lines.map((l) => l.quoteId)).size > 1)
           .map(([key, lines]) => {

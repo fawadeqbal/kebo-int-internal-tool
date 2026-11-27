@@ -917,12 +917,12 @@ export class LedgerService {
         if (!o) continue;
         const plans = allPlans.get(orderId) ?? [];
         for (const p of plans) {
-          if (!owing.some((r) => r.orderId === orderId && r.supplierId === p.factory.id && r.currency === p.currency)) continue;
+          if (!owing.some((r) => r.orderId === orderId && r.supplierId === p.supplier.id && r.currency === p.currency)) continue;
           const rate = p.currency === fx.main ? 1 : (fx.rates[p.currency] ?? null);
           for (const r of p.rows) {
             const open = decimalToMinor(r.open as never);
             if (open <= 0) continue;
-            add(p.factory.id, p.factory.name, {
+            add(p.supplier.id, p.supplier.name, {
               orderId,
               refNo: o.refNo,
               label: r.label,

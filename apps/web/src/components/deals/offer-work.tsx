@@ -99,7 +99,7 @@ export function OfferPanel({ kit, q, step, only = false, onClose }: { kit: Offer
   return (
     <SidePanel
       title={one && part ? `Edit ${OFFER_PART_LABEL[part].toLowerCase()}` : "Edit offer"}
-      description={[q.factory.name, kit.refNo].filter(Boolean).join(" · ")}
+      description={[q.supplier.name, kit.refNo].filter(Boolean).join(" · ")}
       onClose={onClose}
       // The payment's installments are a table (as on the order's plan): its window is as wide as the plan's.
       className={!one || part === "prices" ? RULES.window.items : part === "terms" ? RULES.window.table : RULES.window.part}
@@ -426,7 +426,7 @@ function OfferWindow({
                 fill
                 partButton={false}
                 sheet={{
-                  name: `Prices from ${q?.factory.name ?? "the supplier"}`,
+                  name: `Prices from ${q?.supplier.name ?? "the supplier"}`,
                   upload: !used,
                   templateRows: items.map((it) => ({ no: it.no, values: { description: it.description, model: it.model ?? "", requestedItemId: it.id, quantity: it.quantity, unit: it.unit, unitPrice: "", taxRate: String(h.taxRate) } })),
                 }}
@@ -460,7 +460,7 @@ function OfferWindow({
                         <option value="">Copy another offer…</option>
                         {others.map((o) => (
                           <option key={o.id} value={o.id}>
-                            {o.factory.name} ({o.lines.length})
+                            {o.supplier.name} ({o.lines.length})
                           </option>
                         ))}
                       </Select>
@@ -475,7 +475,7 @@ function OfferWindow({
                     : []),
                   ...others.map((o) => ({
                     key: `offer-${o.id}`,
-                    label: `Copy ${o.factory.name}’s items`,
+                    label: `Copy ${o.supplier.name}’s items`,
                     note: String(o.lines.filter((l) => !l.alternativeOfId).length),
                     onSelect: () =>
                       batch.add(
@@ -557,7 +557,7 @@ function OfferWindow({
       />
       {asking && q && (
         <ConfirmDialog
-          title={asking === "offer" ? `Remove ${q.factory.name}’s offer?` : `Remove ${asking.fileName}?`}
+          title={asking === "offer" ? `Remove ${q.supplier.name}’s offer?` : `Remove ${asking.fileName}?`}
           confirmLabel={asking === "offer" ? "Remove the offer" : "Remove the file"}
           cancelLabel={asking === "offer" ? "Keep the offer" : "Keep it"}
           danger
@@ -909,7 +909,7 @@ export function OfferBoxes({
         .flatMap((c) => edits?.cards[c]?.edits ?? [])
         .sort((a, b) => b.at.localeCompare(a.at))
         .map((e) => ({ lines: e.changes, reason: e.reason, by: e.by, at: dateTime(e.at) })),
-      { lines: ["Offer received"], reason: null, by: q.factory.name, at: dateText(q.receivedOn), start: true },
+      { lines: ["Offer received"], reason: null, by: q.supplier.name, at: dateText(q.receivedOn), start: true },
     ];
     return <HistoryButton title={title} entries={entries} allHref={historyHref} />;
   };
@@ -941,7 +941,7 @@ export function OfferBoxes({
         <RecordBox title="Supplier" what="the supplier" canEdit={canEdit} edit={edit("factory", "the supplier")} history={history(["offer.factory"], "Supplier")}>
           <BoxFacts
             rows={[
-              ["Supplier", q.factory.name],
+              ["Supplier", q.supplier.name],
               ["Received on", dateText(q.receivedOn)],
               ["Valid until", q.validUntil ? dateText(q.validUntil) : null],
               ["Their reference", q.reference || null],
@@ -973,9 +973,9 @@ export function OfferBoxes({
           what="prices"
           canEdit={canEdit}
           edit={<OfferEdit kit={kit} q={q} step="prices" what="prices" words={q.lines.length ? undefined : "Add items"} only variant="ghost" />}
-          tools={<LinesExcel name={`Prices from ${q.factory.name}`} rows={rows} columns={columns} numbers={numbers} />}
+          tools={<LinesExcel name={`Prices from ${q.supplier.name}`} rows={rows} columns={columns} numbers={numbers} />}
           history={history(["lines", "offer.prices"], "Prices")}
-          label={`${q.factory.name} · prices`}
+          label={`${q.supplier.name} · prices`}
           rows={rows}
           columns={viewColumns}
           numbers={numbers}

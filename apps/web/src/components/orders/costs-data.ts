@@ -19,7 +19,7 @@ export const orderCostsSetup = cache(async (id: string) => {
   if (!costs) return null;
   const [settings, people, m, o] = await Promise.all([getSettings(), optional(getPeople), optional(() => orderMoneyOf(id)), optional(() => orderOf(id))]);
   const suppliers = new Map<string, string>();
-  for (const r of m?.factories?.rows ?? []) suppliers.set(r.factory.id, r.factory.name);
+  for (const r of m?.suppliers?.rows ?? []) suppliers.set(r.supplier.id, r.supplier.name);
   const setup: CostSetup = {
     mainCurrency: settings.sales.currency,
     fx: { main: settings.sales.currency, rates: settings.sales.exchangeRates },

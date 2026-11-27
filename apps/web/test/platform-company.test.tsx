@@ -70,7 +70,7 @@ function company(over: Partial<CompanyDetail> = {}): CompanyDetail {
       orders: 64,
       openOrders: 5,
       customers: 119,
-      factories: 125,
+      suppliers: 125,
       twoStepOff: 1,
       people: [
         {

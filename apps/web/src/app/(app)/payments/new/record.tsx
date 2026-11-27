@@ -167,7 +167,7 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
           </Table>
         </Card>
       )}
-      {plan && kind === "out" && plan.factories && plan.factories.rows.length > 0 && (
+      {plan && kind === "out" && plan.suppliers && plan.suppliers.rows.length > 0 && (
         <Card>
           <CardHeader title={`${plan.refNo ?? "The order"} · we owe`} />
           <Table>
@@ -178,9 +178,9 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
               </tr>
             </THead>
             <tbody>
-              {plan.factories.rows.map((r) => (
-                <Tr key={r.factory.id}>
-                  <Td>{r.factory.name}</Td>
+              {plan.suppliers.rows.map((r) => (
+                <Tr key={r.supplier.id}>
+                  <Td>{r.supplier.name}</Td>
                   <Td className="text-right tabular">{money(r.toPay, r.currency)}</Td>
                 </Tr>
               ))}
@@ -323,7 +323,7 @@ async function OnOrder({
     );
   }
   const [m, people] = await Promise.all([orderMoneyOf(orderId), getPeople()]);
-  const owing = m.factories?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
+  const owing = m.suppliers?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
   return (
     <>
       {picker}

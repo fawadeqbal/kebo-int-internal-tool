@@ -132,6 +132,28 @@ describe("a phone app from before the rename keeps working", () => {
     }
   });
 
+  it("the bare word (step B): its old twin for everyone but the web that says it reads it (supplier.2)", async () => {
+    const quoteOf = async (names: string | null) => {
+      const req = request(app.getHttpServer())
+        .get(`/api/inquiries/${inquiryId}/sourcing`)
+        .set("authorization", `Bearer ${sana}`)
+        .set("user-agent", DART);
+      const res = await (names ? req.set("x-names", names) : req).expect(200);
+      return (res.body.quotes as Record<string, unknown>[])[0]!;
+    };
+    // An old phone, and the web of the day before (during a deploy): `factory` beside `supplier`, the same value.
+    for (const names of [null, "supplier"]) {
+      const q = await quoteOf(names);
+      expect(q.supplier).toEqual(expect.objectContaining({ id: expect.any(String), name: expect.any(String) }));
+      expect(q.factory).toEqual(q.supplier);
+    }
+    // Today's web: the new names alone.
+    const q = await quoteOf("supplier.2");
+    expect(q.supplier).toEqual(expect.objectContaining({ id: expect.any(String) }));
+    expect("factory" in q).toBe(false);
+    expect("factoryTotal" in q).toBe(false);
+  });
+
   it("an uploaded form's old field name is read too: an offer's file stays on the offer", async () => {
     const offerId = ((await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes as { id: string }[])[0]!.id;
     await request(app.getHttpServer())
@@ -230,6 +252,35 @@ describe("a phone app from before the rename keeps working", () => {
       asSent: { factoryIds: ["f1"] },
       sent: { supplierId: "f1" },
     });
+    // The bare word (step B) is an answer's twin only: never read in a body (Terms' sides and who bears a cost are
+    // tables keyed by the stored "factory"), and left alone for the web that says it reads it (supplier.2).
+    const answer = { supplier: { id: "f1" }, rows: [{ suppliers: [] }], borneBy: { customer: "a", factory: "b" } };
+    const beforeBare: Record<string, string>[] = [{ "user-agent": DART }, { "user-agent": "Mozilla/5.0", "x-names": "supplier" }];
+    for (const headers of beforeBare) {
+      let sent: unknown;
+      const res = { json: (b: unknown) => (sent = b) };
+      const req: { headers: Record<string, string>; url: string; body?: unknown } = {
+        headers,
+        url: "/api/x",
+        body: { sides: { factory: "kept" } },
+      };
+      oldNames()(req, res, () => undefined);
+      res.json(answer);
+      expect(req.body).toEqual({ sides: { factory: "kept" } });
+      expect(sent).toEqual({
+        supplier: { id: "f1" },
+        factory: { id: "f1" },
+        rows: [{ suppliers: [], factories: [] }],
+        borneBy: { customer: "a", factory: "b" },
+      });
+    }
+    {
+      let sent: unknown;
+      const res = { json: (b: unknown) => (sent = b) };
+      oldNames()({ headers: { "user-agent": "Mozilla/5.0", "x-names": "supplier.2" }, url: "/api/x" }, res, () => undefined);
+      res.json(answer);
+      expect(sent).toEqual(answer);
+    }
     // A phone build that says it reads the new names is not an old phone: when a body carries both, the new one wins.
     expect(run({ "user-agent": DART, "x-names": "supplier" }, "/api/expenses", { supplierQuoteId: "new", factoryQuoteId: "old" })).toEqual({
       url: "/api/expenses",
