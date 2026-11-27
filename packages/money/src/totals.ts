@@ -16,7 +16,7 @@ export interface DocumentTotals {
 
 /**
  * The single place where quotation and proforma totals are worked out:
- * total = subtotal − discount. Sales carry no tax (tax is only on factory
+ * total = subtotal − discount. Sales carry no tax (tax is only on supplier
  * prices). The discount is never negative and never more than the subtotal,
  * and it is spread over the lines (by line total) so per-line profit adds up.
  */

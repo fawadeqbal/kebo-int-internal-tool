@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronRight } from "lucide-react";
 import { Button, capsClass, cn, Field, Input, Notice, Textarea, linkClass } from "@kebo/ui";
-import type { FactoryOption } from "@/lib/types-deals";
+import type { SupplierOption } from "@/lib/types-deals";
 import type { QuickSupplier, QuickSupplierResult } from "@/app/(app)/inquiries/[id]/sourcing/actions";
 
 /** Enter in these small inputs must not save the whole offer. */
@@ -28,8 +28,8 @@ export function NewSupplierForm({
 }: {
   initialName: string;
   add: (v: QuickSupplier) => Promise<QuickSupplierResult>;
-  search: (q: string) => Promise<FactoryOption[]>;
-  onUse: (f: FactoryOption) => void;
+  search: (q: string) => Promise<SupplierOption[]>;
+  onUse: (f: SupplierOption) => void;
   /** Gives the window's Add and use its way in. */
   onReady: (api: { save: () => void }) => void;
   onBusy: (busy: boolean) => void;
@@ -37,7 +37,7 @@ export function NewSupplierForm({
   const [q, setQ] = useState<QuickSupplier>({ name: initialName, contactPerson: "", phone: "", wechat: "", email: "", address: "", bankDetails: "", notes: "" });
   const [more, setMore] = useState(false);
   const [result, setResult] = useState<Extract<QuickSupplierResult, { ok: false }> | null>(null);
-  const [found, setFound] = useState<{ name: string; list: FactoryOption[] }>({ name: "", list: [] });
+  const [found, setFound] = useState<{ name: string; list: SupplierOption[] }>({ name: "", list: [] });
   const set = (k: keyof QuickSupplier, value: string) => setQ((s) => ({ ...s, [k]: value }));
   const err = (k: string) => result?.errors?.[k]?.[0];
 

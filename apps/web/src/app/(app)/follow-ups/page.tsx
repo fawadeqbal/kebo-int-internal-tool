@@ -117,7 +117,7 @@ export default async function FollowUpsPage({
     ...orders.map((o) => ({ value: `orderId:${o.id}`, label: `${o.refNo} · ${o.customer.name}`, group: "Orders" })),
     ...inquiries.map((d) => ({ value: `inquiryId:${d.id}`, label: `${d.refNo} · ${d.customer.name}`, group: "Inquiries" })),
     ...customers.map((c) => ({ value: `customerId:${c.id}`, label: c.name, group: "Customers" })),
-    ...suppliers.map((f) => ({ value: `factoryId:${f.id}`, label: f.name, group: "Suppliers" })),
+    ...suppliers.map((f) => ({ value: `supplierId:${f.id}`, label: f.name, group: "Suppliers" })),
   ];
 
   // The tick and the pencil, the same in the table and in the phone's list.

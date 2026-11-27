@@ -35,7 +35,7 @@ export type Search = {
 /**
  * The company's money records, one page each (they were the tabs of Cash & accounts): the cash
  * book (where the money is), expenses, what customers still owe us (Finance) and what we still
- * owe the factories (Purchasing). The numbers and charts are on Reports.
+ * owe the suppliers (Purchasing). The numbers and charts are on Reports.
  */
 
 /** Who may open which: the pages check it, the sidebar hides what they may not. */
@@ -250,7 +250,7 @@ export async function VaultOverview({ today }: { today: string }) {
 
 /**
  * Where our money is (each account and its balance today), and every amount in
- * and out in a month or a year: from customers, to factories, expenses, and
+ * and out in a month or a year: from customers, to suppliers, expenses, and
  * moves between our accounts. One account shows its balance line by line, like
  * a bank statement, so the two can be checked against each other.
  */

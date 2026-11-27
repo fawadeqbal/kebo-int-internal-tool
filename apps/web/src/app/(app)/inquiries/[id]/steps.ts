@@ -4,7 +4,7 @@ import type { DealDetail } from "@/lib/types";
 
 /**
  * The inquiry in words: its status line, what to do next, and the quotation's short status ("R2 draft"),
- * worked out from the inquiry's stage, its factory offers and its quotation.
+ * worked out from the inquiry's stage, its supplier offers and its quotation.
  */
 
 type Rev = NonNullable<DealDetail["quotation"]>["revisions"][number];
@@ -27,14 +27,14 @@ export function quotationStatus(d: DealDetail) {
   return `R${latest.number} ${latest.status}`;
 }
 
-/** What the inquiry's frame knows about its factory side (null: this person does not see factory prices). */
+/** What the inquiry's frame knows about its supplier side (null: this person does not see supplier prices). */
 export interface OfferFacts {
   /** Offers entered. */
   offers: number;
-  /** Factories asked, and how many of them answered. */
+  /** Suppliers asked, and how many of them answered. */
   asked: number;
   answered: number;
-  /** Factories asked that have not answered yet. */
+  /** Suppliers asked that have not answered yet. */
   waiting: { name: string; replyBy: string | null }[];
 }
 

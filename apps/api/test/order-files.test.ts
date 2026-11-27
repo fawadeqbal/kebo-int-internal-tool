@@ -90,7 +90,7 @@ describe("order files", () => {
         .post("/customers", { name: `Files Pharma ${tag}`, country: "PK", contacts: [{ name: "Ali", email: `ali-${tag}@fp.test` }] })
         .expect(201)
     ).body.id;
-    const factoryId = (
+    const supplierId = (
       await api(app, sana)
         .post("/factories", { name: `Files Works ${tag}`, address: "Ningbo" })
         .expect(201)
@@ -109,7 +109,7 @@ describe("order files", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "DPP-260", quantity: 1, unitPrice: 300000 }],

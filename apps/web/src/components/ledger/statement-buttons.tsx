@@ -13,7 +13,7 @@ import { emailOutAction } from "@/app/(app)/send-actions";
 const ABOUT: Partial<Record<LedgerPartyKind, string>> = { customer: "customer", factory: "supplier" };
 
 /**
- * The statement of a customer, factory or person, for the period on screen: "Statement PDF" gives it its number
+ * The statement of a customer, supplier or person, for the period on screen: "Statement PDF" gives it its number
  * and opens the paper; Share and Email (the app's two buttons, design "Email and Share", 26 Nov 2026) give it its
  * number and send it: WhatsApp, WeChat… or an email from the company's address (or your own mail app).
  */

@@ -3,8 +3,8 @@ import { ButtonLink, Card, CardBody, CardHeader, EmptyLine } from "@kebo/ui";
 import { FileText } from "lucide-react";
 import { hasFeature, requireUser } from "@/lib/session";
 import { api } from "@/lib/api";
-import type { FactoryGroups, FactoryOrders } from "@/lib/types-facts";
-import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
+import type { SupplierGroups, SupplierOrders } from "@/lib/types-facts";
+import { supplierOf, supplierPayablesOf } from "@/lib/party-data";
 import { plural, whole } from "@/lib/format";
 
 /**
@@ -15,10 +15,10 @@ export async function SupplierSide({ id }: { id: string }) {
   const me = await requireUser();
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
   const [f, payables, pos, groups] = await Promise.all([
-    factoryOf(id),
-    factoryPayablesOf(id),
-    money ? api.get<FactoryOrders>("/insights/facts/factory-orders", { factoryId: id }).catch(() => null) : null,
-    money ? api.get<FactoryGroups>("/insights/facts/factories/groups", { period: "all", by: "factory", factoryId: id }).catch(() => null) : null,
+    supplierOf(id),
+    supplierPayablesOf(id),
+    money ? api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id }).catch(() => null) : null,
+    money ? api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory", supplierId: id }).catch(() => null) : null,
   ]);
   const r = f.record;
   const toPay = payables.filter((p) => Number(p.toPay) > 0.005);

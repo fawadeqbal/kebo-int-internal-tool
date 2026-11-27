@@ -3,14 +3,14 @@ import { PrismaService } from "../../database/prisma.service";
 import { CompanyContext } from "../../common/company/company-context";
 import { toInfo } from "../../common/company/companies.service";
 import { agreedView } from "../orders/orders.service";
-import { copyOfOffer, offerTermsSelect } from "./factory-terms";
+import { copyOfOffer, offerTermsSelect } from "./supplier-terms";
 
 /**
  * Old records, filled once (design "RFQ Desk — terms that travel", step 4): an order made before it kept its own
  * copy of what was agreed takes its quotation's as its own — exactly what it already showed and printed, so nothing
  * on a screen or a paper changes, but one without a port of discharge of its own takes the quotation's — and the
- * ship-by date typed on it stays typed; a purchase order sent (or its order sent to the factory) before it kept
- * what was agreed with the factory takes its offer's. Run when the API starts; what has its copy is left alone.
+ * ship-by date typed on it stays typed; a purchase order sent (or its order sent to the supplier) before it kept
+ * what was agreed with the supplier takes its offer's. Run when the API starts; what has its copy is left alone.
  */
 @Injectable()
 export class TermsFillService {
@@ -94,18 +94,18 @@ export class TermsFillService {
       });
       orders += r.count;
     }
-    // Sent: on its own day, or (before purchase orders were sent one by one) the day the order went to the factory.
+    // Sent: on its own day, or (before purchase orders were sent one by one) the day the order went to the supplier.
     const sent = await db.purchaseOrder.findMany({
-      where: { termsCopied: false, OR: [{ sentOn: { not: null } }, { order: { factoryOrderedOn: { not: null } } }] },
+      where: { termsCopied: false, OR: [{ sentOn: { not: null } }, { order: { supplierOrderedOn: { not: null } } }] },
       select: { id: true, orderId: true, supplierId: true },
     });
     for (const po of sent) {
       const line = await db.orderLine.findFirst({
-        where: { orderId: po.orderId, factoryId: po.supplierId, quoteLine: { factoryQuoteLine: { isNot: null } } },
+        where: { orderId: po.orderId, supplierId: po.supplierId, quoteLine: { supplierQuoteLine: { isNot: null } } },
         orderBy: { sortOrder: "asc" },
-        select: { quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: offerTermsSelect } } } } } },
+        select: { quoteLine: { select: { supplierQuoteLine: { select: { supplierQuote: { select: offerTermsSelect } } } } } },
       });
-      const r = await db.purchaseOrder.updateMany({ where: { id: po.id, termsCopied: false }, data: copyOfOffer(line?.quoteLine?.factoryQuoteLine?.factoryQuote ?? null) });
+      const r = await db.purchaseOrder.updateMany({ where: { id: po.id, termsCopied: false }, data: copyOfOffer(line?.quoteLine?.supplierQuoteLine?.supplierQuote ?? null) });
       purchaseOrders += r.count;
     }
     return { orders, purchaseOrders };

@@ -49,7 +49,7 @@ const PATH = "/finance/ledger";
 
 /**
  * Finance › Ledger (approved page 34): every money record, posted from its document. Views over the same rows:
- * All entries · By account · Customers · Factories · Staff · Orders. A click on a row opens the entry in the side
+ * All entries · By account · Customers · Suppliers · Staff · Orders. A click on a row opens the entry in the side
  * panel (both sides, what it settles, the document). Nothing here is typed: change the document, the ledger follows.
  */
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<Search> }) {
@@ -219,7 +219,7 @@ async function Entries({
   );
 }
 
-/** Orders: pick one to see exactly its rows (the order, its factories' parts, money in and out, its expenses). */
+/** Orders: pick one to see exactly its rows (the order, its suppliers' parts, money in and out, its expenses). */
 async function OrderPicker() {
   const orders = await api.get<OrderRow[]>("/orders").catch(() => [] as OrderRow[]);
   return (
@@ -364,7 +364,7 @@ async function Balances({ sp }: { sp: Search }) {
   );
 }
 
-/** By account: every account's balance (as the cash book, the customers', the factories'…), and debits equal credits. */
+/** By account: every account's balance (as the cash book, the customers', the suppliers'…), and debits equal credits. */
 async function Accounts({ period }: { period: { to: string } }) {
   const a = await api.get<LedgerAccounts>("/ledger/accounts", { to: period.to });
   return (
@@ -421,7 +421,7 @@ async function Accounts({ period }: { period: { to: string } }) {
   );
 }
 
-/** Customers, factories or staff: what each owes us or we owe them, by how late, and their own ledger. */
+/** Customers, suppliers or staff: what each owes us or we owe them, by how late, and their own ledger. */
 async function Parties({ side }: { side: "receivable" | "payable" | "staff" }) {
   const a = await api.get<LedgerAgeing>("/ledger/ageing", { side });
   const kind = side === "receivable" ? "customer" : side === "payable" ? "factory" : "staff";

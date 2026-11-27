@@ -7,7 +7,7 @@ import { useTime } from "@/lib/time-client";
 import type { Fx } from "@/lib/fx";
 import type { Person } from "@/lib/types";
 import type { ExpenseView } from "@/lib/types-money";
-import { EditCustomerPayment, FactoryPaymentForm } from "./forms";
+import { EditCustomerPayment, SupplierPaymentForm } from "./forms";
 import { CostPanel, subOf } from "./cost-window";
 import { costForOf } from "./cost-kinds";
 
@@ -27,12 +27,12 @@ export function ChangeCustomerPayment(props: Omit<ComponentProps<typeof EditCust
   );
 }
 
-export function ChangeSupplierPayment(props: Omit<ComponentProps<typeof FactoryPaymentForm>, "onClose" | "bare">) {
+export function ChangeSupplierPayment(props: Omit<ComponentProps<typeof SupplierPaymentForm>, "onClose" | "bare">) {
   return (
     <UrlWindow name="change" title="Change the payment" className={RULES.window.part}>
       {(close) => (
         <PanelBody>
-          <FactoryPaymentForm {...props} bare onClose={close} />
+          <SupplierPaymentForm {...props} bare onClose={close} />
         </PanelBody>
       )}
     </UrlWindow>

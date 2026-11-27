@@ -18,7 +18,7 @@ import type { LineColumn, LineRow, LineValues } from "./line-table";
  */
 
 /** A line's price columns: an empty or 0 price is something the line still needs. */
-const PRICE_KEYS = new Set(["unitPrice", "factoryPrice"]);
+const PRICE_KEYS = new Set(["unitPrice", "supplierPrice"]);
 const isZero = (raw: string) => raw === "" || Number(raw.replace(/,/g, "")) === 0;
 
 /**

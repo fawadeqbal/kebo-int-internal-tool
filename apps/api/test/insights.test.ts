@@ -26,7 +26,7 @@ describe("dashboard, reports, notifications, reminders, audit", () => {
     expect(mine.money).toBeNull();
     expect(mine.todo.length).toBeGreaterThan(0);
     expect(mine.todo[0]).toHaveProperty("needs.title");
-    expect(mine.todo[0].needs.late).toBe(true); // Bilal's goods are past the factory's ready date
+    expect(mine.todo[0].needs.late).toBe(true); // Bilal's goods are past the supplier's ready date
     const all = (await api(app, manager).get("/dashboard").expect(200)).body;
     expect(all.money.currency).toBe("USD");
     expect(Number(all.money.now.toReceive)).toBeGreaterThan(0);

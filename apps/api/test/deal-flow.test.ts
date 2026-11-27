@@ -112,7 +112,7 @@ describe("a whole deal through the API", () => {
   it("records supplier prices and works out the landed cost in USD", async () => {
     const q = await api(app, staff)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Wenzhou Valve ${tag}`,
+        newSupplierName: `Wenzhou Valve ${tag}`,
         receivedOn: "2026-10-20",
         currency: "CNY",
         lines: [{ requestedItemId: itemId, description: "Gate valve DN100 PN16", quantity: 200, unitPrice: "628.32", taxRate: 13 }],

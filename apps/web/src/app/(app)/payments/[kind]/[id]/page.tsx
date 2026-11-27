@@ -19,7 +19,7 @@ import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Me } from "@/lib/session";
 import { fieldLabel, hiddenChange, shown } from "@/components/common/history-words";
-import { editPaymentAction, factoryPaymentAction, repeatingAction } from "../../../money/actions";
+import { editPaymentAction, supplierPaymentAction, repeatingAction } from "../../../money/actions";
 import { removeRecordFileAction, voidPaymentAction } from "../../actions";
 import { opensPayments } from "../../shared";
 import { cache } from "react";
@@ -350,7 +350,7 @@ async function changeOf(me: Me, p: PaymentView, expense: ExpenseView | null): Pr
     if (!f || !x || !f.canRecord) return null;
     return (
       <ChangeSupplierPayment
-        action={factoryPaymentAction.bind(null, m.orderId, x.id, x.updatedAt)}
+        action={supplierPaymentAction.bind(null, m.orderId, x.id, x.updatedAt)}
         factories={f.rows}
         people={people}
         orderCurrency={m.currency}

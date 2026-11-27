@@ -264,7 +264,7 @@ describe("settings", () => {
     expect(values.reminders).toMatchObject({ newDays: 2, sourcingDays: 9, dueSoonDays: 4 });
     expect(values.notifications).toEqual({ emails: ["boss@keboint.com"], newInquiry: false, dealWonOrLost: true, paymentReceived: false, dailySummary: true });
     expect(values.reminders.depositDays).toBe(7);
-    // VAT now comes from the customer's country and the factory, not from Settings.
+    // VAT now comes from the customer's country and the supplier, not from Settings.
     expect(dropped.sort()).toEqual(["invoicePaymentDays", "notifyQuotation", "pricesIncludeVat", "vatRate"]);
   });
 

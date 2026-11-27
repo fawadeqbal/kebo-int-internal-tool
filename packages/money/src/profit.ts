@@ -9,7 +9,7 @@ import { allocate, multiplyMinor, roundHalfAway, type Minor } from "./core";
  *   cost (freight, hand-priced) are revenue with unknown cost, reported apart
  *   so they never inflate profit.
  * - Actual (from cash): money received from the customer less money paid to
- *   factories and other costs on the order.
+ *   suppliers and other costs on the order.
  */
 
 export interface SoldLine {
@@ -104,7 +104,7 @@ export function profitTotals(lines: CostedSoldLine[]): ProfitTotals {
   };
 }
 
-/** Totals per group key (customer, category, factory…), most profit first. */
+/** Totals per group key (customer, category, supplier…), most profit first. */
 export function profitBy(lines: CostedSoldLine[], key: string, limit = 8) {
   const groups = new Map<string, CostedSoldLine[]>();
   for (const l of lines) {

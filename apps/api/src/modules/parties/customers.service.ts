@@ -141,7 +141,7 @@ export class CustomersService {
     const features = await this.limits.features();
     return {
       ...c,
-      orders: c.orders.map(({ factoryOrderedOn, shipments, delivery, ...o }) => ({ ...o, word: orderWord(wordFactsOf({ status: o.status, factoryOrderedOn, shipments, delivery }), features) })),
+      orders: c.orders.map(({ supplierOrderedOn, shipments, delivery, ...o }) => ({ ...o, word: orderWord(wordFactsOf({ status: o.status, supplierOrderedOn, shipments, delivery }), features) })),
     };
   }
 

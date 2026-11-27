@@ -111,7 +111,7 @@ describe("the order's history", () => {
             summary: "SO-1: ready date told",
             reason: null,
             changes: [
-              { field: "factoryId", from: null, to: "1ce05c69" },
+              { field: "supplierId", from: null, to: "1ce05c69" },
               { field: "ask", from: null, to: "true" },
               { field: "readyToldVia", from: null, to: "wechat" },
             ],

@@ -62,9 +62,9 @@ import { EventBus, type DomainEvent } from "../../common/events/event-bus";
 import { StagesService } from "../inquiries/stages.service";
 import { requireReason } from "../../common/audit/reason";
 import { ordersWithMoneyDue } from "../billing/api";
-import { chargedExpenses, factoryBorneExpenses, factoryPositionOf, fxOf, moneyFacts, positionOf, reachedOn, supplierPaidRelation, type MoneyCtx } from "../billing/api";
+import { chargedExpenses, supplierBorneExpenses, supplierPositionOf, fxOf, moneyFacts, positionOf, reachedOn, supplierPaidRelation, type MoneyCtx } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
-import { chasesOf, factoryPlansFor } from "../billing/api";
+import { chasesOf, supplierPlansFor } from "../billing/api";
 import { createPlan, termsOf } from "../billing/api";
 import { buyerAtOrder, buyerNow, buyerOf } from "./buyer";
 import { setPaymentTerms } from "./payment-terms";
@@ -100,17 +100,17 @@ const orderInclude = {
   expenses: chargedExpenses,
   lines: {
     orderBy: { sortOrder: "asc" },
-    // The factory each line was quoted from (through the quotation line and the factory's price).
+    // The supplier each line was quoted from (through the quotation line and the supplier's price).
     include: {
       quoteLine: {
         select: {
           requestedItemId: true,
           requestedItem: { select: { parentId: true } },
-          factoryQuoteLineId: true,
-          factoryQuoteLine: { select: { parentId: true } },
+          supplierQuoteLineId: true,
+          supplierQuoteLine: { select: { parentId: true } },
         },
       },
-      // The factory it was bought from (frozen when the order was made).
+      // The supplier it was bought from (frozen when the order was made).
       factory: { select: { id: true, name: true } },
       // How it is packed, case by case (the packing list's rows).
       cases: caseRowsSelect,
@@ -148,31 +148,31 @@ const orderInclude = {
   },
   // The shipments hold the B/L, the day the goods left and the container (Shipment 1 first).
   shipments: orderShipments,
-  // The delivery: with the shipments and the factory order day, what the order's one status word reads.
+  // The delivery: with the shipments and the supplier order day, what the order's one status word reads.
   delivery: { select: { deliveredOn: true } },
-  // Each factory's ready date (the order's is the latest of them).
+  // Each supplier's ready date (the order's is the latest of them).
   ...readySelect,
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
-/** "1", "2", "2.1" for an order's lines (a factory's parts under their line). */
+/** "1", "2", "2.1" for an order's lines (a supplier's parts under their line). */
 export function orderLineNumbers(
   lines: {
     id: string;
     quoteLine: {
       requestedItemId: string | null;
       requestedItem: { parentId: string | null } | null;
-      factoryQuoteLineId: string | null;
-      factoryQuoteLine: { parentId: string | null } | null;
+      supplierQuoteLineId: string | null;
+      supplierQuoteLine: { parentId: string | null } | null;
     } | null;
   }[],
 ) {
   return numberQuoteLines(
     lines.map((l) => ({
       id: l.id,
-      factoryQuoteLineId: l.quoteLine?.factoryQuoteLineId ?? null,
-      factoryParentId: l.quoteLine?.factoryQuoteLine?.parentId ?? null,
+      supplierQuoteLineId: l.quoteLine?.supplierQuoteLineId ?? null,
+      supplierParentId: l.quoteLine?.supplierQuoteLine?.parentId ?? null,
       requestedItemId: l.quoteLine?.requestedItemId ?? null,
       itemParentId: l.quoteLine?.requestedItem?.parentId ?? null,
     })),
@@ -182,7 +182,7 @@ export function orderLineNumbers(
 const qty = (d: { toString(): string }) => Number(d.toString());
 const trimQty = (d: { toString(): string }) => String(qty(d));
 
-/** What came in from the factory and whether the packing list is made, for the rules in @kebo/shared. */
+/** What came in from the supplier and whether the packing list is made, for the rules in @kebo/shared. */
 export function goodsOf(
   lines: { type: string; description: string; quantity: { toString(): string }; receivedQty: { toString(): string }; unit: string }[],
   packedAt: Date | null,
@@ -199,13 +199,13 @@ export function goodsOf(
 
 type LineRow = OrderRow["lines"][number];
 
-/** What a line shows besides the order's own columns: what reached the customer (Delivery & SAT on), the factory's price (people who see factory prices). */
+/** What a line shows besides the order's own columns: what reached the customer (Delivery & SAT on), the supplier's price (people who see supplier prices). */
 interface LineShows {
   delivered: boolean;
-  factoryPrices: boolean;
+  supplierPrices: boolean;
 }
 
-/** A line of the order as the screens get it: the order's columns, then what each step adds (received, packing, delivered, the factory's price). */
+/** A line of the order as the screens get it: the order's columns, then what each step adds (received, packing, delivered, the supplier's price). */
 function lineView(l: LineRow, no: string, show: LineShows) {
   return {
     id: l.id,
@@ -234,14 +234,14 @@ function lineView(l: LineRow, no: string, show: LineShows) {
     delivered: show.delivered
       ? { qty: trimQty(l.deliveredQty), condition: (l.deliveredCondition as LineCondition | null) ?? null, note: l.deliveryNote }
       : null,
-    factoryPrice:
-      show.factoryPrices && l.factoryUnitPrice !== null
+    supplierPrice:
+      show.supplierPrices && l.supplierUnitPrice !== null
         ? {
-            unitPrice: l.factoryUnitPrice.toFixed(2),
-            taxRate: l.factoryTaxRate?.toString() ?? "0",
+            unitPrice: l.supplierUnitPrice.toFixed(2),
+            taxRate: l.supplierTaxRate?.toString() ?? "0",
             /** The price already has the tax in it (not added again). */
-            taxIncluded: l.factoryTaxIncluded,
-            currency: l.factoryCurrency,
+            taxIncluded: l.supplierTaxIncluded,
+            currency: l.supplierCurrency,
           }
         : null,
   };
@@ -478,7 +478,7 @@ export class OrdersService {
       include: { quotation: { include: { inquiry: true } } },
     });
     // The order is the accepted option: its lines, its total.
-    // With the factory price each line was bought at (frozen on the order: what we owe the factory),
+    // With the supplier price each line was bought at (frozen on the order: what we owe the supplier),
     // and the costs to reach the basis it was sold on (part of its cost).
     const option = await tx.quotationOption.findFirstOrThrow({
       where: { id: optionId, revisionId },
@@ -486,8 +486,8 @@ export class OrdersService {
         lines: {
           orderBy: { sortOrder: "asc" },
           include: {
-            factoryQuoteLine: {
-              select: { unitPrice: true, taxRate: true, factoryQuote: { select: { factoryId: true, currency: true, taxIncluded: true } } },
+            supplierQuoteLine: {
+              select: { unitPrice: true, taxRate: true, supplierQuote: { select: { supplierId: true, currency: true, taxIncluded: true } } },
             },
           },
         },
@@ -551,11 +551,11 @@ export class OrdersService {
             lineTotal: l.lineTotal,
             unitCost: l.unitCost,
             sortOrder: l.sortOrder,
-            factoryId: l.factoryQuoteLine?.factoryQuote.factoryId ?? null,
-            factoryUnitPrice: l.factoryQuoteLine?.unitPrice ?? null,
-            factoryTaxRate: l.factoryQuoteLine?.taxRate ?? null,
-            factoryTaxIncluded: l.factoryQuoteLine?.factoryQuote.taxIncluded ?? false,
-            factoryCurrency: l.factoryQuoteLine?.factoryQuote.currency ?? null,
+            supplierId: l.supplierQuoteLine?.supplierQuote.supplierId ?? null,
+            supplierUnitPrice: l.supplierQuoteLine?.unitPrice ?? null,
+            supplierTaxRate: l.supplierQuoteLine?.taxRate ?? null,
+            supplierTaxIncluded: l.supplierQuoteLine?.supplierQuote.taxIncluded ?? false,
+            supplierCurrency: l.supplierQuoteLine?.supplierQuote.currency ?? null,
           })),
         },
         stageChanges: {
@@ -598,7 +598,7 @@ export class OrdersService {
       entityId: order.id,
       summary: `Order ${refNo} from ${rev.quotation.refNo} R${rev.number} Option ${option.letter} (${formatMinor(toMinor(option.total), rev.currency)})`,
     });
-    // The ledger: the customer owes the order total, and we owe each factory its part, from today.
+    // The ledger: the customer owes the order total, and we owe each supplier its part, from today.
     await this.ledger.post(tx, [{ type: "order_all", id: order.id }], { userId: actorId });
     const event: DomainEvent = {
       type: "order.created",
@@ -758,10 +758,10 @@ export class OrdersService {
       shipBy: fromDbDateOrNull(o.shipBy),
       /** When the customer wanted it (the deal's "wanted by"): the suggestion for ship-by while it is empty. */
       shipBySuggested: o.shipBy ? null : fromDbDateOrNull(requiredBy),
-      /** The latest of the factories' ready dates (known once each has given one). */
+      /** The latest of the suppliers' ready dates (known once each has given one). */
       readyOn: readyOnOf(o),
-      /** Each factory's own ready date. */
-      readyBy: readyByOf(o).map((r) => ({ ...r, name: o.lines.find((l) => l.factory?.id === r.factoryId)?.factory?.name ?? null })),
+      /** Each supplier's own ready date. */
+      readyBy: readyByOf(o).map((r) => ({ ...r, name: o.lines.find((l) => l.factory?.id === r.supplierId)?.factory?.name ?? null })),
       /** The shipment's, never the order's: the earliest day a shipment left, and Shipment 1's B/L. */
       shippedOn: ship.shippedOn,
       blNo: ship.blNo,
@@ -844,7 +844,7 @@ export class OrdersService {
               at: o.cancellation?.cancelledAt ?? null,
               reason: o.cancellation?.reason ?? null,
               customerMoney: o.cancellation?.customerMoney ?? null,
-              factoryMoney: o.cancellation?.factoryMoney ?? null,
+              supplierMoney: o.cancellation?.supplierMoney ?? null,
             }
           : null,
       documents: this.documentsOf(o),
@@ -864,24 +864,24 @@ export class OrdersService {
 
   async get(user: SessionUser, id: string) {
     const o = await this.load(user, id);
-    return { ...(await this.view(o, user)), factoryFiles: await this.factoryFilesOf(user, o.id), factoryTerms: await this.factoryTermsOf(user, o) };
+    return { ...(await this.view(o, user)), supplierFiles: await this.supplierFilesOf(user, o.id), supplierTerms: await this.supplierTermsOf(user, o) };
   }
 
   /**
-   * What each factory of the order gives (its offer's terms), beside what we agreed with the customer (design
-   * "terms that travel": the customer and the factory, side by side): its delivery basis, lead time, payment
+   * What each supplier of the order gives (its offer's terms), beside what we agreed with the customer (design
+   * "terms that travel": the customer and the supplier, side by side): its delivery basis, lead time, payment
    * parts and warranty, what its goods cost us in the order's currency, and its ready date. People who see
-   * factory prices only.
+   * supplier prices only.
    */
-  private async factoryTermsOf(user: SessionUser, o: OrderRow) {
+  private async supplierTermsOf(user: SessionUser, o: OrderRow) {
     if (!can(user, "sourcing.manage")) return [];
-    const quotes = await this.prisma.db.factoryQuote.findMany({
+    const quotes = await this.prisma.db.supplierQuote.findMany({
       where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId: o.id } } } } } } },
       select: {
         id: true,
         reference: true,
         receivedOn: true,
-        factoryId: true,
+        supplierId: true,
         factory: { select: { id: true, name: true } },
         basis: true,
         basisPlace: true,
@@ -897,14 +897,14 @@ export class OrdersService {
     });
     const { sales } = await this.settings.get();
     const ready = readyByOf(o);
-    // Agreed with each factory: its purchase order's own copy once sent (design "terms that travel", step 3b).
+    // Agreed with each supplier: its purchase order's own copy once sent (design "terms that travel", step 3b).
     const pos = await this.prisma.db.purchaseOrder.findMany({
       where: { orderId: o.id, termsCopied: true },
       select: { supplierId: true, basis: true, basisPlace: true, leadDays: true, leadFrom: true, warrantyMonths: true, warrantyFrom: true },
     });
     return quotes.map((q) => {
-      const po = pos.find((p) => p.supplierId === q.factoryId);
-      const terms = offerTermsOf(q, sales.factoryAdvancePercent);
+      const po = pos.find((p) => p.supplierId === q.supplierId);
+      const terms = offerTermsOf(q, sales.supplierAdvancePercent);
       return {
         factory: q.factory,
         offer: { id: q.id, reference: q.reference, receivedOn: fromDbDate(q.receivedOn) },
@@ -921,9 +921,9 @@ export class OrdersService {
           : terms,
         /** Its goods' cost on the order, in the order's currency (what we pay it, at the rate quoted). */
         costMinor: o.lines
-          .filter((l) => l.type === "goods" && l.factoryId === q.factoryId && l.unitCost !== null)
+          .filter((l) => l.type === "goods" && l.supplierId === q.supplierId && l.unitCost !== null)
           .reduce((t, l) => t + Math.round(decimalToMinor(l.unitCost!) * Number(l.quantity)), 0),
-        readyOn: ready.find((r) => r.factoryId === q.factoryId)?.readyOn ?? null,
+        readyOn: ready.find((r) => r.supplierId === q.supplierId)?.readyOn ?? null,
       };
     });
   }
@@ -1039,19 +1039,19 @@ export class OrdersService {
   }
 
   /**
-   * The factory's own quotation, catalogue and screenshots kept with the offer
+   * The supplier's own quotation, catalogue and screenshots kept with the offer
    * this order was made from (evidence for what was bought), for people who
-   * see factory prices. The deal's URS and documents are the deal's files.
+   * see supplier prices. The deal's URS and documents are the deal's files.
    */
-  private async factoryFilesOf(user: SessionUser, orderId: string) {
+  private async supplierFilesOf(user: SessionUser, orderId: string) {
     if (!can(user, "sourcing.manage")) return [];
-    const quotes = await this.prisma.db.factoryQuote.findMany({
+    const quotes = await this.prisma.db.supplierQuote.findMany({
       where: { lines: { some: { quoteLines: { some: { orderLines: { some: { orderId } } } } } } },
       select: { id: true, factory: { select: { name: true } } },
     });
     if (!quotes.length) return [];
     const files = await this.prisma.db.attachment.findMany({
-      where: { factoryQuoteId: { in: quotes.map((q) => q.id) }, deletedAt: null, replacedById: null },
+      where: { supplierQuoteId: { in: quotes.map((q) => q.id) }, deletedAt: null, replacedById: null },
       orderBy: { createdAt: "asc" },
     });
     return files.map((f) => ({
@@ -1062,7 +1062,7 @@ export class OrdersService {
       kind: f.kind,
       note: f.note,
       uploadedOn: f.createdAt.toISOString(),
-      factory: quotes.find((q) => q.id === f.factoryQuoteId)!.factory.name,
+      factory: quotes.find((q) => q.id === f.supplierQuoteId)!.factory.name,
     }));
   }
 
@@ -1226,12 +1226,12 @@ export class OrdersService {
     const all = [...(await this.list(user, { mine: true })), ...(await this.list(user, { mine: true, status: "closed", ids: due }))];
     const today = this.clock.today();
     const soon = (await this.settings.get()).reminders.dueSoonDays;
-    // A factory's part (the advance, the balance on the ready date) due soon or late, for people who see factory money.
+    // A supplier's part (the advance, the balance on the ready date) due soon or late, for people who see supplier money.
     if (can(user, "sourcing.manage")) {
       const { sales } = await this.settings.get();
       const open = all.filter((x) => x.status === "open");
       // Every open order's payment plans in one read, not one read per order.
-      const plans = await factoryPlansFor(this.prisma.db, open.map((i) => i.id), sales.factoryAdvancePercent, today, soon, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
+      const plans = await supplierPlansFor(this.prisma.db, open.map((i) => i.id), sales.supplierAdvancePercent, today, soon, fxOf(await this.settings.get(), await this.limits.allows("expenses")));
       for (const i of open) {
         for (const p of plans.get(i.id) ?? []) {
           const n = p.next;
@@ -1252,17 +1252,17 @@ export class OrdersService {
     const o = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       select: {
-        lines: { select: { factoryId: true, factoryUnitPrice: true, factoryCurrency: true, factoryTaxRate: true, factoryTaxIncluded: true, quantity: true, factory: { select: { name: true } } } },
+        lines: { select: { supplierId: true, supplierUnitPrice: true, supplierCurrency: true, supplierTaxRate: true, supplierTaxIncluded: true, quantity: true, factory: { select: { name: true } } } },
         supplierPaid: supplierPaidRelation,
-        expenses: factoryBorneExpenses,
+        expenses: supplierBorneExpenses,
       },
     });
     const bills = await tx.expense.findMany({ where: { orderId, voidedAt: null, payLater: true, repaidOn: null }, select: { amount: true, currency: true, description: true } });
-    const name = (id: string) => o.lines.find((l) => l.factoryId === id)?.factory?.name ?? "a supplier";
+    const name = (id: string) => o.lines.find((l) => l.supplierId === id)?.factory?.name ?? "a supplier";
     return [
-      ...factoryPositionOf(o, fx)
+      ...supplierPositionOf(o, fx)
         .filter((r) => r.toPayMinor > 0)
-        .map((r) => `${formatMinor(r.toPayMinor, r.currency)} to ${name(r.factoryId)}`),
+        .map((r) => `${formatMinor(r.toPayMinor, r.currency)} to ${name(r.supplierId)}`),
       ...bills.map((b) => `${formatMinor(toMinor(b.amount.toString()), b.currency)} for ${b.description}`),
     ];
   }
@@ -1312,7 +1312,7 @@ export class OrdersService {
       if (input.to === "done") Object.assign(data, { status: "closed", closedAt: new Date() });
       if (o.stage === "done" && !forward) Object.assign(data, { status: "open", closedAt: null });
       await tx.order.update({ where: { id: o.id }, data });
-      // The goods' ready date (every factory's): the customer's and the factories' plans follow it by themselves.
+      // The goods' ready date (every supplier's): the customer's and the suppliers' plans follow it by themselves.
       if (input.to === "in_production" && input.readyOn) await setReadyAll(tx, o.id, input.readyOn);
       if (input.to === "shipped" && forward) await this.freezePacking(tx, o.id, user.id);
       await tx.orderStageChange.create({
@@ -1350,7 +1350,7 @@ export class OrdersService {
   }
 
   /**
-   * The order flow moved on (ordered from the factory, a shipment left): the
+   * The order flow moved on (ordered from the supplier, a shipment left): the
    * order's stage follows by itself, forward only and only while it is open.
    * No warnings are asked (the work already happened); the history says why.
    * Nothing is copied: the ship date and B/L stay on the shipment.
@@ -1488,7 +1488,7 @@ export class OrdersService {
     return { o, byId };
   }
 
-  /** How many of each goods line came in from the factory so far (totals, not additions). */
+  /** How many of each goods line came in from the supplier so far (totals, not additions). */
   async recordReceipt(user: SessionUser, id: string, input: ReceiptInput) {
     if (!can(user, "orders.update")) throw new ForbiddenError("You cannot change orders.");
     const today = this.clock.today();
@@ -1610,12 +1610,12 @@ export class OrdersService {
 
   /** What the screens show of the lines for this person and company. */
   private async lineShows(user: SessionUser): Promise<LineShows> {
-    return { delivered: await this.limits.allows("delivery_sat"), factoryPrices: can(user, "sourcing.manage") };
+    return { delivered: await this.limits.allows("delivery_sat"), supplierPrices: can(user, "sourcing.manage") };
   }
 
   /**
    * One goods line, changed in a step's line table: what came in from the
-   * factory (Production), its packing (Shipping) or what reached the customer
+   * supplier (Production), its packing (Shipping) or what reached the customer
    * (Delivery & SAT). Only the fields sent change. Same rules and history as
    * the whole-list saves (PUT receipt / packing); answers the line and the
    * order's goods summary.
@@ -1807,7 +1807,7 @@ export class OrdersService {
       };
       if (Object.keys(onShipment).length) await onPrimaryShipment(tx, o, onShipment);
       if (Object.keys(data).length) await tx.order.update({ where: { id: o.id }, data });
-      // The ready date is each factory's: one date for all of them, or each factory's own.
+      // The ready date is each supplier's: one date for all of them, or each supplier's own.
       const ready =
         input.readyBy !== undefined
           ? await setReadyDates(tx, o.id, input.readyBy)
@@ -1830,7 +1830,7 @@ export class OrdersService {
         oldValues: { ...before, ...(ready && ready.before.length > 1 ? { readyBy: readyWords(ready.before, names) } : {}) },
         newValues: {
           ...sent,
-          ...(ready ? { readyOn: orderReadyOn(ready.after.flatMap((r) => (r.factoryId ? [r.factoryId] : [])), ready.after) } : {}),
+          ...(ready ? { readyOn: orderReadyOn(ready.after.flatMap((r) => (r.supplierId ? [r.supplierId] : [])), ready.after) } : {}),
           ...(ready && ready.after.length > 1 ? { readyBy: readyWords(ready.after, names) } : {}),
           reason: undefined,
         },

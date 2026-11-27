@@ -10,7 +10,7 @@ import { api, signIn, startApp } from "./app";
 /**
  * The platform admin's company page (record frame with sections): the data it
  * needs that the API did not give before — the people's two-step sign-in, who
- * signed in this week, open orders, customers and factories, the plan's price,
+ * signed in this week, open orders, customers and suppliers, the plan's price,
  * the company's own details (read-only), its address, when each module was
  * switched off, the main contact's phone, and the whole history by kind. Only
  * for platform admins.
@@ -95,7 +95,7 @@ describe("platform: the company page's data", () => {
       factories: expect.any(Number),
       twoStepOff: expect.any(Number),
     });
-    // The sample data has customers, factories and open orders.
+    // The sample data has customers, suppliers and open orders.
     expect(a.customers).toBeGreaterThan(0);
     expect(a.factories).toBeGreaterThan(0);
     expect(a.openOrders).toBeGreaterThan(0);

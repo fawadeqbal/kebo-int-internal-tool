@@ -59,7 +59,7 @@ export class GateError extends DomainError {
 }
 
 /**
- * The change affects someone else, the customer, a factory or money, so it needs
+ * The change affects someone else, the customer, a supplier or money, so it needs
  * a reason. Answered 409 { code: "reason_needed", choices }; the form asks "Why?"
  * (quick choices or own words) and sends the same request again with `reason`.
  */

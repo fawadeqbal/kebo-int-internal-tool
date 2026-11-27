@@ -24,7 +24,7 @@ export function SelectCardList({ label, children, column, className }: { label: 
 }
 
 /**
- * One item of a short list you pick from to work on (a factory offer, a
+ * One item of a short list you pick from to work on (a supplier offer, a
  * quotation option): name and its key figure, one meta line, status badges.
  */
 export function SelectCard({

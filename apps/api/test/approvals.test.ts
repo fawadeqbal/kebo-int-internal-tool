@@ -117,7 +117,7 @@ describe("money sent for approval", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Approve Valves ${tag}`,
+        newSupplierName: `Approve Valves ${tag}`,
         receivedOn: "2026-10-01",
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "Valve", quantity: 10, unitPrice: 1000 }],

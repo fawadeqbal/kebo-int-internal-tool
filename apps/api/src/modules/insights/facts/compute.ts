@@ -2,7 +2,7 @@ import { livePart, decimalToMinor, fromDbDate, fromDbDateOrNull, type Prisma } f
 import { fromMinor, orderCosting, orderMoney, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import {
   dealRevision,
-  factoryReadyActual,
+  supplierReadyActual,
   plannedAndSpent,
   planStatus,
   readSettings,
@@ -15,17 +15,17 @@ import {
 import { daysBetween, dateIn, type ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../../database/prisma.service";
 import { reachedOn } from "../../billing/api";
-import { factoryPlansOf } from "../../billing/api";
+import { supplierPlansOf } from "../../billing/api";
 import { convert, MainMoney, orderRate } from "../../money/order-money";
 import { livePlansOf } from "../../billing/api";
-import { factoryPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../billing/api";
-import { factoryReadyOf, readyOnOf } from "@kebo/database";
+import { supplierPositionOf, fxOf, positionOf, type MoneyCtx, supplierPaidRelation } from "../../billing/api";
+import { supplierReadyOf, readyOnOf } from "@kebo/database";
 import { optionFigures, worthInMain, worthOf } from "../../quotations/revision-figures";
 
 /*
  * Insights data (PR B): the rows of the three calculated tables, worked out ONLY through the shared rules —
  * positionOf (orderPosition), the order's costing and orderMoney exactly as the order's Costs page reads them,
- * the live plan (planStatus), factoryPositionOf / factoryPlansOf, shippedOnOf, the ready dates per factory,
+ * the live plan (planStatus), supplierPositionOf / supplierPlansOf, shippedOnOf, the ready dates per supplier,
  * revision worth. No formula of its own: a figure here is one of those, turned into the main currency.
  */
 
@@ -37,8 +37,8 @@ export interface FactsCtx {
   money: MainMoney;
   timeZone: string;
   today: ISODate;
-  /** Settings › the advance a factory asks by default (its plan when none is saved). */
-  factoryAdvancePercent: number;
+  /** Settings › the advance a supplier asks by default (its plan when none is saved). */
+  supplierAdvancePercent: number;
 }
 
 /** Settings read fresh from the database (not the 30-second cache), so a change of rates is seen at once. */
@@ -49,7 +49,7 @@ export async function factsCtxOf(db: Db, timeZone: string, today: ISODate, expen
     money: new MainMoney(settings.sales.currency, settings.sales.exchangeRates),
     timeZone,
     today,
-    factoryAdvancePercent: settings.sales.factoryAdvancePercent,
+    supplierAdvancePercent: settings.sales.supplierAdvancePercent,
   };
 }
 
@@ -92,7 +92,7 @@ const orderSelect = {
   receivables: { orderBy: { sortOrder: "asc" }, select: { amount: true, part: true } },
   expenses: {
     where: { voidedAt: null },
-    select: { amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, category: true, factoryId: true },
+    select: { amount: true, currency: true, rate: true, borneBy: true, voidedAt: true, category: true, supplierId: true },
   },
   costs: { select: { step: true, cost: true } },
   shipments: { select: { departedOn: true } },
@@ -105,16 +105,16 @@ const orderSelect = {
       quantity: true,
       receivedQty: true,
       receivedOn: true,
-      factoryId: true,
-      factoryUnitPrice: true,
-      factoryCurrency: true,
-      factoryTaxRate: true,
-      factoryTaxIncluded: true,
-      quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { factoryId: true } } } } } },
+      supplierId: true,
+      supplierUnitPrice: true,
+      supplierCurrency: true,
+      supplierTaxRate: true,
+      supplierTaxIncluded: true,
+      quoteLine: { select: { supplierQuoteLine: { select: { supplierQuote: { select: { supplierId: true } } } } } },
     },
   },
   supplierPaid: supplierPaidRelation,
-  factories: { select: { factoryId: true, readyOn: true } },
+  factories: { select: { supplierId: true, readyOn: true } },
   _count: { select: { claims: true } },
 } satisfies Prisma.OrderSelect;
 
@@ -150,7 +150,7 @@ function orderMoneyOf(o: OrderData, ctx: FactsCtx) {
   const m = orderMoney({
     ...costing,
     receivedMinor: position.receivedMinor,
-    factoryPaidMinor: 0,
+    supplierPaidMinor: 0,
     expensesMinor: plan.spentMinor,
     basisPaidMinor: plan.coveredMinor,
     bankChargesMinor: position.bankChargesMinor,
@@ -158,22 +158,22 @@ function orderMoneyOf(o: OrderData, ctx: FactsCtx) {
   return { position, costing, plan, m };
 }
 
-/** Order and order × factory rows for these orders (orders that are gone simply have none). */
+/** Order and order × supplier rows for these orders (orders that are gone simply have none). */
 export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promise<{ orders: FactRow[]; factories: FactRow[] }> {
   if (!ids.length) return { orders: [], factories: [] };
   const orders = await db.order.findMany({ where: { id: { in: ids } }, select: orderSelect });
   // One after the other: inside a transaction they share one connection.
   const plans = await livePlansOf(db, orders.map((o) => o.id));
   const firstQuotes = await firstQuotesOf(db, orders.map((o) => o.inquiryId));
-  const offers = await db.factoryQuote.groupBy({
-    by: ["inquiryId", "factoryId"],
+  const offers = await db.supplierQuote.groupBy({
+    by: ["inquiryId", "supplierId"],
     where: { deletedAt: null, inquiryId: { in: [...new Set(orders.map((o) => o.inquiryId))] } },
     _count: { _all: true },
   });
-  const offersOf = (inquiryId: string, factoryId: string) => offers.find((x) => x.inquiryId === inquiryId && x.factoryId === factoryId)?._count._all ?? 0;
+  const offersOf = (inquiryId: string, supplierId: string) => offers.find((x) => x.inquiryId === inquiryId && x.supplierId === supplierId)?._count._all ?? 0;
   const main = ctx.fx.main;
   const out: FactRow[] = [];
-  const factoryRows: FactRow[] = [];
+  const supplierRows: FactRow[] = [];
   for (const o of orders) {
     const inMain = (minor: Minor) => ctx.money.order(minor, o);
     const { position, costing, plan, m } = orderMoneyOf(o, ctx);
@@ -239,32 +239,32 @@ export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promis
       days_to_ship: shippedOn ? daysBetween(orderedOn, shippedOn) : null,
     });
 
-    // One row per factory its lines are bought from.
-    const factoryIds = [...new Set(o.lines.flatMap((l) => (l.factoryId ? [l.factoryId] : [])))];
-    if (!factoryIds.length) continue;
-    const positions = factoryPositionOf(o, ctx.fx).filter((r) => r.lines > 0);
-    const factoryPlans = await factoryPlansOf(db, o.id, ctx.factoryAdvancePercent, ctx.today, 0, ctx.fx);
-    for (const factoryId of factoryIds) {
-      const mine = positions.filter((r) => r.factoryId === factoryId);
+    // One row per supplier its lines are bought from.
+    const supplierIds = [...new Set(o.lines.flatMap((l) => (l.supplierId ? [l.supplierId] : [])))];
+    if (!supplierIds.length) continue;
+    const positions = supplierPositionOf(o, ctx.fx).filter((r) => r.lines > 0);
+    const supplierPlans = await supplierPlansOf(db, o.id, ctx.supplierAdvancePercent, ctx.today, 0, ctx.fx);
+    for (const supplierId of supplierIds) {
+      const mine = positions.filter((r) => r.supplierId === supplierId);
       const one = mine.length === 1 ? mine[0]! : null;
       const toMain = (minor: Minor, currency: string) => ctx.money.live(minor, currency);
       const toPayMain = mine.reduce((t, r) => t + toMain(r.toPayMinor, r.currency), 0);
       // Its plan's open parts in the main currency; what the plan does not date (prices changed since): no date.
       const parts: OpenPart[] = [];
-      for (const fp of factoryPlans.filter((p) => p.factory.id === factoryId))
+      for (const fp of supplierPlans.filter((p) => p.factory.id === supplierId))
         for (const r of fp.rows) if (toMinor(r.open) > 0) parts.push({ dueOn: r.due, open: money(toMain(toMinor(r.open), fp.currency)) });
       const undated = toPayMain - sumOpen(parts);
       if (undated > 0) parts.push({ dueOn: null, open: money(undated) });
-      const goods = o.lines.filter((l) => l.factoryId === factoryId && l.type === "goods");
-      const promised = factoryReadyOf(o, factoryId);
-      const actual = factoryReadyActual(
+      const goods = o.lines.filter((l) => l.supplierId === supplierId && l.type === "goods");
+      const promised = supplierReadyOf(o, supplierId);
+      const actual = supplierReadyActual(
         goods.map((l) => ({ quantity: l.quantity.toString(), receivedQty: l.receivedQty.toString(), receivedOn: fromDbDateOrNull(l.receivedOn) })),
         shippedOn,
       );
       const delay = readyDelay(promised, actual);
-      factoryRows.push({
+      supplierRows.push({
         order_id: o.id,
-        factory_id: factoryId,
+        factory_id: supplierId,
         status: o.status,
         ordered_on: orderedOn,
         currency: one?.currency ?? null,
@@ -280,13 +280,13 @@ export async function orderFactsOf(db: Db, ids: string[], ctx: FactsCtx): Promis
         ready_actual: actual,
         days_late: delay.daysLate,
         on_time: delay.onTime,
-        offers_sent: offersOf(o.inquiryId, factoryId),
-        offer_won: o.lines.some((l) => l.factoryId === factoryId && l.quoteLine?.factoryQuoteLine?.factoryQuote.factoryId === factoryId),
+        offers_sent: offersOf(o.inquiryId, supplierId),
+        offer_won: o.lines.some((l) => l.supplierId === supplierId && l.quoteLine?.supplierQuoteLine?.supplierQuote.supplierId === supplierId),
         claims: o._count.claims,
       });
     }
   }
-  return { orders: out, factories: factoryRows };
+  return { orders: out, factories: supplierRows };
 }
 
 /** Of the open parts, what was due before `today` (minor units of the main currency). */
@@ -307,7 +307,7 @@ const inquirySelect = {
   createdAt: true,
   closedAt: true,
   customer: { select: { country: true } },
-  _count: { select: { factoryQuotes: { where: { deletedAt: null } } } },
+  _count: { select: { supplierQuotes: { where: { deletedAt: null } } } },
   quotations: {
     select: {
       letter: true,
@@ -344,7 +344,7 @@ export async function inquiryFactsOf(db: Db, ids: string[], ctx: FactsCtx): Prom
       stage: i.stage,
       received_on: receivedOn,
       first_quote_on: firstQuote,
-      got_prices: i._count.factoryQuotes > 0,
+      got_prices: i._count.supplierQuotes > 0,
       quoted_value_main: latest ? money(ctx.money.live(worthOf(latest).lowMinor, latest.currency)) : null,
       main_currency: ctx.fx.main,
       outcome,

@@ -113,7 +113,7 @@ test("an inquiry's supplier offers: asked and answered in one list, the Amount w
   const item = (await (await page.request.get(`/api/inquiries/${deal.id}`)).json()).items[0];
   const offer = (name: string, price: number, lead: number, included: boolean) =>
     send(`/inquiries/${deal.id}/factory-quotes`, {
-      newFactoryName: `${name} ${tag}`,
+      newSupplierName: `${name} ${tag}`,
       receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
       currency: "CNY",
       taxIncluded: included,
@@ -127,7 +127,7 @@ test("an inquiry's supplier offers: asked and answered in one list, the Amount w
   await offer("Jinan Scroll", 86_000, 35, false);
   await offer("Ruian Scroll", 91_500, 25, true);
   const suppliers = await (await page.request.get("/api/factories", { params: { pageSize: 1 } })).json();
-  await send(`/inquiries/${deal.id}/factory-requests`, { factoryIds: [suppliers.rows[0].id] });
+  await send(`/inquiries/${deal.id}/factory-requests`, { supplierIds: [suppliers.rows[0].id] });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/inquiries/${deal.id}/sourcing`);

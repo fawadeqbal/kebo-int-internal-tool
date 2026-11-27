@@ -1,13 +1,13 @@
-import type { FactoryQuoteView, SourcingView } from "@/lib/types-deals";
+import type { SupplierQuoteView, SourcingView } from "@/lib/types-deals";
 
 /**
- * What a factory offer holds and still needs, worked out the same way on the
+ * What a supplier offer holds and still needs, worked out the same way on the
  * server (the step's header line, the offers table) and in the browser.
  */
 
 type Items = SourcingView["items"];
 /** The customer's top items and parts it answers, as "4 of 5 items" (null: no list to compare with). */
-export function coverOf(q: FactoryQuoteView, items: Items) {
+export function coverOf(q: SupplierQuoteView, items: Items) {
   if (!items.length) return null;
   // Items split into parts are priced in their parts: count what can be priced.
   const priceable = items.filter((i) => !i.hasParts);
@@ -20,7 +20,7 @@ export function coverOf(q: FactoryQuoteView, items: Items) {
  * said "covers all 4 items"): "covers all 4 items · 2 without a price". `start`: "covers" in a sentence, or a cell's
  * own capital ("All 4 items").
  */
-export function coverText(q: FactoryQuoteView, items: Items, start: "sentence" | "cell" = "sentence") {
+export function coverText(q: SupplierQuoteView, items: Items, start: "sentence" | "cell" = "sentence") {
   if (!q.lines.length) return start === "cell" ? "No items yet" : "no items yet";
   const c = coverOf(q, items);
   const what = c ? (c.all ? (c.of === 1 ? "the 1 item" : `all ${c.of} items`) : `${c.n} of ${c.of} items`) : `${q.lines.length} item${q.lines.length === 1 ? "" : "s"}`;
@@ -28,5 +28,5 @@ export function coverText(q: FactoryQuoteView, items: Items, start: "sentence" |
   return q.unpriced > 0 ? `${text} · ${q.unpriced} without a price` : text;
 }
 
-/** The factory's short name: "Ruian factory" → "Ruian". */
+/** The supplier's short name: "Ruian factory" → "Ruian". */
 export const shortName = (name: string) => name.replace(/\s+(factory|machinery|co\.?,? ?ltd\.?|company)\b.*$/i, "").trim() || name;

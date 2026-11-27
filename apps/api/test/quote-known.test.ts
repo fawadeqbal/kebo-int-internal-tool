@@ -48,7 +48,7 @@ describe("a quotation starts from what is known", () => {
     const items = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body.items as { id: string; description: string; quantity: string }[];
     await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `${name} ${tag}`,
+        newSupplierName: `${name} ${tag}`,
         receivedOn: "2026-11-01",
         currency: "CNY",
         lines: items.map((i) => ({ requestedItemId: i.id, description: i.description, quantity: Number(i.quantity), unitPrice: "1000" })),

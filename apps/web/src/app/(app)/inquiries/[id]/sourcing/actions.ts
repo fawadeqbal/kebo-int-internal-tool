@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { factoryQuoteInput } from "@kebo/shared";
+import { supplierQuoteInput } from "@kebo/shared";
 import { api, ApiError } from "@/lib/api";
 import { attempt, formBody, reasonOf, type ActionState } from "@/lib/actions";
 import type { Paged } from "@/lib/types";
 import { requireUser } from "@/lib/session";
-import type { FactoryOption, FactoryQuoteView } from "@/lib/types-deals";
+import type { SupplierOption, SupplierQuoteView } from "@/lib/types-deals";
 
 const refresh = (id: string) => revalidatePath(`/inquiries/${id}`, "layout");
 
@@ -21,7 +21,7 @@ export type QuickSupplier = {
   bankDetails: string;
   notes: string;
 };
-export type QuickSupplierResult = { ok: true; factory: FactoryOption } | { ok: false; message: string; errors?: Record<string, string[] | undefined> };
+export type QuickSupplierResult = { ok: true; factory: SupplierOption } | { ok: false; message: string; errors?: Record<string, string[] | undefined> };
 
 /**
  * "New supplier" in the offer window: added to the supplier list now, looked after by whoever adds it (as on
@@ -49,10 +49,10 @@ export async function quickSupplierAction(v: QuickSupplier): Promise<QuickSuppli
   return { ok: true, factory: { id: f.id, name: f.name, contactPerson: f.contactPerson ?? (blank(v.contactPerson) as string | null) } };
 }
 
-/** Factory picker: search the factory list by name or contact person. */
-export async function searchFactoriesAction(q: string): Promise<FactoryOption[]> {
+/** Supplier picker: search the supplier list by name or contact person. */
+export async function searchSuppliersAction(q: string): Promise<SupplierOption[]> {
   try {
-    const res = await api.get<Paged<FactoryOption>>("/factories", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
+    const res = await api.get<Paged<SupplierOption>>("/factories", { q: q.trim().slice(0, 100) || undefined, pageSize: 8 });
     return res.rows.map((f) => ({ id: f.id, name: f.name, contactPerson: f.contactPerson }));
   } catch {
     return [];
@@ -66,7 +66,7 @@ export async function searchFactoriesAction(q: string): Promise<FactoryOption[]>
  */
 function locateLineErrors(body: Record<string, unknown>, r: ActionState): ActionState {
   if (r.ok || !r.errors?.lines) return r;
-  const parsed = factoryQuoteInput.safeParse(body);
+  const parsed = supplierQuoteInput.safeParse(body);
   if (parsed.success) return r;
   const errors = { ...r.errors };
   for (const issue of parsed.error.issues) {
@@ -77,8 +77,8 @@ function locateLineErrors(body: Record<string, unknown>, r: ActionState): Action
   return { ...r, errors };
 }
 
-/** Add (quoteId null) or edit one factory's prices; JSON in `payload`. */
-export async function saveFactoryQuoteAction(
+/** Add (quoteId null) or edit one supplier's prices; JSON in `payload`. */
+export async function saveSupplierQuoteAction(
   dealId: string,
   quoteId: string | null,
   _prev: ActionState,
@@ -95,18 +95,18 @@ export async function saveFactoryQuoteAction(
   );
   if (!r.ok) return r;
   refresh(dealId);
-  // Named by the factory, and what came with it.
-  const factory = String(form.get("factoryLabel") ?? "").trim();
+  // Named by the supplier, and what came with it.
+  const supplier = String(form.get("supplierLabel") ?? "").trim();
   const lines = Array.isArray((body as { lines?: unknown[] }).lines) ? (body as { lines: unknown[] }).lines.length : 0;
   const currency = (body as { currency?: string }).currency;
   return {
     ...r,
-    message: factory ? `Offer from ${factory} ${quoteId ? "saved" : "added"}` : r.message,
+    message: supplier ? `Offer from ${supplier} ${quoteId ? "saved" : "added"}` : r.message,
     detail: [lines ? `${lines} ${lines === 1 ? "item" : "items"}` : null, currency].filter(Boolean).join(" · ") || undefined,
   };
 }
 
-export async function removeFactoryQuoteAction(dealId: string, quoteId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function removeSupplierQuoteAction(dealId: string, quoteId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const reason = reasonOf(form);
   const r = await attempt(
     form,
@@ -120,9 +120,9 @@ export async function removeFactoryQuoteAction(dealId: string, quoteId: string, 
 /* ---------------------------------------------------------------- the offer's lines, one change at a time */
 
 /** What a line change gives back to the line table: the offer numbered again, or why not. */
-export type OfferLineResult = { ok: true; offer: FactoryQuoteView } | { ok: false; message: string; reasonChoices?: string[] };
+export type OfferLineResult = { ok: true; offer: SupplierQuoteView } | { ok: false; message: string; reasonChoices?: string[] };
 
-async function lineCall(dealId: string, fn: () => Promise<FactoryQuoteView>): Promise<OfferLineResult> {
+async function lineCall(dealId: string, fn: () => Promise<SupplierQuoteView>): Promise<OfferLineResult> {
   try {
     const offer = await fn();
     refresh(dealId);
@@ -139,21 +139,21 @@ async function lineCall(dealId: string, fn: () => Promise<FactoryQuoteView>): Pr
 }
 
 export async function addOfferLinesAction(dealId: string, quoteId: string, body: object) {
-  return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-quotes/${quoteId}/lines`, body));
+  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/factory-quotes/${quoteId}/lines`, body));
 }
 
 export async function editOfferLineAction(dealId: string, lineId: string, body: object) {
-  return lineCall(dealId, () => api.patch<FactoryQuoteView>(`/factory-lines/${lineId}`, body));
+  return lineCall(dealId, () => api.patch<SupplierQuoteView>(`/factory-lines/${lineId}`, body));
 }
 
 export async function moveOfferLineAction(dealId: string, lineId: string, body: object) {
-  return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-lines/${lineId}/move`, body));
+  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/factory-lines/${lineId}/move`, body));
 }
 
 export async function removeOfferLineAction(dealId: string, lineId: string, reason?: string) {
-  return lineCall(dealId, () => api.delete<FactoryQuoteView>(`/factory-lines/${lineId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`));
+  return lineCall(dealId, () => api.delete<SupplierQuoteView>(`/factory-lines/${lineId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`));
 }
 
 export async function copyOfferLinesAction(dealId: string, quoteId: string, fromQuoteId: string) {
-  return lineCall(dealId, () => api.post<FactoryQuoteView>(`/factory-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
+  return lineCall(dealId, () => api.post<SupplierQuoteView>(`/factory-quotes/${quoteId}/copy-lines`, { fromQuoteId }));
 }

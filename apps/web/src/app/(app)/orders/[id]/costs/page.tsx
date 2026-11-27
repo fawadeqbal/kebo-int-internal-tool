@@ -55,7 +55,7 @@ function Figure({
 /**
  * Costs (design "money, simple", board OCost; managers with the expenses feature): the order's cost sheet.
  * Four figures (order total, costs so far, paid so far, profit now) and one list of every cost: the goods
- * from the factory order, freight and insurance from the shipment, bank charges from the payments, and the
+ * from the supplier order, freight and insurance from the shipment, bank charges from the payments, and the
  * costs added here. A cost counts as soon as it is known and is marked paid when it is paid.
  */
 export default async function OrderCostsPage({ params }: { params: Promise<{ id: string }> }) {

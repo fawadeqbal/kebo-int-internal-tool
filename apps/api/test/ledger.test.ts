@@ -34,9 +34,9 @@ type Check = { differences: { kind: string; key: string; ledger: string; expecte
 
 /**
  * Finance › Ledger: every write path posts its document's rows in the same transaction (payments, transfers over
- * several orders, credit used, refunded and removed, factory payments, expenses and who bears them, own money and
+ * several orders, credit used, refunded and removed, supplier payments, expenses and who bears them, own money and
  * its repayment, transfers between accounts, opening balances, orders made and cancelled, approvals); a change is
- * a reversal plus the new rows (an order's or factory part's amounts: the difference); exchange differences; every
+ * a reversal plus the new rows (an order's or supplier part's amounts: the difference); exchange differences; every
  * posting balanced; rows never changed; the rebuild idempotent; the check against today's figures; the read
  * endpoints, who may read them, and another company reaches none of it.
  */
@@ -52,7 +52,7 @@ describe("the ledger", () => {
   let me: string;
   let managerId: string;
   let customerId: string;
-  let factoryId: string;
+  let supplierId: string;
   let usdAccount: string;
   let cnyAccount: string;
   let today = "";
@@ -67,7 +67,7 @@ describe("the ledger", () => {
   const n = (v: { toString(): string } | null | undefined) => Number(v?.toString() ?? 0);
 
   /** A new deal for the customer, quoted and accepted: its order's id. */
-  const newOrder = async (price = 71000, currency = "USD", factory = factoryId) => {
+  const newOrder = async (price = 71000, currency = "USD", supplier = supplierId) => {
     const inquiry = (
       await api(app, sana)
         .post("/inquiries", {
@@ -81,7 +81,7 @@ describe("the ledger", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId: factory,
+        supplierId: supplier,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "ZH-120", quantity: 1, unitPrice: price, taxRate: 13 }],
@@ -149,7 +149,7 @@ describe("the ledger", () => {
         .post("/customers", { name: `Ledger Pharma ${tag}`, country: "PK", contacts: [{ name: "Rauf", email: `rauf-${tag}@ledger.test` }] })
         .expect(201)
     ).body.id;
-    factoryId = (
+    supplierId = (
       await api(app, sana)
         .post("/factories", { name: `Ledger Pack ${tag}` })
         .expect(201)
@@ -200,11 +200,11 @@ describe("the ledger", () => {
       ["order", `customer:${customerId}`, n(o.total), 0],
       ["order", "sales", 0, n(o.total)],
     ]);
-    const po = await rowsOf("purchase_order", `${orderId}:${factoryId}`);
-    // CNY 71,000 + 13% tax: what factoryPosition says we owe.
+    const po = await rowsOf("purchase_order", `${orderId}:${supplierId}`);
+    // CNY 71,000 + 13% tax: what supplierPosition says we owe.
     expect(po.map((r) => [r.type, r.account, r.currency, n(r.debit), n(r.credit)])).toEqual([
       ["purchase_order", "goods_cost", "CNY", 80230, 0],
-      ["purchase_order", `factory:${factoryId}`, "CNY", 0, 80230],
+      ["purchase_order", `factory:${supplierId}`, "CNY", 0, 80230],
     ]);
     expect(po[0]!.ref).toContain(o.refNo);
     balanced([...order, ...po]);
@@ -359,12 +359,12 @@ describe("the ledger", () => {
 
   it("factory payments: posted, changed, removed; paid at another rate than the order's, the difference is an exchange difference", async () => {
     const orderId = await newOrder(10000);
-    const part = `${orderId}:${factoryId}:CNY`;
+    const part = `${orderId}:${supplierId}:CNY`;
     // What we owe: CNY 11,300 (with 13% tax), posted at Settings' 7.1; paid at 7.0 per USD.
     const made = (
       await api(app, manager)
         .post(`/orders/${orderId}/factory-payments`, {
-          factoryId,
+          supplierId,
           amount: 11300,
           currency: "CNY",
           rate: 7,
@@ -378,25 +378,25 @@ describe("the ledger", () => {
     const entry = (await db().allocation.findUniqueOrThrow({ where: { id } })).movementId;
     const rows = await rowsOf("movement", entry);
     expect(rows.map((r) => [r.type, r.account, r.currency, n(r.debit), n(r.credit)])).toEqual([
-      ["money_out", `factory:${factoryId}`, "CNY", 11300, 0],
+      ["money_out", `factory:${supplierId}`, "CNY", 11300, 0],
       ["money_out", `money:${cnyAccount}`, "CNY", 0, 11300],
     ]);
     expect(rows[0]!.ref).toMatch(/^FP-\d{4}-\d{4}-1$/);
     // Settled in CNY; in USD it was worth 1,591.55 when owed and cost 1,614.29: a 22.74 loss.
     const fx = await rowsOf("fx_factory", part);
     expect(fx.map((r) => [r.type, r.account, n(r.debit), n(r.credit), n(r.debitBase), n(r.creditBase)])).toEqual([
-      ["fx", `factory:${factoryId}`, 0, 0, 0, 22.74],
+      ["fx", `factory:${supplierId}`, 0, 0, 0, 22.74],
       ["fx", "fx_diff", 22.74, 0, 22.74, 0],
     ]);
     const base = await db().$queryRaw<{ b: string }[]>`
-      select sum(debit_base - credit_base)::text as b from ledger_entries where order_id = ${orderId}::uuid and account = ${`factory:${factoryId}`}`;
+      select sum(debit_base - credit_base)::text as b from ledger_entries where order_id = ${orderId}::uuid and account = ${`factory:${supplierId}`}`;
     expect(Number(base[0]!.b)).toBe(0);
     await agrees();
 
     // Changed: no longer settled, the exchange difference is reversed too.
     await api(app, manager)
       .patch(`/factory-payments/${id}`, {
-        factoryId,
+        supplierId,
         amount: 10000,
         currency: "CNY",
         rate: 7,
@@ -487,12 +487,12 @@ describe("the ledger", () => {
     expect(rows.filter((r) => r.reversesId).every((r) => r.reason === "Their documents")).toBe(true);
     expect(Number((await due(orderId)).due)).toBe(dueBefore + 62);
     await agrees();
-    // Borne by the factory instead (CNY 710 → off what we owe it, in CNY).
+    // Borne by the supplier instead (CNY 710 → off what we owe it, in CNY).
     const f = (
       await api(app, manager)
         .post("/expenses", {
           orderId,
-          factoryId,
+          supplierId,
           category: "other",
           description: `Guard door ${tag}`,
           amount: 710,
@@ -505,7 +505,7 @@ describe("the ledger", () => {
         .expect(201)
     ).body;
     rows = await rowsOf("expense", f.id);
-    expect(rows.map((r) => [r.account, r.currency, n(r.debit), n(r.credit)])).toContainEqual([`factory:${factoryId}`, "CNY", 710, 0]);
+    expect(rows.map((r) => [r.account, r.currency, n(r.debit), n(r.credit)])).toContainEqual([`factory:${supplierId}`, "CNY", 710, 0]);
     await agrees();
     await api(app, manager).post(`/expenses/${f.id}/void`, { reason: "Supplier refused" }).expect(200);
     await agrees();
@@ -591,14 +591,14 @@ describe("the ledger", () => {
       })
       .expect(201);
     await api(app, manager)
-      .post(`/orders/${orderId}/factory-payments`, { factoryId, amount: 5000, currency: "CNY", paidOn: day(-2), accountId: cnyAccount })
+      .post(`/orders/${orderId}/factory-payments`, { supplierId, amount: 5000, currency: "CNY", paidOn: day(-2), accountId: cnyAccount })
       .expect(201);
     await api(app, manager)
-      .post(`/orders/${orderId}/cancel`, { reason: "Customer called it off", customerMoney: "credit", factoryMoney: "loss" })
+      .post(`/orders/${orderId}/cancel`, { reason: "Customer called it off", customerMoney: "credit", supplierMoney: "loss" })
       .expect(200);
     const order = await rowsOf("order", orderId);
     expect(order.filter((r) => r.reversesId).map((r) => r.reason)).toEqual(["Customer called it off", "Customer called it off"]);
-    const po = await rowsOf("purchase_order", `${orderId}:${factoryId}`);
+    const po = await rowsOf("purchase_order", `${orderId}:${supplierId}`);
     expect(po.filter((r) => r.reversesId)).toHaveLength(2);
     // What paid it is released (the transfer stands): back off the order, onto the customer's credit.
     const kept = await db().allocation.findFirstOrThrow({ where: { orderId, target: "order", voidedAt: { not: null } } });
@@ -606,12 +606,12 @@ describe("the ledger", () => {
       [`customer:${customerId}`, 3000, 0],
       [`credit:${customerId}`, 0, 3000],
     ]);
-    // The customer owes nothing on it any more; the factory's money written off.
+    // The customer owes nothing on it any more; the supplier's money written off.
     expect((await owedOn(orderId)).minor).toBe(0);
     const loss = await db().expense.findFirstOrThrow({ where: { orderId, step: "factory" } });
     expect((await rowsOf("expense", loss.id)).map((r) => [r.account, n(r.debit), n(r.credit)])).toEqual([
       ["expense:other", 5000, 0],
-      [`factory:${factoryId}`, 0, 5000],
+      [`factory:${supplierId}`, 0, 5000],
     ]);
     await agrees();
   });
@@ -637,11 +637,11 @@ describe("the ledger", () => {
   it("an order's or supplier part's amounts change: the difference is posted as a correction", async () => {
     const orderId = await newOrder(10000);
     const o = await db().order.findUniqueOrThrow({ where: { id: orderId }, include: { lines: true } });
-    const line = o.lines.find((l) => l.factoryId)!;
-    // A change of total and of the factory's price (no screen changes them yet; the rule is ready for one).
+    const line = o.lines.find((l) => l.supplierId)!;
+    // A change of total and of the supplier's price (no screen changes them yet; the rule is ready for one).
     await db().$transaction(async (tx) => {
       await tx.order.update({ where: { id: orderId }, data: { total: n(o.total) + 100 } });
-      await tx.orderLine.update({ where: { id: line.id }, data: { factoryUnitPrice: 11000 } });
+      await tx.orderLine.update({ where: { id: line.id }, data: { supplierUnitPrice: 11000 } });
     });
     await inCompany(() =>
       db().$transaction(async (tx) =>
@@ -653,11 +653,11 @@ describe("the ledger", () => {
       [`customer:${customerId}`, 100, 0, "Price agreed again"],
       ["sales", 0, 100, "Price agreed again"],
     ]);
-    const po = await rowsOf("purchase_order", `${orderId}:${factoryId}`);
+    const po = await rowsOf("purchase_order", `${orderId}:${supplierId}`);
     // 1,000 more a unit, with 13% tax: 1,130.
     expect(po.filter((r) => r.type === "correction").map((r) => [r.account, n(r.debit), n(r.credit)])).toEqual([
       ["goods_cost", 1130, 0],
-      [`factory:${factoryId}`, 0, 1130],
+      [`factory:${supplierId}`, 0, 1130],
     ]);
     await agrees();
   });
@@ -732,7 +732,7 @@ describe("the ledger", () => {
     expect(last.balanceBase).toBe(party.closing.base);
     const open = (await api(app, manager).get(`/ledger/parties/customer/${customerId}?onlyOpen=true`).expect(200)).body;
     expect(open.closing.base).toBe(party.closing.base);
-    const fac = (await api(app, manager).get(`/ledger/parties/factory/${factoryId}`).expect(200)).body;
+    const fac = (await api(app, manager).get(`/ledger/parties/factory/${supplierId}`).expect(200)).body;
     expect(fac.sign).toBe("we owe");
     await api(app, manager).get(`/ledger/parties/factory/${customerId}`).expect(404);
     await api(app, manager).get(`/ledger/parties/nobody/${customerId}`).expect(400);
@@ -756,16 +756,16 @@ describe("the ledger", () => {
     expect(draft.doc.rows[0].item).toBe("Opening balance");
     expect(draft.doc.rows.at(-1).balance).toEqual({ money: draft.doc.total.amount, currency: "USD" });
     const year = Number(today.slice(0, 4));
-    const one = (await api(app, manager).post(`/ledger/parties/factory/${factoryId}/statement`, { year }).expect(201)).body;
-    const two = (await api(app, manager).post(`/ledger/parties/factory/${factoryId}/statement`, { year }).expect(201)).body;
+    const one = (await api(app, manager).post(`/ledger/parties/factory/${supplierId}/statement`, { year }).expect(201)).body;
+    const two = (await api(app, manager).post(`/ledger/parties/factory/${supplierId}/statement`, { year }).expect(201)).body;
     expect(two.no).toBe(one.no + 1);
     expect(two.number).toBe(`ST-F-${year}-${String(two.no).padStart(4, "0")}`);
-    const issued = (await api(app, manager).get(`/ledger/parties/factory/${factoryId}/statement?no=${two.no}`).expect(200)).body;
+    const issued = (await api(app, manager).get(`/ledger/parties/factory/${supplierId}/statement?no=${two.no}`).expect(200)).body;
     expect(issued.doc.number).toBe(two.number);
     expect(issued.share.message).toContain(two.number);
     // A number never issued is refused; another company or no permission reaches none of it.
-    await api(app, manager).get(`/ledger/parties/factory/${factoryId}/statement?no=${two.no + 50}`).expect(400);
-    await api(app, bilal).post(`/ledger/parties/factory/${factoryId}/statement`, { year }).expect(403);
+    await api(app, manager).get(`/ledger/parties/factory/${supplierId}/statement?no=${two.no + 50}`).expect(400);
+    await api(app, bilal).post(`/ledger/parties/factory/${supplierId}/statement`, { year }).expect(403);
     await api(app, manager).post(`/ledger/parties/factory/${customerId}/statement`, { year }).expect(404);
     const staff = (await api(app, manager).get(`/ledger/parties/staff/${me}/statement`).expect(200)).body;
     expect(staff.doc.columns.map((c: { label: string }) => c.label)).toContain("Paid from own money");
@@ -808,9 +808,9 @@ describe("the ledger", () => {
     expect(theirs.rows).toEqual([]);
     await api(app, boss).get(`/ledger/entries/${one.id}`).expect(404);
     await api(app, boss).get(`/ledger/parties/customer/${customerId}`).expect(404);
-    await api(app, boss).get(`/ledger/parties/factory/${factoryId}`).expect(404);
-    await api(app, boss).get(`/ledger/parties/factory/${factoryId}/statement`).expect(404);
-    await api(app, boss).post(`/ledger/parties/factory/${factoryId}/statement`, { year: 2026 }).expect(404);
+    await api(app, boss).get(`/ledger/parties/factory/${supplierId}`).expect(404);
+    await api(app, boss).get(`/ledger/parties/factory/${supplierId}/statement`).expect(404);
+    await api(app, boss).post(`/ledger/parties/factory/${supplierId}/statement`, { year: 2026 }).expect(404);
     expect((await api(app, boss).get("/ledger/accounts").expect(200)).body.groups).toEqual([]);
     expect((await api(app, boss).get("/ledger/check").expect(200)).body.differences).toEqual([]);
     // Their connection cannot point a row at our records.

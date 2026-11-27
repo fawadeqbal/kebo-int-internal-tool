@@ -36,10 +36,10 @@ describe("currencies", () => {
     const customer = (await api(app, sana).post("/customers", { name: `Lahore Foods ${tag}`, country: "PK", contacts: [{ name: "Ali", email: `ali-${tag}@lf.test` }] }).expect(201))
       .body;
     const deal = (await api(app, sana).post("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me, requirements: "Filling line" }).expect(201)).body;
-    const bad = await api(app, sana).post(`/inquiries/${deal.id}/factory-quotes`, { newFactoryName: `Euro Works ${tag}`, receivedOn: "2026-10-26", currency: "EUR" }).expect(422);
+    const bad = await api(app, sana).post(`/inquiries/${deal.id}/factory-quotes`, { newSupplierName: `Euro Works ${tag}`, receivedOn: "2026-10-26", currency: "EUR" }).expect(422);
     expect(bad.body.fieldErrors.currency[0]).toBe("Choose USD, CNY, PKR");
     // Lower case is fine.
-    await api(app, sana).post(`/inquiries/${deal.id}/factory-quotes`, { newFactoryName: `Pak Works ${tag}`, receivedOn: "2026-10-26", currency: "pkr" }).expect(201);
+    await api(app, sana).post(`/inquiries/${deal.id}/factory-quotes`, { newSupplierName: `Pak Works ${tag}`, receivedOn: "2026-10-26", currency: "pkr" }).expect(201);
   });
 
   it("converts an offer's prices when its currency changes, or keeps the numbers when asked", async () => {
@@ -47,14 +47,14 @@ describe("currencies", () => {
     const customer = (await api(app, sana).post("/customers", { name: `Karachi Agro ${tag}`, country: "PK", contacts: [{ name: "Omar", email: `omar-${tag}@ka.test` }] }).expect(201))
       .body;
     const deal = (await api(app, sana).post("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me, requirements: "Rice mill" }).expect(201)).body;
-    const header = { newFactoryName: `Hubei Mills ${tag}`, receivedOn: "2026-10-26", currency: "CNY" };
+    const header = { newSupplierName: `Hubei Mills ${tag}`, receivedOn: "2026-10-26", currency: "CNY" };
     const q = (await api(app, sana).post(`/inquiries/${deal.id}/factory-quotes`, header).expect(201)).body;
     await api(app, sana)
       .post(`/factory-quotes/${q.id}/lines`, { lines: [{ description: "Rice mill 2 t/h", quantity: 1, unit: "set", unitPrice: 7100, taxRate: 0 }, { description: "Spares", quantity: 1, unit: "lot", unitPrice: 355, taxRate: 0 }] })
       .expect(201);
-    const factoryId = (await api(app, sana).get(`/factory-quotes/${q.id}`).expect(200)).body.factory.id;
+    const supplierId = (await api(app, sana).get(`/factory-quotes/${q.id}`).expect(200)).body.factory.id;
     const put = (currency: string, convertPrices: boolean) =>
-      api(app, sana).put(`/factory-quotes/${q.id}`, { factoryId, receivedOn: "2026-10-26", currency, convertPrices }).expect(200);
+      api(app, sana).put(`/factory-quotes/${q.id}`, { supplierId, receivedOn: "2026-10-26", currency, convertPrices }).expect(200);
     const prices = async () => (await api(app, sana).get(`/factory-quotes/${q.id}`).expect(200)).body.lines.map((l: { unitPrice: string }) => l.unitPrice);
 
     await put("USD", true);

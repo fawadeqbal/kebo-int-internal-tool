@@ -39,11 +39,11 @@ describe("order sections: files and reminders", () => {
     await prisma.platform.company.update({ where: { id: FIRST_COMPANY_ID }, data: { featuresOff: [] } });
     app.get(CompaniesService).forget(FIRST_COMPANY_ID);
     const customerId = (await api(app, sana).post("/customers", { name: `Sections Water ${tag}`, country: "NG", contacts: [{ name: "Ade", email: `ade-${tag}@sw.test` }] }).expect(201)).body.id;
-    const factoryId = (await api(app, sana).post("/factories", { name: `Sections Works ${tag}`, address: "Zhangjiagang" }).expect(201)).body.id;
+    const supplierId = (await api(app, sana).post("/factories", { name: `Sections Works ${tag}`, address: "Zhangjiagang" }).expect(201)).body.id;
     const inquiry = (await api(app, sana).post("/inquiries", { customerId, category: "Machinery", assigneeId: me, items: [{ description: "Filler", quantity: 1 }] }).expect(201)).body;
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiry.id}/factory-quotes`, { factoryId, receivedOn: ago(5).toISOString().slice(0, 10), currency: "CNY", lines: [{ requestedItemId: item.id, description: "RFC-32", quantity: 1, unitPrice: 300000 }] })
+      .post(`/inquiries/${inquiry.id}/factory-quotes`, { supplierId, receivedOn: ago(5).toISOString().slice(0, 10), currency: "CNY", lines: [{ requestedItemId: item.id, description: "RFC-32", quantity: 1, unitPrice: 300000 }] })
       .expect(201);
     const draft = (await api(app, sana).get(`/inquiries/${inquiry.id}/quotation/draft`)).body;
     const r = (await api(app, sana).post(`/inquiries/${inquiry.id}/quotation/revisions`, draft).expect(201)).body;
@@ -131,11 +131,11 @@ describe("order sections: files and reminders", () => {
       fat: { plannedOn: "2026-12-03", doneOn, result: "passed_with_remarks", remarks: "Small leak fixed on the spot" },
       goodsReceivedAt: "Forwarder's warehouse",
     });
-    // A result needs its day; a factory that is not on the order, a made-up result and a made-up channel are refused.
+    // A result needs its day; a supplier that is not on the order, a made-up result and a made-up channel are refused.
     await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatDoneOn: "", fatResult: "passed" }).expect(422);
     await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatResult: "wonderful", fatDoneOn: "2026-12-03" }).expect(422);
     await api(app, sana).put(`/orders/${orderId}/factory-facts`, { readyToldVia: "pigeon" }).expect(422);
-    await api(app, sana).put(`/orders/${orderId}/factory-facts`, { factoryId: "00000000-0000-4000-8000-000000000000", fatPlannedOn: "2026-12-03" }).expect(400);
+    await api(app, sana).put(`/orders/${orderId}/factory-facts`, { supplierId: "00000000-0000-4000-8000-000000000000", fatPlannedOn: "2026-12-03" }).expect(400);
     await api(app, bilal).put(`/orders/${orderId}/factory-facts`, { fatPlannedOn: "2026-12-04" }).expect(404);
     // The history says it in words, and the FAT report prints from it.
     const h = (await api(app, sana).get(`/history?type=order&id=${orderId}`).expect(200)).body as { action: string; summary: string }[];
@@ -163,10 +163,10 @@ describe("order sections: files and reminders", () => {
 
   it("reminds when the ready date passed and the goods are not in, a planned factory test has no result, and the ship-by date passed", async () => {
     expect((await mine()).filter((i) => i.key.startsWith("section:"))).toEqual([]);
-    // The factory's row of the order (made the first time something is kept for it).
-    const line = await prisma.platform.orderLine.findFirstOrThrow({ where: { orderId, type: "goods" }, select: { factoryId: true, companyId: true } });
-    await prisma.platform.orderFactory.deleteMany({ where: { orderId } });
-    await prisma.platform.orderFactory.create({ data: { orderId, companyId: line.companyId, factoryId: line.factoryId, readyOn: ago(5), fatPlannedOn: ago(4) } });
+    // The supplier's row of the order (made the first time something is kept for it).
+    const line = await prisma.platform.orderLine.findFirstOrThrow({ where: { orderId, type: "goods" }, select: { supplierId: true, companyId: true } });
+    await prisma.platform.orderSupplier.deleteMany({ where: { orderId } });
+    await prisma.platform.orderSupplier.create({ data: { orderId, companyId: line.companyId, supplierId: line.supplierId, readyOn: ago(5), fatPlannedOn: ago(4) } });
     await prisma.platform.order.update({ where: { id: orderId }, data: { shipBy: ago(6) } });
     // All three are days late, so they are among the most urgent the list keeps.
     const got = (await mine()).filter((i) => i.key.startsWith("section:"));
@@ -177,7 +177,7 @@ describe("order sections: files and reminders", () => {
     // Someone who does not see the order is not reminded of it.
     expect(await mine(bilal)).toEqual([]);
     // The test done: that reminder goes; the others stay.
-    await prisma.platform.orderFactory.updateMany({ where: { orderId }, data: { fatDoneOn: ago(1), fatResult: "passed" } });
+    await prisma.platform.orderSupplier.updateMany({ where: { orderId }, data: { fatDoneOn: ago(1), fatResult: "passed" } });
     // The list is kept for a moment per person; another change makes it fresh.
     await api(app, sana).post(`/orders/${orderId}/notes`, { body: "Factory test passed." });
     const after = (await mine()).filter((i) => i.key.startsWith("section:")).map((i) => i.key.split(":")[2]).sort();

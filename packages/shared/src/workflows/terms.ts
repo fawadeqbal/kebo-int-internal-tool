@@ -2,14 +2,14 @@ import { formatMinor, type Minor } from "@kebo/money";
 import { addDays, type ISODate } from "@kebo/utils";
 import type { BalanceTerms } from "../enums";
 import { paymentSentenceOf } from "./quotation";
-import type { FactoryDueRule, FactoryPlanRow, PlanDueRule, PlanPart } from "./money-route";
+import type { SupplierDueRule, SupplierPlanRow, PlanDueRule, PlanPart } from "./money-route";
 
 /**
- * Terms that travel (design "RFQ Desk — terms that travel, one thing in one place", 16 Nov 2026): the factory
+ * Terms that travel (design "RFQ Desk — terms that travel, one thing in one place", 16 Nov 2026): the supplier
  * offer and the quotation keep their terms in the same four groups, in this order and with these names —
  * Delivery · Payment · Warranty · Conditions — as facts a date can be worked out from:
  * - a lead time is days from a moment (after the advance or deposit, after the order, after the drawings);
- * - the payment is parts, like the plan an order and a factory are paid on (a share, and when it falls due);
+ * - the payment is parts, like the plan an order and a supplier are paid on (a share, and when it falls due);
  * - a warranty is months from a moment (shipment, delivery, the site test).
  * The words the papers print are made from these facts; an older offer or quotation keeps the words it has
  * (and its one advance %, or its deposit % and balance terms). Nothing here touches the database.
@@ -17,7 +17,7 @@ import type { FactoryDueRule, FactoryPlanRow, PlanDueRule, PlanPart } from "./mo
 
 export const TERMS_GROUPS = ["Delivery", "Payment", "Warranty", "Conditions"] as const;
 
-/** Whose terms: what we promise the customer (a quotation), or what a factory gives us (its offer). */
+/** Whose terms: what we promise the customer (a quotation), or what a supplier gives us (its offer). */
 export type TermsSide = "customer" | "factory";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -32,7 +32,7 @@ export const LEAD_FROMS = ["after_payment", "after_order", "after_drawings"] as 
 export type LeadFrom = (typeof LEAD_FROMS)[number];
 export const isLeadFrom = (v: unknown): v is LeadFrom => LEAD_FROMS.includes(v as LeadFrom);
 
-/** The moment in words: the customer pays a deposit, we pay the factory an advance. */
+/** The moment in words: the customer pays a deposit, we pay the supplier an advance. */
 export const LEAD_FROM_LABEL: Record<TermsSide, Record<LeadFrom, string>> = {
   customer: { after_payment: "after the deposit", after_order: "after the order", after_drawings: "after the drawings are approved" },
   factory: { after_payment: "after the deposit", after_order: "after the order", after_drawings: "after the drawings are approved" },
@@ -47,7 +47,7 @@ export function leadWords(days: number, from: string | null | undefined, side: T
 /**
  * A lead time's days and moment when its words say them plainly ("45 days after deposit", "6 weeks after
  * the order", "30-40 days": the longer one); null for anything else ("working days", "ex stock"). A lead time
- * without a moment counts from the payment, as a factory's and a quotation's usually do.
+ * without a moment counts from the payment, as a supplier's and a quotation's usually do.
  */
 export function parseLead(words: string | null | undefined): { days: number; from: LeadFrom } | null {
   const w = (words ?? "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -139,7 +139,7 @@ export interface TermPart {
 /** When a customer's part falls due (a quotation's; the order's plan starts from them). */
 export const QUOTE_PART_RULES = ["on_order", "before_shipment", "against_bl_copy", "after_shipping", "after_arrival", "lc", "after_sat"] as const;
 export type QuotePartRule = (typeof QUOTE_PART_RULES)[number];
-/** When a factory's part falls due (its offer's; the factory's plan on an order starts from them). */
+/** When a supplier's part falls due (its offer's; the supplier's plan on an order starts from them). */
 export const OFFER_PART_RULES = ["on_order", "on_ready", "after_shipping"] as const;
 export type OfferPartRule = (typeof OFFER_PART_RULES)[number];
 
@@ -288,7 +288,7 @@ export function quotePaymentSentence(parts: TermPart[]): string {
 }
 
 /**
- * A factory offer's terms as facts, to check a promise against: its lead time as days from a moment, its payment
+ * A supplier offer's terms as facts, to check a promise against: its lead time as days from a moment, its payment
  * as parts (an older offer: its advance, or the company's usual one, and the rest when ready), its warranty as
  * months from a moment. An older offer's words are read for them where they say them plainly.
  */
@@ -316,7 +316,7 @@ export function offerTermsOf(
   };
 }
 
-/* ---------------------------------------------------------------- what we promise beside what the factory gives */
+/* ---------------------------------------------------------------- what we promise beside what the supplier gives */
 
 /** What we promise the customer in an option. */
 export interface OurTerms {
@@ -330,7 +330,7 @@ export interface OurTerms {
   currency: string;
 }
 
-/** What the option's factory gives us. */
+/** What the option's supplier gives us. */
 export interface TheirTerms {
   factory: string;
   leadDays: number | null;
@@ -338,11 +338,11 @@ export interface TheirTerms {
   parts: TermPart[] | null;
   warrantyMonths: number | null;
   warrantyFrom: string | null;
-  /** What the option costs us at the factory, in the quotation's currency (null: not known, e.g. no rate). */
+  /** What the option costs us at the supplier, in the quotation's currency (null: not known, e.g. no rate). */
   costMinor: Minor | null;
 }
 
-/** One check of a promise against the factory: fine (ok) or something to look at, in a sentence. */
+/** One check of a promise against the supplier: fine (ok) or something to look at, in a sentence. */
 export interface TermsCheck {
   key: "lead" | "payment" | "warranty";
   ok: boolean;
@@ -351,7 +351,7 @@ export interface TermsCheck {
   text: string;
 }
 
-/** The lead time we promise against the factory's: the days to spare, or how many more it needs. */
+/** The lead time we promise against the supplier's: the days to spare, or how many more it needs. */
 export function leadCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | null {
   if (ours.leadDays === null || theirs.leadDays === null) return null;
   const given = leadWords(theirs.leadDays, theirs.leadFrom, "factory");
@@ -372,9 +372,9 @@ export function leadCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | null
 }
 
 /**
- * The customer's money against the factory's, at the two moments we pay the factory: when we order (the
- * customer's deposit against the factory's advance) and before the goods leave (what the customer has paid
- * by then against what the factory wants by then). When the factory wants more, we pay the difference first.
+ * The customer's money against the supplier's, at the two moments we pay the supplier: when we order (the
+ * customer's deposit against the supplier's advance) and before the goods leave (what the customer has paid
+ * by then against what the supplier wants by then). When the supplier wants more, we pay the difference first.
  */
 export function paymentCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | null {
   if (!theirs.parts?.length || theirs.costMinor === null || theirs.costMinor <= 0 || !ours.parts.length) return null;
@@ -411,7 +411,7 @@ export function paymentCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | n
   };
 }
 
-/** The warranty we give against the factory's, both counted on from shipment: the months the factory does not cover. */
+/** The warranty we give against the supplier's, both counted on from shipment: the months the supplier does not cover. */
 export function warrantyCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | null {
   if (ours.warrantyMonths === null || theirs.warrantyMonths === null) return null;
   const ourFrom = isWarrantyFrom(ours.warrantyFrom) ? ours.warrantyFrom : "shipment";
@@ -429,13 +429,13 @@ export function warrantyCheck(ours: OurTerms, theirs: TheirTerms): TermsCheck | 
   };
 }
 
-/** Every check of one option against its factory (only those both sides say enough for). */
+/** Every check of one option against its supplier (only those both sides say enough for). */
 export const termsChecks = (ours: OurTerms, theirs: TheirTerms): TermsCheck[] =>
   [leadCheck(ours, theirs), paymentCheck(ours, theirs), warrantyCheck(ours, theirs)].filter((c): c is TermsCheck => c !== null);
 
-/* ---------------------------------------------------------------- the factory's plan from its offer's parts */
+/* ---------------------------------------------------------------- the supplier's plan from its offer's parts */
 
-/** An offer's parts are an advance and the rest when ready (or one of them): the company's usual factory plan. */
+/** An offer's parts are an advance and the rest when ready (or one of them): the company's usual supplier plan. */
 export function plainOfferParts(parts: Pick<TermPart, "rule">[]): boolean {
   const rules = parts.map((p) => p.rule);
   return rules.length > 0 && rules.length <= 2 && rules.every((r, i) => (r === "on_order" && i === 0) || (r === "on_ready" && i === rules.length - 1));
@@ -444,7 +444,7 @@ export function plainOfferParts(parts: Pick<TermPart, "rule">[]): boolean {
 /**
  * Each part's amount of a total from its share: rounded to the cent, and when the shares make 100% the last takes
  * what is left, so they add up exactly (review 24 Nov: 21,319.40 + 49,745.26 = 71,064.66 on a 71,064.65 quotation).
- * Every place that turns shares into money reads it: the quotation, the editors, the order's and factory's plans.
+ * Every place that turns shares into money reads it: the quotation, the editors, the order's and supplier's plans.
  */
 export function partAmounts(percents: number[], totalMinor: Minor): Minor[] {
   const whole = Math.round(percents.reduce((t, p) => t + p, 0) * 100) === 10000;
@@ -457,12 +457,12 @@ export function partAmounts(percents: number[], totalMinor: Minor): Minor[] {
 }
 
 /**
- * The factory's plan on an order from its offer's parts (design "terms that travel", step 3): each part its share
+ * The supplier's plan on an order from its offer's parts (design "terms that travel", step 3): each part its share
  * of what we owe (the last the rest, so they add up exactly), due when we order, when they say ready, or days after
  * the goods leave. Null when the parts are the usual advance and the rest when ready — the company's default plan
  * is that, to the cent and in the same words, as before.
  */
-export function offerPlan(parts: TermPart[], owedMinor: Minor): FactoryPlanRow[] | null {
+export function offerPlan(parts: TermPart[], owedMinor: Minor): SupplierPlanRow[] | null {
   if (!parts.length || !partsAddUp(parts) || plainOfferParts(parts)) return null;
   const amounts = partAmounts(
     parts.map((p) => p.percent),
@@ -470,7 +470,7 @@ export function offerPlan(parts: TermPart[], owedMinor: Minor): FactoryPlanRow[]
   );
   return parts.map((p, i) => {
     const amountMinor = amounts[i]!;
-    const dueRule: FactoryDueRule = p.rule === "on_order" ? "on_order" : p.rule === "on_ready" ? "on_ready" : "on_ship_plus_days";
+    const dueRule: SupplierDueRule = p.rule === "on_order" ? "on_order" : p.rule === "on_ready" ? "on_ready" : "on_ship_plus_days";
     const when = partWhen(p, "factory");
     return {
       label: p.label.trim() || `${percentText(p.percent)}% ${when}`.replace(/^./, (c) => c.toUpperCase()),
@@ -548,8 +548,8 @@ export function partsPlan(parts: TermPart[], totalMinor: Minor, orderedOn: ISODa
 }
 
 /**
- * An order's plan as parts of its total, for the checks against the factory (design "terms that travel": the
- * customer and the factory, side by side): the deposit is due with the order; a part due on the ready date is
+ * An order's plan as parts of its total, for the checks against the supplier (design "terms that travel": the
+ * customer and the supplier, side by side): the deposit is due with the order; a part due on the ready date is
  * before shipment; a dated part before shipment when it falls on or before ship by (else after shipping); the
  * others after shipping, by a letter of credit or after the site test, with their days.
  */

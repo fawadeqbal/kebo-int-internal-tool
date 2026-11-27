@@ -1,112 +1,112 @@
 import { decimalToMinor, fromDbDateOrNull, type Prisma } from "@kebo/database";
 import { fromMinor } from "@kebo/money";
-import { defaultFactoryPlan, factoryPlanStatus, offerPlan, shippedOnOf, storedParts, type FactoryDueRule, type FactoryPlanRow } from "@kebo/shared";
+import { defaultSupplierPlan, supplierPlanStatus, offerPlan, shippedOnOf, storedParts, type SupplierDueRule, type SupplierPlanRow } from "@kebo/shared";
 import type { ISODate } from "@kebo/utils";
 import type { PrismaService, Tx } from "../../database/prisma.service";
-import { factoryReadyOf, readySelect } from "@kebo/database";
-import { factoryBorneExpenses, factoryPositionOf, type MoneyCtx, supplierPaidRelation } from "./position";
+import { supplierReadyOf, readySelect } from "@kebo/database";
+import { supplierBorneExpenses, supplierPositionOf, type MoneyCtx, supplierPaidRelation } from "./position";
 
 type Db = PrismaService["db"] | Tx;
-type FactoryRef = { id: string; name: string };
+type SupplierRef = { id: string; name: string };
 
 /**
- * What we owe each factory for the order's goods (the price frozen on each
- * line when the order was made, plus tax unless it was included, × the quantity), in the factory's
- * currency, keyed "factoryId:currency".
+ * What we owe each supplier for the order's goods (the price frozen on each
+ * line when the order was made, plus tax unless it was included, × the quantity), in the supplier's
+ * currency, keyed "supplierId:currency".
  */
-export function owedByFactory<F extends FactoryRef>(
-  lines: { factory: F | null; factoryUnitPrice: Prisma.Decimal | null; factoryCurrency: string | null; factoryTaxRate: Prisma.Decimal | null; factoryTaxIncluded: boolean; quantity: Prisma.Decimal }[],
+export function owedBySupplier<F extends SupplierRef>(
+  lines: { factory: F | null; supplierUnitPrice: Prisma.Decimal | null; supplierCurrency: string | null; supplierTaxRate: Prisma.Decimal | null; supplierTaxIncluded: boolean; quantity: Prisma.Decimal }[],
 ) {
-  // The one formula (factoryPosition), without payments or expenses: only what the lines owe.
-  const rows = factoryPositionOf({ lines: lines.map((l) => ({ ...l, factoryId: l.factory?.id ?? null })), supplierPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
-  const factories = new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
-  return new Map(rows.map((r) => [r.key, { factory: factories.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
+  // The one formula (supplierPosition), without payments or expenses: only what the lines owe.
+  const rows = supplierPositionOf({ lines: lines.map((l) => ({ ...l, supplierId: l.factory?.id ?? null })), supplierPaid: [], expenses: [] }, { main: "", rates: {}, expensesOn: false });
+  const suppliers = new Map(lines.flatMap((l) => (l.factory ? [[l.factory.id, l.factory] as const] : [])));
+  return new Map(rows.map((r) => [r.key, { factory: suppliers.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, lines: r.lines }]));
 }
 
 const planLines = {
-  where: { factoryId: { not: null } },
+  where: { supplierId: { not: null } },
   select: {
-    factoryId: true,
+    supplierId: true,
     factory: { select: { id: true, name: true } },
-    factoryUnitPrice: true,
-    factoryCurrency: true,
-    factoryTaxRate: true,
-    factoryTaxIncluded: true,
+    supplierUnitPrice: true,
+    supplierCurrency: true,
+    supplierTaxRate: true,
+    supplierTaxIncluded: true,
     quantity: true,
     // The offer the line was bought on: the advance it asks, and its payment as parts.
-    quoteLine: { select: { factoryQuoteLine: { select: { factoryQuote: { select: { advancePercent: true, paymentParts: true } } } } } },
+    quoteLine: { select: { supplierQuoteLine: { select: { supplierQuote: { select: { advancePercent: true, paymentParts: true } } } } } },
   },
 } as const;
 
 type AdvanceLine = {
-  factoryId: string | null;
-  quoteLine: { factoryQuoteLine: { factoryQuote: { advancePercent: Prisma.Decimal | null; paymentParts?: Prisma.JsonValue } } | null } | null;
+  supplierId: string | null;
+  quoteLine: { supplierQuoteLine: { supplierQuote: { advancePercent: Prisma.Decimal | null; paymentParts?: Prisma.JsonValue } } | null } | null;
 };
 
 /**
- * The advance a factory asks on this order: its offer's (FactoryQuote.advancePercent, the offer the lines
+ * The advance a supplier asks on this order: its offer's (SupplierQuote.advancePercent, the offer the lines
  * were bought on), else the company's default (Settings).
  */
-export function advanceOf(lines: AdvanceLine[], factoryId: string, fallback: number): number {
+export function advanceOf(lines: AdvanceLine[], supplierId: string, fallback: number): number {
   for (const l of lines) {
-    const p = l.factoryId === factoryId ? l.quoteLine?.factoryQuoteLine?.factoryQuote.advancePercent : null;
+    const p = l.supplierId === supplierId ? l.quoteLine?.supplierQuoteLine?.supplierQuote.advancePercent : null;
     if (p !== null && p !== undefined) return Number(p);
   }
   return fallback;
 }
 
 /**
- * A factory's plan on an order until one is saved (design "terms that travel", step 3): its offer's parts when
+ * A supplier's plan on an order until one is saved (design "terms that travel", step 3): its offer's parts when
  * they are more than an advance and the rest when ready; else the company's usual plan — the advance its offer
  * asks (else Settings') when we order, the rest on its ready date — as before.
  */
-export function startingPlan(lines: AdvanceLine[], factoryId: string, fallback: number, owedMinor: number): FactoryPlanRow[] {
+export function startingPlan(lines: AdvanceLine[], supplierId: string, fallback: number, owedMinor: number): SupplierPlanRow[] {
   for (const l of lines) {
-    const parts = l.factoryId === factoryId ? storedParts(l.quoteLine?.factoryQuoteLine?.factoryQuote.paymentParts, "factory") : null;
+    const parts = l.supplierId === supplierId ? storedParts(l.quoteLine?.supplierQuoteLine?.supplierQuote.paymentParts, "factory") : null;
     const plan = parts ? offerPlan(parts, owedMinor) : null;
     if (plan) return plan;
-    if (l.factoryId === factoryId && l.quoteLine?.factoryQuoteLine) break;
+    if (l.supplierId === supplierId && l.quoteLine?.supplierQuoteLine) break;
   }
-  return defaultFactoryPlan(owedMinor, advanceOf(lines, factoryId, fallback));
+  return defaultSupplierPlan(owedMinor, advanceOf(lines, supplierId, fallback));
 }
 
 /**
- * Each factory's payment plan on an order, with what is paid on each part and
- * where it stands. Paid counts what we sent and the expenses the factory bears
- * (taken off what we owe it, as on the order's money: factoryPosition), so a
- * balance the factory bore is not shown late. A factory without a stored plan
+ * Each supplier's payment plan on an order, with what is paid on each part and
+ * where it stands. Paid counts what we sent and the expenses the supplier bears
+ * (taken off what we owe it, as on the order's money: supplierPosition), so a
+ * balance the supplier bore is not shown late. A supplier without a stored plan
  * shows the company's default (advance on order, balance on the ready date)
  * until one is saved (the advance its offer asks, else Settings'); the balance's date follows that
- * factory's own ready date.
+ * supplier's own ready date.
  */
-export async function factoryPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
+export async function supplierPlansOf(db: Db, orderId: string, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
   const o = await db.order.findUniqueOrThrow({ where: { id: orderId }, select: planSelect });
   return plansOf(o, advancePercent, today, soonDays, fx);
 }
 
-/** factoryPlansOf for many orders in one read (lists across orders): each order's plans by its id. */
-export async function factoryPlansFor(db: Db, orderIds: string[], advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
+/** supplierPlansOf for many orders in one read (lists across orders): each order's plans by its id. */
+export async function supplierPlansFor(db: Db, orderIds: string[], advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
   const orders = orderIds.length ? await db.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, ...planSelect } }) : [];
   return new Map(orders.map((o) => [o.id, plansOf(o, advancePercent, today, soonDays, fx)] as const));
 }
 
 const planSelect = {
-  factoryOrderedOn: true,
+  supplierOrderedOn: true,
   ...readySelect,
   // "Days after shipping" parts count from the day the goods left (the earliest shipment).
   shipments: { select: { departedOn: true } },
   lines: planLines,
   supplierPaid: supplierPaidRelation,
-  expenses: factoryBorneExpenses,
+  expenses: supplierBorneExpenses,
   payables: { orderBy: { sortOrder: "asc" }, include: { supplier: { select: { id: true, name: true } } } },
 } satisfies Prisma.OrderSelect;
 
 function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advancePercent: number, today: ISODate, soonDays: number, fx: MoneyCtx) {
-  const names = new Map<string, FactoryRef>();
+  const names = new Map<string, SupplierRef>();
   for (const l of o.lines) if (l.factory) names.set(l.factory.id, l.factory);
   for (const r of o.payables) names.set(r.supplier!.id, r.supplier!);
-  const positions = factoryPositionOf(o, fx).filter((r) => r.lines > 0);
-  const owed = new Map(positions.map((r) => [r.key, { factory: names.get(r.factoryId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));
+  const positions = supplierPositionOf(o, fx).filter((r) => r.lines > 0);
+  const owed = new Map(positions.map((r) => [r.key, { factory: names.get(r.supplierId)!, currency: r.currency, owedMinor: r.owedMinor, settledMinor: r.settledMinor, takenOffMinor: r.takenOffMinor }]));
   for (const r of o.payables) {
     const key = `${r.supplierId}:${r.currency}`;
     if (!owed.has(key)) {
@@ -116,27 +116,27 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
       owed.set(key, { factory: r.supplier!, currency: r.currency!, owedMinor: 0, settledMinor: paid, takenOffMinor: 0 });
     }
   }
-  const orderedOn = fromDbDateOrNull(o.factoryOrderedOn);
+  const orderedOn = fromDbDateOrNull(o.supplierOrderedOn);
   const shippedOn = shippedOnOf(o.shipments.map((x) => ({ departedOn: fromDbDateOrNull(x.departedOn) })));
   return [...owed.entries()].map(([key, f]) => {
     const stored = o.payables.filter((r) => `${r.supplierId}:${r.currency}` === key);
-    const rows: (FactoryPlanRow & { id: string | null; supplierRef: string | null })[] = stored.length
+    const rows: (SupplierPlanRow & { id: string | null; supplierRef: string | null })[] = stored.length
       ? stored.map((r) => ({
           id: r.id,
           supplierRef: r.supplierRef,
           label: r.label,
           percent: r.percent === null ? null : Number(r.percent),
           amountMinor: decimalToMinor(r.amount),
-          dueRule: r.dueRule as FactoryDueRule,
+          dueRule: r.dueRule as SupplierDueRule,
           dueOn: fromDbDateOrNull(r.dueOn),
           dueDays: r.dueDays,
         }))
       : startingPlan(o.lines, f.factory.id, advancePercent, f.owedMinor).map((r) => ({ ...r, id: null, supplierRef: null }));
     const paidMinor = f.settledMinor;
     const planMinor = rows.reduce((t, r) => t + r.amountMinor, 0);
-    // This factory's own ready date (one per factory; the order's is the latest).
-    const readyOn = factoryReadyOf(o, f.factory.id);
-    const status = factoryPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays, shippedOn);
+    // This supplier's own ready date (one per supplier; the order's is the latest).
+    const readyOn = supplierReadyOf(o, f.factory.id);
+    const status = supplierPlanStatus(rows, paidMinor, orderedOn, readyOn, today, soonDays, shippedOn);
     const paidBy = paymentsOnParts(
       rows,
       o.supplierPaid.filter((p) => !p.voidedAt && `${p.movement.partyId}:${p.movement.currency}` === key).map((p) => ({ id: p.id, minor: decimalToMinor(p.share) })),
@@ -145,14 +145,14 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
     return {
       factory: f.factory,
       currency: f.currency,
-      /** The factory's ready date ("on the ready date" rows fall due then). */
+      /** The supplier's ready date ("on the ready date" rows fall due then). */
       readyOn,
       owed: fromMinor(f.owedMinor),
       /** Saved for this order (false: the company's default, shown until saved). */
       saved: stored.length > 0,
       /** The plan adds up to something else than we owe (prices changed since): shown to fix. */
       differs: f.owedMinor > 0 && planMinor !== f.owedMinor ? fromMinor(f.owedMinor - planMinor) : null,
-      /** Paid, with the expenses the factory bears (taken off what we owe it). */
+      /** Paid, with the expenses the supplier bears (taken off what we owe it). */
       paid: fromMinor(paidMinor),
       takenOff: fromMinor(f.takenOffMinor),
       toPay: fromMinor(Math.max(f.owedMinor - paidMinor, 0)),
@@ -182,12 +182,12 @@ function plansOf(o: Prisma.OrderGetPayload<{ select: typeof planSelect }>, advan
   });
 }
 
-export type FactoryPlanView = Awaited<ReturnType<typeof factoryPlansOf>>[number];
+export type SupplierPlanView = Awaited<ReturnType<typeof supplierPlansOf>>[number];
 
 /**
  * Which payments paid each part of a plan: payments pay the parts in order (the oldest first, as
- * factoryPlanStatus counts them), so each part lists the payments, or the shares of them, that went to
- * it. What is paid beyond the plan's parts goes to none. A part paid by what the factory bears (an
+ * supplierPlanStatus counts them), so each part lists the payments, or the shares of them, that went to
+ * it. What is paid beyond the plan's parts goes to none. A part paid by what the supplier bears (an
  * expense taken off what we owe it) has no payment of its own.
  */
 export function paymentsOnParts(parts: { amountMinor: number }[], payments: { id: string; minor: number }[]): { id: string; minor: number }[][] {
@@ -211,10 +211,10 @@ export function paymentsOnParts(parts: { amountMinor: number }[], payments: { id
   return out;
 }
 
-/** Ordered from the factory: each factory owed on the order gets the default plan (its offer's advance), unless it has one. */
-export async function seedFactoryPlans(tx: Tx, orderId: string, advancePercent: number) {
+/** Ordered from the supplier: each supplier owed on the order gets the default plan (its offer's advance), unless it has one. */
+export async function seedSupplierPlans(tx: Tx, orderId: string, advancePercent: number) {
   const o = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { lines: planLines, payables: { select: { supplierId: true, currency: true } } } });
-  for (const [key, f] of owedByFactory(o.lines)) {
+  for (const [key, f] of owedBySupplier(o.lines)) {
     if (f.owedMinor <= 0 || o.payables.some((r) => `${r.supplierId}:${r.currency}` === key)) continue;
     await tx.invoice.createMany({
       data: startingPlan(o.lines, f.factory.id, advancePercent, f.owedMinor).map((r, i) => ({

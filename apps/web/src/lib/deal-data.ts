@@ -10,7 +10,7 @@ import type { QuotationView, SourcingView } from "./types-deals";
  * bar) and each step page ask for the same things.
  */
 export const dealOf = cache((id: string) => load(() => api.get<DealDetail>(`/inquiries/${id}`)));
-/** The factory offers, costed (people who see factory prices; 403 otherwise). */
+/** The supplier offers, costed (people who see supplier prices; 403 otherwise). */
 export const sourcingOf = cache((id: string) => api.get<SourcingView>(`/inquiries/${id}/sourcing`));
 export const quotationOf = cache((id: string) => api.get<QuotationView>(`/inquiries/${id}/quotation`));
 /** Every change on the inquiry, its offers, quotation, files and order (newest first). */

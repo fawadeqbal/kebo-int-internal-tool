@@ -6,18 +6,18 @@ import { Field, Input, Select, Textarea, Notice } from "@kebo/ui";
 import { PanelSection } from "@/components/common/panel";
 import { LeadField, WarrantyFields } from "@/components/deals/terms-fields";
 import type { ActionState } from "@/lib/actions";
-import type { FactoryOwed, FactoryPaymentView } from "@/lib/types-money";
+import type { SupplierOwed, SupplierPaymentView } from "@/lib/types-money";
 import type { Person } from "@/lib/types";
-import { FactoryPaymentForm, VoidForm } from "@/components/money/forms";
+import { SupplierPaymentForm, VoidForm } from "@/components/money/forms";
 import { AttachedFile } from "@/components/money/attachment";
 import { FormWindow } from "./form-window";
 import { FieldRow, SectionWindow } from "./section-window";
 
 type Action = (prev: ActionState, form: FormData) => Promise<ActionState>;
-type Fx = Parameters<typeof FactoryPaymentForm>[0]["fx"];
+type Fx = Parameters<typeof SupplierPaymentForm>[0]["fx"];
 
-/** "Purchase order": the factory's own number for our order and the day we ordered; its files are their proforma and our signed PO. */
-export function FactoryOrderWindow({
+/** "Purchase order": the supplier's own number for our order and the day we ordered; its files are their proforma and our signed PO. */
+export function SupplierOrderWindow({
   orderId,
   sub,
   action,
@@ -38,11 +38,11 @@ export function FactoryOrderWindow({
     <SectionWindow button={{ label: "Edit" }} title="Purchase order" sub={sub} action={action} files={canFiles ? { orderId, section: "purchase_order" } : undefined}>
       {(s) => (
         <FieldRow>
-          <Field label="Their order no." htmlFor="fo-no" optional error={s.errors?.factoryOrderNo}>
-            <Input id="fo-no" name="factoryOrderNo" maxLength={60} defaultValue={s.values?.factoryOrderNo ?? orderNo ?? ""} />
+          <Field label="Their order no." htmlFor="fo-no" optional error={s.errors?.supplierOrderNo}>
+            <Input id="fo-no" name="supplierOrderNo" maxLength={60} defaultValue={s.values?.supplierOrderNo ?? orderNo ?? ""} />
           </Field>
-          <Field label="Ordered on" htmlFor="fo-on" optional error={s.errors?.factoryOrderedOn}>
-            <Input id="fo-on" name="factoryOrderedOn" type="date" max={today} defaultValue={s.values?.factoryOrderedOn ?? orderedOn ?? ""} />
+          <Field label="Ordered on" htmlFor="fo-on" optional error={s.errors?.supplierOrderedOn}>
+            <Input id="fo-on" name="supplierOrderedOn" type="date" max={today} defaultValue={s.values?.supplierOrderedOn ?? orderedOn ?? ""} />
           </Field>
         </FieldRow>
       )}
@@ -50,8 +50,8 @@ export function FactoryOrderWindow({
   );
 }
 
-/** "Pay the factory": money sent to a factory on this order, with its slip. */
-export function PayFactoryWindow({
+/** "Pay the factory": money sent to a supplier on this order, with its slip. */
+export function PaySupplierWindow({
   label = "Pay the supplier",
   main,
   sub,
@@ -61,12 +61,12 @@ export function PayFactoryWindow({
   main?: boolean;
   sub: string;
   action: Action;
-  factories: FactoryOwed[];
+  factories: SupplierOwed[];
   people: Person[];
   orderCurrency: string;
   fx: Fx;
   today: string;
-  prefill?: { factoryId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null };
+  prefill?: { supplierId: string; amount: string; kind: "deposit" | "balance"; reference?: string | null };
   /** Open at once (a list's row asked for it), and what to do once it closes. */
   startOpen?: boolean;
   onClosed?: () => void;
@@ -78,15 +78,15 @@ export function PayFactoryWindow({
   return (
     <>
       <FormWindow button={{ label, kind: main ? "main" : "plain" }} title="Pay the supplier" sub={sub} size="lg" disabled={!p.factories.length} startOpen={startOpen} onClosed={onClosed} name={name}>
-        {(close) => <FactoryPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
+        {(close) => <SupplierPaymentForm {...fields} bare onClose={close} onFileError={setFileError} />}
       </FormWindow>
       {fileError && <Notice tone="bad">{fileError}</Notice>}
     </>
   );
 }
 
-/** "Change" on a payment to a factory: its fields with why it changes, its bank slip, and "Remove this payment". */
-export function ChangeFactoryPaymentWindow({
+/** "Change" on a payment to a supplier: its fields with why it changes, its bank slip, and "Remove this payment". */
+export function ChangeSupplierPaymentWindow({
   sub,
   payment,
   save,
@@ -95,11 +95,11 @@ export function ChangeFactoryPaymentWindow({
   ...p
 }: {
   sub: string;
-  payment: FactoryPaymentView;
+  payment: SupplierPaymentView;
   save: Action;
   remove: Action;
   removeFile: () => Promise<ActionState>;
-  factories: FactoryOwed[];
+  factories: SupplierOwed[];
   people: Person[];
   orderCurrency: string;
   fx: Fx;
@@ -109,7 +109,7 @@ export function ChangeFactoryPaymentWindow({
     <FormWindow button={{ label: "Change", kind: "link" }} title="Change a payment" sub={sub} size="lg">
       {(close) => (
         <>
-          <FactoryPaymentForm {...p} action={save} payment={payment} bare onClose={close} />
+          <SupplierPaymentForm {...p} action={save} payment={payment} bare onClose={close} />
           <div className="flex flex-col gap-2 border-t border-line pt-4">
             <p className="text-md font-semibold">Bank slip</p>
             <AttachedFile src={`/files/factory-payments/${payment.id}`} file={payment.file} what="Bank slip" canChange remove={removeFile} empty="No bank slip" />
@@ -123,8 +123,8 @@ export function ChangeFactoryPaymentWindow({
   );
 }
 
-/** What the factory Change window starts from: what the purchase order keeps as agreed now. */
-export interface FactoryAgreedValues {
+/** What the supplier Change window starts from: what the purchase order keeps as agreed now. */
+export interface SupplierAgreedValues {
   basis: string | null;
   basisPlace: string | null;
   leadDays: number | null;
@@ -137,10 +137,10 @@ export interface FactoryAgreedValues {
   notes: string | null;
 }
 
-function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionState; values: FactoryAgreedValues; payment: ReactNode; sent: boolean }) {
+function SupplierAgreedFields({ state, values, payment, sent }: { state: ActionState; values: SupplierAgreedValues; payment: ReactNode; sent: boolean }) {
   // After "Why?" the form is drawn again from what was typed (state.values).
   const typed = state.values ?? {};
-  const pick = (k: keyof FactoryAgreedValues, fallback: string) => (k in typed ? (typed[k] ?? "") : fallback);
+  const pick = (k: keyof SupplierAgreedValues, fallback: string) => (k in typed ? (typed[k] ?? "") : fallback);
   const whole = (n: number | null) => (n === null ? "" : String(n));
   const [leadDays, setLeadDays] = useState(pick("leadDays", whole(values.leadDays)));
   const [leadFrom, setLeadFrom] = useState<LeadFrom>(() => {
@@ -219,11 +219,11 @@ function FactoryAgreedFields({ state, values, payment, sent }: { state: ActionSt
 }
 
 /**
- * Change what we agreed with the factory (design "terms that travel", step 3b): Delivery, the payment's note,
+ * Change what we agreed with the supplier (design "terms that travel", step 3b): Delivery, the payment's note,
  * Warranty and Conditions on its purchase order; the parts are changed in its plan. Once sent, a change from
  * their offer asks why.
  */
-export function FactoryAgreedWindow({
+export function SupplierAgreedWindow({
   title,
   sub,
   action,
@@ -234,14 +234,14 @@ export function FactoryAgreedWindow({
   title: string;
   sub: string;
   action: Action;
-  values: FactoryAgreedValues;
+  values: SupplierAgreedValues;
   /** The plan in a line. */
   payment: ReactNode;
   sent: boolean;
 }) {
   return (
     <SectionWindow button={{ label: "Edit", kind: "edit", what: "what we agreed with the supplier" }} title={title} sub={sub} action={action} size="md">
-      {(s) => <FactoryAgreedFields state={s} values={values} payment={payment} sent={sent} />}
+      {(s) => <SupplierAgreedFields state={s} values={values} payment={payment} sent={sent} />}
     </SectionWindow>
   );
 }

@@ -11,7 +11,7 @@ const options = z
   .object({ prices: flag, showHs: flag, lcStatement: flag, advance: flag, stamp: flag, models: flag, meta: flag, terms: flag, bank: flag, signatures: flag } satisfies Record<(typeof PAPER_OPTIONS)[number], typeof flag>)
   .default({});
 
-/** Save as draft: the options (and, for a purchase order, which factory). */
+/** Save as draft: the options (and, for a purchase order, which supplier). */
 export const paperDraftInput = z.object({ options, ref: optionalId });
 export type PaperDraftInput = z.infer<typeof paperDraftInput>;
 
@@ -33,7 +33,7 @@ export const paperFixInput = z
   });
 export type PaperFixInput = z.infer<typeof paperFixInput>;
 
-/** Read a paper: a version (?v=), the options to preview with (?opts=prices,stamp), which payment, plan item or factory. */
+/** Read a paper: a version (?v=), the options to preview with (?opts=prices,stamp), which payment, plan item or supplier. */
 export const paperQueryInput = z.object({
   v: z.coerce.number().int().min(1).max(999).optional(),
   opts: z.string().max(200).optional(),

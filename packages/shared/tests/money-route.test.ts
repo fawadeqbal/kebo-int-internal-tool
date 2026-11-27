@@ -5,9 +5,9 @@ import {
   balanceTermsOf,
   countsAsMinor,
   creditBalances,
-  defaultFactoryPlan,
-  factoryDueOn,
-  factoryPlanStatus,
+  defaultSupplierPlan,
+  supplierDueOn,
+  supplierPlanStatus,
   customerMoney,
   lcChecks,
   lcChecksLine,
@@ -20,8 +20,8 @@ import {
   depositLabel,
   routeFromTerms,
   orderReadyOn,
-  factoryReadyOn,
-  readyByFactory,
+  supplierReadyOn,
+  readyBySupplier,
   receivedForMinor,
   routePlan,
   routeSummary,
@@ -154,15 +154,15 @@ describe("money v2: the route builds the plan", () => {
 
   it("gives each supplier its ready date; the order's is the latest, once all have one", () => {
     const rows = [
-      { factoryId: "a", readyOn: "2027-03-01" },
-      { factoryId: "b", readyOn: "2027-04-01" },
+      { supplierId: "a", readyOn: "2027-03-01" },
+      { supplierId: "b", readyOn: "2027-04-01" },
     ];
     expect(orderReadyOn(["a", "b"], rows)).toBe("2027-04-01");
-    expect(factoryReadyOn(["a", "b"], rows, "a")).toBe("2027-03-01");
+    expect(supplierReadyOn(["a", "b"], rows, "a")).toBe("2027-03-01");
     expect(orderReadyOn(["a", "b", "c"], rows)).toBeNull();
-    expect(readyByFactory(["a", "b", "c"], rows).map((r) => r.readyOn)).toEqual(["2027-03-01", "2027-04-01", null]);
-    // No factory on the lines: one date for the goods.
-    expect(orderReadyOn([], [{ factoryId: null, readyOn: "2027-05-05" }])).toBe("2027-05-05");
+    expect(readyBySupplier(["a", "b", "c"], rows).map((r) => r.readyOn)).toEqual(["2027-03-01", "2027-04-01", null]);
+    // No supplier on the lines: one date for the goods.
+    expect(orderReadyOn([], [{ supplierId: null, readyOn: "2027-05-05" }])).toBe("2027-05-05");
   });
 
   it("says how and when", () => {
@@ -240,34 +240,34 @@ describe("money v2: one transfer, credit", () => {
 
 describe("money v2: the supplier payment plan", () => {
   it("starts with a deposit when ordered and the balance on the ready date", () => {
-    expect(defaultFactoryPlan(36_736_300, 30)).toEqual([
+    expect(defaultSupplierPlan(36_736_300, 30)).toEqual([
       { label: "Deposit 30%", percent: 30, amountMinor: 11_020_890, dueRule: "on_order", dueOn: null },
       { label: "Balance 70%", percent: 70, amountMinor: 25_715_410, dueRule: "on_ready", dueOn: null },
     ]);
-    expect(defaultFactoryPlan(1000, 0)).toEqual([{ label: "Payment", percent: 100, amountMinor: 1000, dueRule: "on_ready", dueOn: null }]);
+    expect(defaultSupplierPlan(1000, 0)).toEqual([{ label: "Payment", percent: 100, amountMinor: 1000, dueRule: "on_ready", dueOn: null }]);
   });
 
   it("dates the balance by the ready date, and pays the parts in order", () => {
-    const rows = defaultFactoryPlan(1_000_000, 30);
-    expect(factoryDueOn(rows[1]!, "2026-11-08", "2027-01-07")).toBe("2027-01-07");
-    const s = factoryPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2026-11-02", 3);
+    const rows = defaultSupplierPlan(1_000_000, 30);
+    expect(supplierDueOn(rows[1]!, "2026-11-08", "2027-01-07")).toBe("2027-01-07");
+    const s = supplierPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2026-11-02", 3);
     expect(s.map((r) => [r.status, r.due, r.inDays])).toEqual([
       ["paid", "2026-11-08", 6],
       ["later", "2027-01-07", 66],
     ]);
     // The ready date moved earlier and passed: the balance is late.
-    expect(factoryPlanStatus(rows, 300_000, "2026-11-08", "2026-11-01", "2026-11-02", 3)[1]!.status).toBe("late");
+    expect(supplierPlanStatus(rows, 300_000, "2026-11-08", "2026-11-01", "2026-11-02", 3)[1]!.status).toBe("late");
     // Part paid on the advance, due today.
-    expect(factoryPlanStatus(rows, 100_000, "2026-11-02", null, "2026-11-02", 3)[0]).toMatchObject({ status: "due", paidMinor: 100_000, openMinor: 200_000 });
+    expect(supplierPlanStatus(rows, 100_000, "2026-11-02", null, "2026-11-02", 3)[0]).toMatchObject({ status: "due", paidMinor: 100_000, openMinor: 200_000 });
   });
 
   it("dates a part some days after the goods leave, once they have", () => {
     const after = { label: "Balance 70%", percent: 70, amountMinor: 700_000, dueRule: "on_ship_plus_days" as const, dueOn: null, dueDays: 30 };
-    expect(factoryDueOn(after, "2026-11-08", "2027-01-07")).toBeNull();
-    expect(factoryDueOn(after, "2026-11-08", "2027-01-07", "2027-01-10")).toBe("2027-02-09");
+    expect(supplierDueOn(after, "2026-11-08", "2027-01-07")).toBeNull();
+    expect(supplierDueOn(after, "2026-11-08", "2027-01-07", "2027-01-10")).toBe("2027-02-09");
     const rows = [{ label: "Advance 30%", percent: 30, amountMinor: 300_000, dueRule: "on_order" as const, dueOn: null }, after];
-    expect(factoryPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2027-02-10", 3, "2027-01-10")[1]).toMatchObject({ due: "2027-02-09", status: "late" });
-    expect(factoryPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2027-02-10", 3)[1]).toMatchObject({ due: null, status: "later" });
+    expect(supplierPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2027-02-10", 3, "2027-01-10")[1]).toMatchObject({ due: "2027-02-09", status: "late" });
+    expect(supplierPlanStatus(rows, 300_000, "2026-11-08", "2027-01-07", "2027-02-10", 3)[1]).toMatchObject({ due: null, status: "later" });
   });
 });
 

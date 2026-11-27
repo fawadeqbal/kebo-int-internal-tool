@@ -21,7 +21,7 @@ export const generateMetadata = inquiryTitle();
  * The inquiry's Overview (design rules 18 Nov): the request in the boxes of its steps — Customer, Details, Items,
  * Files — each with its own Edit (that part only). On
  * hold or lost: why, first; once won: the deal that was made. Beside it, the panel every tab has. (How far it
- * has got is in the header and the tabs: Factory offers 2 · Quotations R1 sent.)
+ * has got is in the header and the tabs: Supplier offers 2 · Quotations R1 sent.)
  */
 export default async function DealOverview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ panel?: string; id?: string }> }) {
   const { id } = await params;

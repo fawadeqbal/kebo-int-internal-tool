@@ -99,7 +99,7 @@ describe("billing", () => {
       dueOn: x.dueOn,
       supplierRef: n === plan.rows.length - 1 ? ref : null,
     }));
-    const saved = (await api(app, manager).put(`/orders/${order.id}/factory-plan`, { factoryId: plan.factory.id, items }).expect(200))
+    const saved = (await api(app, manager).put(`/orders/${order.id}/factory-plan`, { supplierId: plan.factory.id, items }).expect(200))
       .body as {
       factories: { plans: { factory: { id: string }; rows: PlanRow[] }[] };
     };

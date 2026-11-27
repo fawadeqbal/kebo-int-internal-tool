@@ -63,7 +63,7 @@ const PAPER_TAB: Record<string, string> = {
 /**
  * Search everything (design "search everything"). Each kind is searched in the fields its own list searches
  * and only as far as this person may see it there: a customer they handle, a deal they handle or every one,
- * suppliers and purchase orders with factory money, payments as Treasury › Payments shows them. A number
+ * suppliers and purchase orders with supplier money, payments as Treasury › Payments shows them. A number
  * typed whole is matched to its record so Enter opens it.
  */
 @Injectable()

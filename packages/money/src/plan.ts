@@ -92,10 +92,10 @@ export function orderCosting(
 /**
  * One order's profit, in one currency.
  * - Earned: the revenue that has a cost, less what its goods cost us (the
- *   factory prices on its lines), the costs to reach the basis we sell on, its
+ *   supplier prices on its lines), the costs to reach the basis we sell on, its
  *   expenses and the bank charges taken from the customer's payments. Revenue
  *   without a cost is never counted as profit: it is reported apart.
- * - Cash: what came in from the customer less what we paid the factories and
+ * - Cash: what came in from the customer less what we paid the suppliers and
  *   the expenses paid so far.
  *
  * Freight and the like paid later (expenses of those kinds, `basisPaidMinor`)
@@ -108,12 +108,12 @@ export interface OrderMoneyFacts {
   revenueMinor: Minor;
   /** The part of the revenue whose lines have a cost. */
   costedRevenueMinor: Minor;
-  /** Factory cost of the goods (lines with a cost). */
+  /** Supplier cost of the goods (lines with a cost). */
   goodsCostMinor: Minor;
   /** Planned costs to reach the basis we sell on (from the accepted option). */
   basisCostMinor?: Minor;
   receivedMinor: Minor;
-  factoryPaidMinor: Minor;
+  supplierPaidMinor: Minor;
   /** All the order's expenses: every cost known, paid or not. */
   expensesMinor: Minor;
   /** Of those, the bills known and not paid yet: a cost already, cash only once paid. */
@@ -134,7 +134,7 @@ export interface OrderMoneyFacts {
  *   order's money page used to call it "earned");
  * - net, "After the deal's costs": expected less what was spent on the deal
  *   before it became the order (`beforeSaleMinor`);
- * - cash, "Cash so far": what came in less what we paid the factories and every
+ * - cash, "Cash so far": what came in less what we paid the suppliers and every
  *   expense paid so far (a bill known and not paid yet is a cost, not cash).
  */
 export function orderMoney(f: OrderMoneyFacts & { beforeSaleMinor?: Minor }) {
@@ -149,7 +149,7 @@ export function orderMoney(f: OrderMoneyFacts & { beforeSaleMinor?: Minor }) {
     grossOnQuoteMinor: grossOnQuote,
     expectedMinor: expected,
     netMinor: expected - Math.max(f.beforeSaleMinor ?? 0, 0),
-    cashMinor: f.receivedMinor - f.factoryPaidMinor - (f.expensesMinor - Math.max(f.expensesUnpaidMinor ?? 0, 0)),
+    cashMinor: f.receivedMinor - f.supplierPaidMinor - (f.expensesMinor - Math.max(f.expensesUnpaidMinor ?? 0, 0)),
     uncostedRevenueMinor: f.revenueMinor - f.costedRevenueMinor,
     /** Expenses counted in the expected profit: those not already in the planned basis costs. */
     expensesCountedMinor: expenses,
@@ -159,7 +159,7 @@ export function orderMoney(f: OrderMoneyFacts & { beforeSaleMinor?: Minor }) {
     grossMarginPercent: margin(grossOnQuote),
     /** Expected profit ÷ the revenue that has a cost. */
     marginPercent: margin(expected),
-    /** Share of the revenue whose factory cost is known, 0–100. */
+    /** Share of the revenue whose supplier cost is known, 0–100. */
     coveragePercent: f.revenueMinor > 0 ? Math.round((f.costedRevenueMinor / f.revenueMinor) * 100) : null,
   };
 }

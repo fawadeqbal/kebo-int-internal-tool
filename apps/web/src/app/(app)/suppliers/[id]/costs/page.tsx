@@ -4,10 +4,10 @@ import { can } from "@kebo/shared";
 import { PhoneList, PhoneRow, ButtonLink, Card, CardHeader, RefCode, StatRow, StatTile, Td, Th, THead, Tr, EmptyLine } from "@kebo/ui";
 import { api } from "@/lib/api";
 import { requirePermission, hasFeature } from "@/lib/session";
-import { factoryOf, factoryPayablesOf } from "@/lib/party-data";
+import { supplierOf, supplierPayablesOf } from "@/lib/party-data";
 import { date, whole, companyToday } from "@/lib/format";
 import type { ExpenseList } from "@/lib/types-money";
-import type { FactoryOrders } from "@/lib/types-facts";
+import type { SupplierOrders } from "@/lib/types-facts";
 import type { LedgerParty } from "@/lib/types-ledger";
 import { DataTable } from "@/components/common/data-table";
 import { supplierTitle } from "@/lib/titles";
@@ -31,10 +31,10 @@ const amount = (v: number) => (Math.abs(v) < 0.005 ? "" : two(v));
 
 /**
  * The supplier's Costs tab (board "Supplier — Costs tab (statement)", managers): Bought, Paid, We owe and the
- * other costs on it; then the statement — every purchase and every payment to the factory, with what we owe
+ * other costs on it; then the statement — every purchase and every payment to the supplier, with what we owe
  * after each — from the ledger for those who see it, else order by order. Print statement above it (Pay supplier is the record's one button, at its top).
  */
-export default async function FactoryCosts({ params }: { params: Promise<{ id: string }> }) {
+export default async function SupplierCosts({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await requirePermission("sourcing.manage");
   if (!(can(me, "expenses.manage") && (await hasFeature("expenses")))) notFound();
@@ -42,10 +42,10 @@ export default async function FactoryCosts({ params }: { params: Promise<{ id: s
   const ledgerOn = can(me, "ledger.view");
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
   const [f, costs, payables, pos, ledger] = await Promise.all([
-    factoryOf(id),
-    api.get<ExpenseList>("/expenses", { factoryId: id }).catch(() => null),
-    factoryPayablesOf(id),
-    insights ? api.get<FactoryOrders>("/insights/facts/factory-orders", { factoryId: id }).catch(() => null) : null,
+    supplierOf(id),
+    api.get<ExpenseList>("/expenses", { supplierId: id }).catch(() => null),
+    supplierPayablesOf(id),
+    insights ? api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id }).catch(() => null) : null,
     ledgerOn ? api.get<LedgerParty>(`/ledger/parties/factory/${id}`, { from: "2000-01-01", to: today }).catch(() => null) : null,
   ]);
   const orders = (pos?.rows ?? []).filter((o) => o.status !== "cancelled");

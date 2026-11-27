@@ -4,9 +4,9 @@ import { api, signIn, startApp } from "./app";
 import { PrismaService } from "../src/database/prisma.service";
 
 /**
- * Home's "Needs attention" picks up the order flow: a factory that has not
+ * Home's "Needs attention" picks up the order flow: a supplier that has not
  * answered, a ready date passed with the goods not in, the LC's last day to ship, and
- * an open claim. The factory's page shows how it answers and what it is making.
+ * an open claim. The supplier's page shows how it answers and what it is making.
  */
 describe("order flow on Home and the supplier page", () => {
   let app: INestApplication;
@@ -14,7 +14,7 @@ describe("order flow on Home and the supplier page", () => {
   let bilal: string;
   let orderId: string;
   let inquiryId: string;
-  let factoryId: string;
+  let supplierId: string;
   let slowId: string;
   const tag = Date.now().toString(36);
   const titles = async (who: string) => ((await api(app, who).get("/reminders").expect(200)).body.items as { title: string; key: string }[]).map((i) => i.title);
@@ -27,14 +27,14 @@ describe("order flow on Home and the supplier page", () => {
     const customer = (await api(app, sana).post("/customers", { name: `Multan Foods ${tag}`, country: "PK", contacts: [{ name: "Asad", email: `asad-${tag}@mf.test` }] }).expect(201)).body;
     const inquiry = (await api(app, sana).post("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me, items: [{ description: "Pouch filler", quantity: 1 }] }).expect(201)).body;
     inquiryId = inquiry.id;
-    factoryId = (await api(app, sana).post("/factories", { name: `Ruian Pack ${tag}` }).expect(201)).body.id;
+    supplierId = (await api(app, sana).post("/factories", { name: `Ruian Pack ${tag}` }).expect(201)).body.id;
     slowId = (await api(app, sana).post("/factories", { name: `Slow Works ${tag}` }).expect(201)).body.id;
     // Asked a week ago; Ruian answers, Slow Works does not.
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [factoryId, slowId], sentOn: week, channel: "wechat" }).expect(201);
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [supplierId, slowId], sentOn: week, channel: "wechat" }).expect(201);
     const item = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiryId}/factory-quotes`, { factoryId, receivedOn: new Date(Date.now() - 4 * 86_400_000).toISOString().slice(0, 10), currency: "CNY", lines: [{ requestedItemId: item.id, description: "Pouch filler", quantity: 1, unitPrice: 90000 }] })
+      .post(`/inquiries/${inquiryId}/factory-quotes`, { supplierId, receivedOn: new Date(Date.now() - 4 * 86_400_000).toISOString().slice(0, 10), currency: "CNY", lines: [{ requestedItemId: item.id, description: "Pouch filler", quantity: 1, unitPrice: 90000 }] })
       .expect(201);
   });
 
@@ -57,11 +57,11 @@ describe("order flow on Home and the supplier page", () => {
     await api(app, sana).post(`/revisions/${r1.id}/status`, { to: "accepted" }).expect(200);
     orderId = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.orders[0].id;
     const ago = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
-    // The factory said the goods would be ready four days ago; nothing has come in.
+    // The supplier said the goods would be ready four days ago; nothing has come in.
     const prisma = app.get(PrismaService);
     const line = await prisma.platform.orderLine.findFirstOrThrow({ where: { orderId, type: "goods" }, select: { companyId: true } });
-    await prisma.platform.orderFactory.deleteMany({ where: { orderId } });
-    await prisma.platform.orderFactory.create({ data: { orderId, companyId: line.companyId, factoryId, readyOn: new Date(`${ago(4)}T00:00:00Z`) } });
+    await prisma.platform.orderSupplier.deleteMany({ where: { orderId } });
+    await prisma.platform.orderSupplier.create({ data: { orderId, companyId: line.companyId, supplierId, readyOn: new Date(`${ago(4)}T00:00:00Z`) } });
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "letter_of_credit" }).expect(200);
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { number: `LC-${tag}`, status: "opened", latestShipOn: ago(-2) }).expect(200);
     await api(app, sana).post(`/orders/${orderId}/claims`, { title: "Wrong voltage", openedOn: ago(1) }).expect(201);
@@ -70,13 +70,13 @@ describe("order flow on Home and the supplier page", () => {
   });
 
   it("the supplier page shows how it answers and what it is making", async () => {
-    const f = (await api(app, sana).get(`/factories/${factoryId}`).expect(200)).body;
+    const f = (await api(app, sana).get(`/factories/${supplierId}`).expect(200)).body;
     expect(f.record).toMatchObject({ asked: 1, answered: 1, avgDaysToAnswer: 3, lateSteps: 1 });
     expect(f.record.openOrders.map((o: { id: string }) => o.id)).toContain(orderId);
     const slow = (await api(app, sana).get(`/factories/${slowId}`).expect(200)).body;
     expect(slow.record).toMatchObject({ asked: 1, answered: 0, avgDaysToAnswer: null, openOrders: [] });
     // Someone who does not handle the order does not see it listed.
     const m = await signIn(app, "manager@example.com", "Manager@12345");
-    expect((await api(app, m).get(`/factories/${factoryId}`).expect(200)).body.record.openOrders.map((o: { id: string }) => o.id)).toContain(orderId);
+    expect((await api(app, m).get(`/factories/${supplierId}`).expect(200)).body.record.openOrders.map((o: { id: string }) => o.id)).toContain(orderId);
   });
 });

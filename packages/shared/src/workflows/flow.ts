@@ -4,7 +4,7 @@ import type {
   ClaimStatus,
   DeliveryCondition,
   LineCondition,
-  FactoryRequestStatus,
+  SupplierRequestStatus,
   OrderDocumentKind,
   OrderDocumentStatus,
   OrderStage,
@@ -19,7 +19,7 @@ import type { PlanFeature } from "../platform";
 /**
  * The order flow after the customer accepts, as one line of steps:
  *
- *   Payment → Factory order → Production → Shipping → Documents & bank → Delivery & SAT
+ *   Payment → Supplier order → Production → Shipping → Documents & bank → Delivery & SAT
  *
  * Each step belongs to a module the platform admin can switch off for a company
  * ("less management"); a switched-off step is left out, never blocking. Nothing
@@ -58,10 +58,10 @@ export const BANK_CONTRACT_STATUS_TONE: Record<BankContractStatus, Tone> = {
   closed: "neutral",
 };
 
-export const FACTORY_REQUEST_STATUS_LABEL: Record<FactoryRequestStatus, string> = { sent: "Asked", quoted: "Quoted", declined: "Declined", no_reply: "No reply" };
-export const FACTORY_REQUEST_STATUS_TONE: Record<FactoryRequestStatus, Tone> = { sent: "info", quoted: "ok", declined: "neutral", no_reply: "warn" };
+export const SUPPLIER_REQUEST_STATUS_LABEL: Record<SupplierRequestStatus, string> = { sent: "Asked", quoted: "Quoted", declined: "Declined", no_reply: "No reply" };
+export const SUPPLIER_REQUEST_STATUS_TONE: Record<SupplierRequestStatus, Tone> = { sent: "info", quoted: "ok", declined: "neutral", no_reply: "warn" };
 
-/** How a factory was asked for a price. */
+/** How a supplier was asked for a price. */
 export const REQUEST_CHANNELS = ["wechat", "email", "whatsapp", "phone", "visit", "other"] as const;
 export type RequestChannel = (typeof REQUEST_CHANNELS)[number];
 export const REQUEST_CHANNEL_LABEL: Record<RequestChannel, string> = { wechat: "WeChat", email: "Email", whatsapp: "WhatsApp", phone: "Phone", visit: "Visit", other: "Other" };
@@ -175,7 +175,7 @@ export const FLOW_STEP_LABEL: Record<FlowStep, string> = {
   delivery: "Delivery & SAT",
 };
 
-/** The module each step belongs to; with it switched off the step is left out. Payment and the factory order are always there. */
+/** The module each step belongs to; with it switched off the step is left out. Payment and the supplier order are always there. */
 export const FLOW_STEP_FEATURE: Partial<Record<FlowStep, PlanFeature>> = {
   production: "production",
   shipping: "shipping",
@@ -191,8 +191,8 @@ export interface FlowFacts {
   route: PaymentRoute | null;
   /** The deposit (or everything, with no deposit) has come in. */
   depositIn: boolean;
-  factoryOrderedOn: string | null;
-  /** The goods lines, and how many came from the factory in full. */
+  supplierOrderedOn: string | null;
+  /** The goods lines, and how many came from the supplier in full. */
   production: { lines: number; received: number };
   readyOn: string | null;
   shipments: { total: number; departed: number; arrived: number };
@@ -227,7 +227,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
   const done: Record<FlowStep, boolean> = {
     // The route is asked for, never a gate: an order paid (or past Confirmed) has its payment step done.
     payment: f.depositIn || after(f.stage, "confirmed"),
-    factory: f.factoryOrderedOn !== null || after(f.stage, "confirmed"),
+    factory: f.supplierOrderedOn !== null || after(f.stage, "confirmed"),
     production: (f.production.lines > 0 && f.production.received === f.production.lines) || shippedStage,
     shipping: f.shipments.total > 0 ? f.shipments.arrived === f.shipments.total : f.stage === "done",
     documents: f.documents.required > 0 && f.documents.ready >= f.documents.required && f.bankSteps.done >= f.bankSteps.required,
@@ -235,7 +235,7 @@ export function flowSteps(f: FlowFacts, features: readonly string[] | null): Flo
   };
   const sub: Record<FlowStep, string> = {
     payment: f.depositIn ? (f.route === null ? "Deposit received · route not chosen" : "Deposit received") : f.route === null ? "Choose how the customer pays" : "Waiting for the deposit",
-    factory: f.factoryOrderedOn ? `Ordered ${f.factoryOrderedOn}` : "Place the order with the supplier",
+    factory: f.supplierOrderedOn ? `Ordered ${f.supplierOrderedOn}` : "Place the order with the supplier",
     production: f.production.lines > 0 && f.production.received === f.production.lines ? "Goods received" : f.readyOn ? `Ready ${f.readyOn}` : "No ready date yet",
     shipping: f.shipments.total
       ? f.shipments.arrived === f.shipments.total

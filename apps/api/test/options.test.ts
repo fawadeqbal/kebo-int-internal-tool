@@ -6,8 +6,8 @@ import { api, signIn, startApp } from "./app";
 type Line = { no: string; description: string; model?: string | null; type: string };
 
 /**
- * Step 2b: what we sell is the factories' lines, not the customer's wording.
- * A quotation offers whole factory offers as options A, B…; the customer
+ * Step 2b: what we sell is the suppliers' lines, not the customer's wording.
+ * A quotation offers whole supplier offers as options A, B…; the customer
  * accepts exactly one, and the order is that option's lines.
  */
 describe("quotation options from supplier offers", () => {
@@ -105,7 +105,7 @@ describe("quotation options from supplier offers", () => {
   it("keeps each supplier's own items, models and parts, and says which items an offer covers", async () => {
     const [boiler, line] = await items();
     const x = {
-      newFactoryName: `Zhangjiagang Complete ${tag}`,
+      newSupplierName: `Zhangjiagang Complete ${tag}`,
       receivedOn: "2026-10-20",
       currency: "CNY",
       leadTime: "45 days",
@@ -140,7 +140,7 @@ describe("quotation options from supplier offers", () => {
     offerY = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/factory-quotes`, {
-          newFactoryName: `Guangzhou Items ${tag}`,
+          newSupplierName: `Guangzhou Items ${tag}`,
           receivedOn: "2026-10-21",
           currency: "CNY",
           // 13% tax on top of its prices.
@@ -171,16 +171,16 @@ describe("quotation options from supplier offers", () => {
     expect(offers.items.map((i: { no: string }) => i.no)).toEqual(["1", "2"]);
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     expect(draft.options).toHaveLength(1);
-    expect(draft.options[0]).toMatchObject({ factoryQuoteId: offerX, leadTime: "45 days" });
+    expect(draft.options[0]).toMatchObject({ supplierQuoteId: offerX, leadTime: "45 days" });
     expect(draft.options[0].prices).toHaveLength(4);
   });
 
   it("offers two suppliers as Option A and B; items come from the offers and cannot be changed in the quotation", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const offers = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/offers?currency=USD`).expect(200)).body;
-    const y = offers.offers.find((o: { factoryQuoteId: string }) => o.factoryQuoteId === offerY);
+    const y = offers.offers.find((o: { supplierQuoteId: string }) => o.supplierQuoteId === offerY);
     const optionB = {
-      factoryQuoteId: offerY,
+      supplierQuoteId: offerY,
       leadTime: "60 days",
       discount: 0,
       prices: [{ lineId: y.lines[0].id, unitPrice: 42000 }],
@@ -197,7 +197,7 @@ describe("quotation options from supplier offers", () => {
           .expect(400)
       ).body.error,
     ).toMatch(/^Option B: enter a price for "Juice line complete"/);
-    // Whatever wording is sent, the lines are the factory's.
+    // Whatever wording is sent, the lines are the supplier's.
     const r = (
       await api(app, sana)
         .post(`/inquiries/${inquiryId}/quotation/revisions`, {
@@ -254,7 +254,7 @@ describe("quotation options from supplier offers", () => {
     const order = (await api(app, sana).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
     expect(order.total).toBe("45500.00");
     expect(order.lines.map((l: Line) => `${l.no} ${l.description}`)).toEqual(["1 Juice line complete", "2 Sea freight to Mombasa"]);
-    // We owe only the factory of the chosen option.
+    // We owe only the supplier of the chosen option.
     const m = (await api(app, sana).get(`/orders/${order.id}/money`).expect(200)).body;
     expect(m.factories.rows.map((f: { factory: { name: string }; owed: string }) => `${f.factory.name} ${f.owed}`)).toEqual([
       `Guangzhou Items ${tag} 282500.00`,
@@ -293,19 +293,19 @@ describe("quotation options from supplier offers", () => {
       .post(`/api/inquiries/${inquiryId}/files`)
       .set("authorization", `Bearer ${sana}`)
       .field("kind", "factory_quote")
-      .field("factoryQuoteId", offerY)
+      .field("supplierQuoteId", offerY)
       .attach("file", Buffer.from("%PDF-1.4 y"), { filename: "Guangzhou PI.pdf", contentType: "application/pdf" })
       .expect(201);
     await request(app.getHttpServer())
       .post(`/api/inquiries/${inquiryId}/files`)
       .set("authorization", `Bearer ${sana}`)
       .field("kind", "factory_quote")
-      .field("factoryQuoteId", offerX)
+      .field("supplierQuoteId", offerX)
       .attach("file", Buffer.from("%PDF-1.4 x"), { filename: "Zhangjiagang quote.pdf", contentType: "application/pdf" })
       .expect(201);
     const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body;
     const order = (await api(app, sana).get(`/orders/${deal.orders[0].id}`).expect(200)).body;
     // Only the offer the order was made from (option B), not the one the customer did not choose.
-    expect(order.factoryFiles.map((f: { fileName: string; factory: string }) => `${f.factory}: ${f.fileName}`)).toEqual([`Guangzhou Items ${tag}: Guangzhou PI.pdf`]);
+    expect(order.supplierFiles.map((f: { fileName: string; factory: string }) => `${f.factory}: ${f.fileName}`)).toEqual([`Guangzhou Items ${tag}: Guangzhou PI.pdf`]);
   });
 });

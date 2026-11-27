@@ -101,16 +101,16 @@ export async function papersPrintAction(orderId: string, _prev: ActionState, for
   return { ...r, data: undefined };
 }
 
-const FACTORY_TERMS_FIELDS = ["basis", "basisPlace", "leadDays", "leadFrom", "warrantyMonths", "warrantyFrom", "warranty", "paymentNote", "moq", "notes"] as const;
+const SUPPLIER_TERMS_FIELDS = ["basis", "basisPlace", "leadDays", "leadFrom", "warrantyMonths", "warrantyFrom", "warranty", "paymentNote", "moq", "notes"] as const;
 
 /**
- * What was agreed with a factory (design "terms that travel", step 3b): Delivery, the payment's note, Warranty and
+ * What was agreed with a supplier (design "terms that travel", step 3b): Delivery, the payment's note, Warranty and
  * Conditions on its purchase order; once it is sent, a change from its offer asks why (the form asks, then sends again).
  */
-export async function factoryTermsAction(orderId: string, poId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
+export async function supplierTermsAction(orderId: string, poId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
   const body: Record<string, string | null> = {};
-  for (const k of FACTORY_TERMS_FIELDS) if (k in v) body[k] = v[k]?.trim() || null;
+  for (const k of SUPPLIER_TERMS_FIELDS) if (k in v) body[k] = v[k]?.trim() || null;
   const r = await attempt(form, () => api.patch(`/orders/${orderId}/purchase-orders/${poId}/terms`, { ...body, reason: reasonOf(form) }), "What was agreed with the supplier is saved.");
   if (r.ok) refresh(orderId);
   return { ...r, data: undefined };
@@ -224,7 +224,7 @@ export async function cancelOrderAction(orderId: string, _prev: ActionState, for
   const body = {
     reason: v.reason,
     ...(v.customerMoney ? { customerMoney: v.customerMoney } : {}),
-    ...(v.factoryMoney ? { factoryMoney: v.factoryMoney } : {}),
+    ...(v.supplierMoney ? { supplierMoney: v.supplierMoney } : {}),
     refundNow: v.refundNow === "true",
     refundAccountId: v.refundAccountId || null,
     refundOn: v.refundOn || null,

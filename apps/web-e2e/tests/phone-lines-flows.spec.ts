@@ -148,7 +148,7 @@ test("offer lines on a phone: what a line still needs is marked and can be shown
   const t = tag();
   const deal = await newInquiry(page, t);
   const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
-    newFactoryName: `Phone Works ${t}`,
+    newSupplierName: `Phone Works ${t}`,
     receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
     currency: "CNY",
     lines: [
@@ -196,7 +196,7 @@ test.describe("a narrow phone (320 px, WCAG reflow)", () => {
     const t = tag();
     const deal = await newInquiry(page, t);
     const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
-      newFactoryName: `Zhejiang Wanshida Pharmaceutical Machinery ${t}`,
+      newSupplierName: `Zhejiang Wanshida Pharmaceutical Machinery ${t}`,
       reference: "WSD-2026-11-0042-REV3",
       receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
       currency: "CNY",
@@ -252,7 +252,7 @@ test("Quote this offer on a phone: the New quotations window fits the screen (no
   const t = tag();
   const deal = await newInquiry(page, t);
   const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
-    newFactoryName: `Zhejiang Wanshida Pharmaceutical Machinery ${t}`,
+    newSupplierName: `Zhejiang Wanshida Pharmaceutical Machinery ${t}`,
     receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
     currency: "USD",
     basis: "FOB",
@@ -305,7 +305,7 @@ test.describe("the smallest phone (320 × 568)", () => {
     });
     const full = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
     const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
-      newFactoryName: `Small Works ${t}`,
+      newSupplierName: `Small Works ${t}`,
       receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
       currency: "CNY",
       lines: [{ description: "Tablet press", quantity: 1, unit: "set", unitPrice: 98000, requestedItemId: full.items[0].id }],
@@ -377,7 +377,7 @@ test.describe("the smallest phone (320 × 568)", () => {
     const deal = await newInquiry(page, t);
     const full = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
     await post(page, `/inquiries/${deal.id}/factory-quotes`, {
-      newFactoryName: `Quote Works ${t}`,
+      newSupplierName: `Quote Works ${t}`,
       receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
       currency: "USD",
       basis: "FOB",
@@ -421,7 +421,7 @@ test.describe("the smallest phone (320 × 568)", () => {
     const deal = await newInquiry(page, t);
     const full = await (await page.request.get(`/api/inquiries/${deal.id}`)).json();
     const offer = await post(page, `/inquiries/${deal.id}/factory-quotes`, {
-      newFactoryName: `Sheet Works ${t}`,
+      newSupplierName: `Sheet Works ${t}`,
       receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
       currency: "CNY",
       leadTime: "35 days after the deposit",

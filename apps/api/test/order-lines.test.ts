@@ -8,7 +8,7 @@ import { CompaniesService } from "../src/common/company/companies.service";
 
 /**
  * Order flow v3, phase 2: the order's lines in one line table. Each step changes
- * one line at a time (PATCH /order-lines/:id): what came in from the factory,
+ * one line at a time (PATCH /order-lines/:id): what came in from the supplier,
  * the packing, what reached the customer. Same rules and history as the whole
  * lists, each set behind its own permission (and Delivery & SAT behind its module).
  */
@@ -71,7 +71,7 @@ describe("order items, one at a time", () => {
     const items = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items as { id: string }[];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        newFactoryName: `Wenzhou Items ${tag}`,
+        newSupplierName: `Wenzhou Items ${tag}`,
         receivedOn: day(-3),
         currency: "CNY",
         lines: [
@@ -229,9 +229,9 @@ describe("order items, one at a time", () => {
     const office = await signIn(app, email2, password);
     await patch(machine.id, { set: "delivered", note: "x" }, office).expect(403);
     await patch(machine.id, { set: "received", receivedQty: 2 }, office).expect(200);
-    // Factory prices only for people who see them.
-    expect((await order(office)).lines.find((l) => l.id === machine.id)).toMatchObject({ factoryPrice: null });
-    expect((await order(sana)).lines.find((l) => l.id === machine.id)).toMatchObject({ factoryPrice: { unitPrice: "130000.00", currency: "CNY" } });
+    // Supplier prices only for people who see them.
+    expect((await order(office)).lines.find((l) => l.id === machine.id)).toMatchObject({ supplierPrice: null });
+    expect((await order(sana)).lines.find((l) => l.id === machine.id)).toMatchObject({ supplierPrice: { unitPrice: "130000.00", currency: "CNY" } });
   });
 
   it("another company's item is not found, and its rows stay out of reach", async () => {

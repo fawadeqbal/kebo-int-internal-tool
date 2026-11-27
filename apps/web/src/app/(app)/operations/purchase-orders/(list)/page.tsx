@@ -28,7 +28,7 @@ const PAGE = PAGE_SIZE;
 /**
  * Purchasing › Purchase orders (board PList): one per supplier on each sales order, with its number, what it
  * costs, what was paid, when it is ready, when it was sent and where it stands. A row opens the purchase
- * order's own page; it is changed on the order's Factory order tab.
+ * order's own page; it is changed on the order's Supplier order tab.
  */
 export default async function PurchaseOrdersPage({
   searchParams,

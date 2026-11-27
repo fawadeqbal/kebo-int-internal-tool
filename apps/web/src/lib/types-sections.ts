@@ -20,11 +20,11 @@ export interface OrderSectionsView {
   stands: StageStandView[];
   /** The small word beside each stage's tab. */
   tabs: Record<string, string>;
-  /** Production, per factory of the order (one row, factory null, when the lines name none). */
-  production: FactoryProduction[];
+  /** Production, per supplier of the order (one row, supplier null, when the lines name none). */
+  production: SupplierProduction[];
 }
 
-export interface FactoryProduction {
+export interface SupplierProduction {
   factory: { id: string; name: string } | null;
   readyOn: string | null;
   readyToldOn: string | null;

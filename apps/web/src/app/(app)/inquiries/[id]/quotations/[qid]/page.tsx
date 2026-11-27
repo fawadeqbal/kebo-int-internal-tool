@@ -138,7 +138,7 @@ export default async function QuotationOwnPage({
   const changed = isDraft || r.status === "sent" ? r.options.flatMap((opt) => (opt.factory && opt.offerChanged?.length ? [{ opt, lines: opt.offerChanged }] : [])) : [];
   // A quotation from one offer says when the supplier's prices end, beside its own Valid until.
   const endOf = r.options.length === 1 ? r.options[0] : null;
-  const ends = endOf?.factory && endOf.factoryValidUntil ? { who: endOf.factory.name, on: endOf.factoryValidUntil } : null;
+  const ends = endOf?.factory && endOf.supplierValidUntil ? { who: endOf.factory.name, on: endOf.supplierValidUntil } : null;
   const prev = at > 0 ? q.quotations[at - 1] : null;
   const next = at < q.quotations.length - 1 ? q.quotations[at + 1] : null;
 
@@ -313,7 +313,7 @@ export default async function QuotationOwnPage({
           }
         >
           {lines
-            .map((l) => `${l.no} ${l.description}: ${money(l.was, opt.factoryCurrency ?? "")} → ${l.now === null ? "gone from the offer" : money(l.now, opt.factoryCurrency ?? "")}`)
+            .map((l) => `${l.no} ${l.description}: ${money(l.was, opt.supplierCurrency ?? "")} → ${l.now === null ? "gone from the offer" : money(l.now, opt.supplierCurrency ?? "")}`)
             .join(" · ")}
           {isDraft ? ". Update prices keeps each item's margin on the new cost; Keep these prices keeps the customer's prices." : ". A sent quotation stays as it is: a new revision takes the new prices."}
         </Notice>
@@ -442,9 +442,9 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
         <>
           <dl className="flex flex-col gap-1.5">
             {r.options.map((o) => {
-              const offer = o.factoryQuoteId ? offers?.offers.find((f) => f.factoryQuoteId === o.factoryQuoteId) : null;
+              const offer = o.supplierQuoteId ? offers?.offers.find((f) => f.supplierQuoteId === o.supplierQuoteId) : null;
               const prefix = r.options.length > 1 ? `Option ${o.letter}: ` : "";
-              if (!o.factoryQuoteId) return <Fragment key={o.id}>{row(`${prefix}Prices`, "Own prices")}</Fragment>;
+              if (!o.supplierQuoteId) return <Fragment key={o.id}>{row(`${prefix}Prices`, "Own prices")}</Fragment>;
               return (
                 <Fragment key={o.id}>
                   {row(`${prefix}Supplier`, o.factory?.name ?? "—")}
@@ -455,9 +455,9 @@ function quoteSide({ x, r, here, base, offers }: { x: QuotationOfDeal; r: Revisi
             })}
           </dl>
           {r.options
-            .filter((o) => o.factoryQuoteId && offers)
+            .filter((o) => o.supplierQuoteId && offers)
             .map((o) => (
-              <Link key={o.id} href={`${base}/offers/${o.factoryQuoteId}`} className="mt-1 inline-flex items-center gap-1 text-md font-semibold text-primary underline underline-offset-2">
+              <Link key={o.id} href={`${base}/offers/${o.supplierQuoteId}`} className="mt-1 inline-flex items-center gap-1 text-md font-semibold text-primary underline underline-offset-2">
                 Open {r.options.length > 1 ? `Option ${o.letter}’s offer` : "the offer"} <ChevronRight className="size-3.5" aria-hidden />
               </Link>
             ))}
@@ -480,7 +480,7 @@ function draftChecks(r: RevisionView): string[] {
       out.push(`${who} does not include item${o.coverage.missing.length === 1 ? "" : "s"} ${o.coverage.missing.join(", ")}; the customer will see ${o.coverage.missing.length === 1 ? "it" : "them"} missing.`);
     // People who see costs: the costs to reach our basis (freight…) are part of the price, so a missing one makes the margin look better than it is.
     if (o.costing && o.factory) {
-      if (o.factoryBasis === null) out.push(`${who}: the supplier's Incoterm is not said, so the costs to reach ${r.incoterm} are not in its cost.`);
+      if (o.supplierBasis === null) out.push(`${who}: the supplier's Incoterm is not said, so the costs to reach ${r.incoterm} are not in its cost.`);
       else if (o.gap) {
         const have = new Set((o.costs ?? []).map((c) => c.step));
         const asLine = (step: BasisStep) => o.lines.some((l) => l.type === "charge" && l.description.toLowerCase().startsWith(BASIS_STEP_LABEL[step].toLowerCase().split(" ")[0]!));
@@ -491,9 +491,9 @@ function draftChecks(r: RevisionView): string[] {
     }
     if (o.costing && o.costing.marginPercent !== null && o.costing.marginPercent < 0) out.push(`${who} sells below cost.`);
     // Never valid longer than the supplier's prices (canvas "From the supplier offer to the quotation").
-    if (o.factory && o.factoryValidUntil && r.validUntil > o.factoryValidUntil)
-      out.push(`${who} is valid until ${date(r.validUntil)}, after ${o.factory.name}'s prices end (${date(o.factoryValidUntil)}).`);
-    // What we promise against what the factory gives (people who see costs): lead time, payment, warranty.
+    if (o.factory && o.supplierValidUntil && r.validUntil > o.supplierValidUntil)
+      out.push(`${who} is valid until ${date(r.validUntil)}, after ${o.factory.name}'s prices end (${date(o.supplierValidUntil)}).`);
+    // What we promise against what the supplier gives (people who see costs): lead time, payment, warranty.
     for (const c of checksOf({ ...r, options: [o] }, o)) if (!c.ok) out.push(`${who}: ${c.text}`);
     return out;
   });

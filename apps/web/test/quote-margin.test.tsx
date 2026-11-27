@@ -9,9 +9,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 const { fromDraft, marginOf, optionTotals, pricedAll, startMargin } = await import("@/components/deals/revision-editor");
 
 const line = (id: string, quantity: string, unitCost: string | null) => ({ id, no: id, parentId: null, requestedItemId: null, answersNo: null, description: `Item ${id}`, model: null, quantity, unit: "pcs", unitCost });
-const offer = (factoryQuoteId: string, lines: ReturnType<typeof line>[], basis: "FOB" | "EXW" = "FOB") => ({
-  factoryQuoteId,
-  factory: { id: `f-${factoryQuoteId}`, name: `Supplier ${factoryQuoteId}` },
+const offer = (supplierQuoteId: string, lines: ReturnType<typeof line>[], basis: "FOB" | "EXW" = "FOB") => ({
+  supplierQuoteId,
+  factory: { id: `f-${supplierQuoteId}`, name: `Supplier ${supplierQuoteId}` },
   currency: "USD",
   basis,
   basisPlace: "Shanghai",
@@ -45,8 +45,8 @@ const draft = (options: RevisionDraft["options"]): RevisionDraft => ({
   notes: null,
   options,
 });
-const option = (factoryQuoteId: string | null, prices: Record<string, number>, extra: Partial<RevisionDraft["options"][number]> = {}) =>
-  ({ factoryQuoteId, discount: 0, leadTime: null, charges: [], costs: [], prices: Object.entries(prices).map(([lineId, unitPrice]) => ({ lineId, unitPrice })), ...extra }) as RevisionDraft["options"][number];
+const option = (supplierQuoteId: string | null, prices: Record<string, number>, extra: Partial<RevisionDraft["options"][number]> = {}) =>
+  ({ supplierQuoteId, discount: 0, leadTime: null, charges: [], costs: [], prices: Object.entries(prices).map(([lineId, unitPrice]) => ({ lineId, unitPrice })), ...extra }) as RevisionDraft["options"][number];
 const marginOfOption = (s: ReturnType<typeof fromDraft>, i: number) => optionTotals(s.options[i]!, offers, s.incoterm, "USD").costing.marginPercent;
 
 describe("the margin a quotation window starts with", () => {

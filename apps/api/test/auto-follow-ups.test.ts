@@ -43,12 +43,12 @@ describe("the system sets the first follow-ups itself", () => {
         .post("/inquiries", { customerId, category: "Machinery", ...(assigneeId ? { assigneeId } : {}), items: [{ description: `Filler ${tag}`, quantity: 1, unit: "set" }] })
         .expect(201)
     ).body as { id: string; refNo: string };
-  /** A quotation from one factory offer, sent to the customer. */
+  /** A quotation from one supplier offer, sent to the customer. */
   const quote = async (inquiryId: string) => {
     const items = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body.items as { id: string; description: string; quantity: string }[];
     await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Auto Works ${tag} ${Math.random().toString(36).slice(2, 6)}`,
+        newSupplierName: `Auto Works ${tag} ${Math.random().toString(36).slice(2, 6)}`,
         receivedOn: today,
         currency: "CNY",
         lines: items.map((i) => ({ requestedItemId: i.id, description: i.description, quantity: Number(i.quantity), unitPrice: "1000" })),

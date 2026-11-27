@@ -57,7 +57,7 @@ export class EditsService {
         ? await db.inquiry.findFirst({ where: { id, deletedAt: null, ...inquiryAccess(user) }, select: { id: true } })
         : type === "factory_quote"
           ? can(user, "sourcing.manage")
-            ? await db.factoryQuote.findFirst({ where: { id, inquiry: { deletedAt: null, ...inquiryAccess(user) } }, select: { id: true } })
+            ? await db.supplierQuote.findFirst({ where: { id, inquiry: { deletedAt: null, ...inquiryAccess(user) } }, select: { id: true } })
             : null
           : type === "quotation"
             ? await db.quotationRevision.findFirst({ where: { id, quotation: { inquiry: { deletedAt: null, ...inquiryAccess(user) } } }, select: { id: true } })
@@ -87,7 +87,7 @@ export class EditsService {
         action: input.kind === "edit" ? EDIT : FIRST,
         entityType: input.type,
         entityId: input.id,
-        // "Lines from the factory edited (edit 2): 1 · Received 1 → 2, and 3 more"
+        // "Lines from the supplier edited (edit 2): 1 · Received 1 → 2, and 3 more"
         summary:
           input.kind === "edit"
             ? `${editCardLabel(input.card)} edited (edit ${n})${input.changes.length ? `: ${input.changes[0]}${input.changes.length > 1 ? `, and ${input.changes.length - 1} more` : ""}` : ""}`

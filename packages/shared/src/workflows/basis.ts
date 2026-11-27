@@ -1,7 +1,7 @@
 import { BASIS_STEPS, type BasisStep, type Incoterm } from "../enums";
 
 /**
- * The costs between a factory's price and ours, in the order goods travel:
+ * The costs between a supplier's price and ours, in the order goods travel:
  * to the port (inland transport and export clearance), sea freight,
  * insurance, delivery at the destination (port charges, transport to the
  * place) and import duties.
@@ -41,14 +41,14 @@ const INCLUDED: Record<Incoterm, readonly BasisStep[]> = {
 export const includedSteps = (term: Incoterm): readonly BasisStep[] => INCLUDED[term];
 
 /**
- * Between the factory's basis and the one we sell on: the steps we must add
- * (factory EXW, we sell CFR → to the port, sea freight), and the steps the
- * factory's price already pays for that we do not sell (factory CFR, we sell
+ * Between the supplier's basis and the one we sell on: the steps we must add
+ * (supplier EXW, we sell CFR → to the port, sea freight), and the steps the
+ * supplier's price already pays for that we do not sell (supplier CFR, we sell
  * FOB → sea freight: ask them for FOB). Unknown basis: nothing can be said.
  */
-export function basisGap(factory: Incoterm | null, selling: Incoterm): { needed: BasisStep[]; extra: BasisStep[] } | null {
-  if (!factory) return null;
-  const have = new Set(INCLUDED[factory]);
+export function basisGap(supplier: Incoterm | null, selling: Incoterm): { needed: BasisStep[]; extra: BasisStep[] } | null {
+  if (!supplier) return null;
+  const have = new Set(INCLUDED[supplier]);
   const want = new Set(INCLUDED[selling]);
   return {
     needed: BASIS_STEPS.filter((s) => want.has(s) && !have.has(s)),

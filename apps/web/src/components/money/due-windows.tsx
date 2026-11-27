@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PaymentPlanTable } from "@/components/order-sections/payment-plan";
-import { PayFactoryWindow } from "@/components/order-sections/factory-windows";
+import { PaySupplierWindow } from "@/components/order-sections/supplier-windows";
 
 /**
  * Finance › Receivables & payables: a row's button is a link that names the window to open (?do=pay, ?pay=…);
@@ -28,8 +28,8 @@ export function PlanInList(props: Omit<Parameters<typeof PaymentPlanTable>[0], "
   return <PaymentPlanTable {...props} onAutoClosed={done} />;
 }
 
-/** "Pay" on a factory's part in the list: the order's own Pay the factory window, opened at once. */
-export function PayFactoryInList(props: Omit<Parameters<typeof PayFactoryWindow>[0], "startOpen" | "onClosed">) {
+/** "Pay" on a supplier's part in the list: the order's own Pay the supplier window, opened at once. */
+export function PaySupplierInList(props: Omit<Parameters<typeof PaySupplierWindow>[0], "startOpen" | "onClosed">) {
   const done = useDropParam("pay");
-  return <PayFactoryWindow {...props} startOpen onClosed={done} />;
+  return <PaySupplierWindow {...props} startOpen onClosed={done} />;
 }

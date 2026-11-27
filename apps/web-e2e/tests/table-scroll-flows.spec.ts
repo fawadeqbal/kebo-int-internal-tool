@@ -18,7 +18,7 @@ async function longOffer(page: Page) {
   const items = Array.from({ length: 24 }, (_, i) => ({ description: `Spare part ${i + 1}`, quantity: i + 1, unit: "pcs" }));
   const inquiry = await send("/inquiries", { customerId: customer.id, category: "Machinery", assigneeId: me.id, items });
   const offer = await send(`/inquiries/${inquiry.id}/factory-quotes`, {
-    newFactoryName: `Scroll Supplier ${tag}`,
+    newSupplierName: `Scroll Supplier ${tag}`,
     receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
     currency: "USD",
     taxIncluded: false,

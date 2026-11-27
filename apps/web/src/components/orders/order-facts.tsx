@@ -58,11 +58,11 @@ export function keyDates(o: OrderView, flow: OrderFlow | null, now: string): { l
 export function orderPeople(o: OrderView, flow: OrderFlow | null): { role: string; name: string; sub?: string | null; href?: string }[] {
   const ship = flow?.shipping?.shipments[0] ?? null;
   const contract = flow?.payment.bankContract ?? null;
-  const factories = flow?.factory.factories ?? [];
+  const suppliers = flow?.factory.factories ?? [];
   return [
     // The customer is named in the header: here, who to talk to there.
     ...(o.contactName ? [{ role: "Contact", name: o.contactName, href: `/customers/${o.customer.id}` }] : []),
-    ...factories.map((x) => ({ role: "Supplier", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/suppliers/${x.id}` })),
+    ...suppliers.map((x) => ({ role: "Supplier", name: x.name, sub: flow?.factory.orderNo ? `their order ${flow.factory.orderNo}` : null, href: `/suppliers/${x.id}` })),
     ...(ship?.forwarder
       ? [{ role: "Forwarder", name: ship.forwarder, sub: [ship.forwarderContact, ship.forwarderPhone].filter(Boolean).join(" · ") || (ship.bookingNo ? `booking ${ship.bookingNo}` : null) }]
       : []),

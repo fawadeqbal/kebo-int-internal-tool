@@ -10,13 +10,13 @@ import { AuditService } from "../../common/audit/audit.service";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "../orders/orders.service";
 
-/** Money in from a customer, or out to a factory. */
+/** Money in from a customer, or out to a supplier. */
 export type PaymentSide = "in" | "out";
 
 const EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "webp", "gif", "heic"]);
 
 type Row = {
-  /** The row the file is kept on: money in, its payment entry; money out, the factory payment. */
+  /** The row the file is kept on: money in, its payment entry; money out, the supplier payment. */
   id: string;
   /** The order it pays (money in that only became credit: none). */
   orderId: string | null;
@@ -29,11 +29,11 @@ type Row = {
 
 /**
  * A photo or PDF kept with a payment as proof: the bank slip, a transfer
- * screenshot, the factory's receipt. One per payment; a new one replaces it.
+ * screenshot, the supplier's receipt. One per payment; a new one replaces it.
  * Money in keeps it on its payment entry (the transfer): asked for by the
  * payment on the order (its allocation) or by the entry itself.
  * Those who record payments add and remove it; whoever can see the payment
- * can open it (factory payments: those who see costs).
+ * can open it (supplier payments: those who see costs).
  */
 @Injectable()
 export class PaymentFilesService {

@@ -9,7 +9,7 @@ import { PrismaService } from "../src/database/prisma.service";
 import { CompaniesService } from "../src/common/company/companies.service";
 
 /**
- * After the customer accepts: asking factories, how the customer pays (informal,
+ * After the customer accepts: asking suppliers, how the customer pays (informal,
  * bank contract, LC), production, shipments, the document set and its trip
  * through the banks, delivery, SAT and claims. Each part is a module the
  * platform admin can switch off for a company, and each change a permission.
@@ -54,37 +54,37 @@ describe("order flow: from asking suppliers to SAT", () => {
   });
 
   it("sends the spec to several suppliers and sees who answered", async () => {
-    // Before asking: every factory is offered, none asked here yet.
+    // Before asking: every supplier is offered, none asked here yet.
     const before = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     expect(before.items).toEqual([]);
     expect(before.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ name: `Henan Pack ${tag}`, askedHere: false, lastAskedOn: null, won: 0, goodAt: null, isNew: true });
     // A day sent in the future is refused; one in the past is kept.
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan], sentOn: day(3) }).expect(400);
-    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan, wuxi], replyBy: day(7), channel: "wechat", sentOn: day(0) }).expect(201)).body;
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [henan], sentOn: day(3) }).expect(400);
+    const asked = (await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [henan, wuxi], replyBy: day(7), channel: "wechat", sentOn: day(0) }).expect(201)).body;
     expect(asked.counts).toEqual({ asked: 2, quoted: 0, waiting: 2, late: 0 });
     expect(asked.items[0]).toMatchObject({ channel: "wechat", waitingDays: 0 });
     expect(asked.suggestions.find((f: { id: string }) => f.id === henan)).toMatchObject({ askedHere: true, lastAskedOn: expect.any(String) });
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan], channel: "pigeon" }).expect(422);
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [henan], channel: "pigeon" }).expect(422);
     // Asking again leaves them as they are.
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [henan] }).expect(201);
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [henan] }).expect(201);
     expect((await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body.items).toHaveLength(2);
 
     // Henan's offer comes in: its request counts as answered.
     const item = (await api(app, sana).get(`/inquiries/${inquiryId}`)).body.items[0];
     await api(app, sana)
-      .post(`/inquiries/${inquiryId}/factory-quotes`, { factoryId: henan, receivedOn: day(-22), currency: "CNY", lines: [{ requestedItemId: item.id, description: "DPP-250 blister machine", quantity: 1, unitPrice: 185000 }] })
+      .post(`/inquiries/${inquiryId}/factory-quotes`, { supplierId: henan, receivedOn: day(-22), currency: "CNY", lines: [{ requestedItemId: item.id, description: "DPP-250 blister machine", quantity: 1, unitPrice: 185000 }] })
       .expect(201);
     const list = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
-    const byFactory = Object.fromEntries(list.items.map((i: { factory: { id: string }; status: string; id: string }) => [i.factory.id, i]));
-    expect(byFactory[henan]).toMatchObject({ status: "quoted", factoryQuoteId: expect.any(String) });
-    expect(byFactory[wuxi]).toMatchObject({ status: "sent" });
-    const declined = (await api(app, sana).patch(`/factory-requests/${byFactory[wuxi].id}`, { status: "declined", note: "Too busy until March" }).expect(200)).body;
+    const bySupplier = Object.fromEntries(list.items.map((i: { factory: { id: string }; status: string; id: string }) => [i.factory.id, i]));
+    expect(bySupplier[henan]).toMatchObject({ status: "quoted", supplierQuoteId: expect.any(String) });
+    expect(bySupplier[wuxi]).toMatchObject({ status: "sent" });
+    const declined = (await api(app, sana).patch(`/factory-requests/${bySupplier[wuxi].id}`, { status: "declined", note: "Too busy until March" }).expect(200)).body;
     expect(declined.counts).toMatchObject({ quoted: 1, waiting: 0 });
 
     // Staff who do not handle the deal cannot see it; a reply-by before the date sent is refused.
     await api(app, bilal).get(`/inquiries/${inquiryId}/factory-requests`).expect(404);
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [wuxi], sentOn: day(-32), replyBy: day(-41) }).expect(400);
-    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { factoryIds: [] }).expect(422);
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [wuxi], sentOn: day(-32), replyBy: day(-41) }).expect(400);
+    await api(app, sana).post(`/inquiries/${inquiryId}/factory-requests`, { supplierIds: [] }).expect(422);
 
     // The history of the deal says who was asked.
     const history = (await api(app, sana).get(`/history?type=deal&id=${inquiryId}`)).body;
@@ -138,7 +138,7 @@ describe("order flow: from asking suppliers to SAT", () => {
     await api(app, sana).put(`/orders/${orderId}/bank-contract`, { openedOn: day(-17), expiresOn: day(-41) }).expect(400);
     await api(app, sana).patch(`/orders/${orderId}/route`, { route: "by_pigeon" }).expect(422);
 
-    // The deposit arrives: Payment is done, the factory order is next.
+    // The deposit arrives: Payment is done, the supplier order is next.
     const o = (await api(app, sana).get(`/orders/${orderId}`)).body;
     await api(app, sana).post(`/orders/${orderId}/payments`).send({}).expect(403); // staff do not record money
     await api(app, admin).post(`/orders/${orderId}/payments`, { kind: "deposit", amount: o.money.deposit, currency: o.currency, paidOn: day(-16), method: "letter_of_credit" }).expect(201);
@@ -146,21 +146,21 @@ describe("order flow: from asking suppliers to SAT", () => {
   });
 
   it("purchase order and production", async () => {
-    await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: "2099-01-01" }).expect(400);
-    let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { factoryOrderedOn: day(-15) }).expect(200)).body;
+    await api(app, sana).patch(`/orders/${orderId}/factory-order`, { supplierOrderedOn: "2099-01-01" }).expect(400);
+    let f = (await api(app, sana).patch(`/orders/${orderId}/factory-order`, { supplierOrderedOn: day(-15) }).expect(200)).body;
     expect(stepState(f)).toMatchObject({ factory: "done", production: "current" });
-    // The order's stage follows: ordered from the factory → In production, said in its history.
+    // The order's stage follows: ordered from the supplier → In production, said in its history.
     const moved = (await api(app, sana).get(`/orders/${orderId}`)).body;
     expect(moved.stage).toBe("in_production");
     expect(moved.history.at(-1)).toMatchObject({ from: "confirmed", to: "in_production", note: "ordered from the supplier" });
 
-    // Production has the ready date, the factory test and the goods from the factory; no timeline to tick.
+    // Production has the ready date, the factory test and the goods from the supplier; no timeline to tick.
     await api(app, sana).put(`/orders/${orderId}/production`, { steps: [] }).expect(404);
     await api(app, sana).put(`/orders/${orderId}/factory-facts`, { fatPlannedOn: day(9) }).expect(200);
     f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
     expect(f.steps.find((s: { key: string }) => s.key === "production").sub).toBe("No ready date yet");
     expect(stepState(f)).toMatchObject({ production: "current" });
-    // Every goods line in from the factory: the production step is done.
+    // Every goods line in from the supplier: the production step is done.
     const lines = (await api(app, sana).get(`/orders/${orderId}`).expect(200)).body.lines as { id: string; type: string; quantity: string }[];
     for (const l of lines.filter((x) => x.type === "goods")) await api(app, sana).patch(`/order-lines/${l.id}`, { set: "received", receivedQty: l.quantity, receivedOn: day(-10) }).expect(200);
     f = (await api(app, sana).get(`/orders/${orderId}/flow`).expect(200)).body;
@@ -394,7 +394,7 @@ describe("order flow: from asking suppliers to SAT", () => {
       cancelled: false,
       route: "informal",
       depositIn: true,
-      factoryOrderedOn: day(-41),
+      supplierOrderedOn: day(-41),
       production: { lines: 0, received: 0 },
       readyOn: null,
       shipments: { total: 0, departed: 0, arrived: 0 },

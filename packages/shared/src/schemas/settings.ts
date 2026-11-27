@@ -114,8 +114,8 @@ export const salesSettings = z.object({
   quotationValidityDays: days(15),
   defaultDepositPercent: z.coerce.number().min(0).max(100).default(30),
   defaultBalanceTerms: z.enum(BALANCE_TERMS).default("before_shipment"),
-  /** The advance we pay a factory when we order (its payment plan starts from it). */
-  factoryAdvancePercent: z.coerce.number().min(0).max(100).default(30),
+  /** The advance we pay a supplier when we order (its payment plan starts from it). */
+  supplierAdvancePercent: z.coerce.number().min(0).max(100).default(30),
   defaultIncoterm: z.enum(INCOTERMS).default("FOB"),
   /**
    * Days added to a supplier's lead time when a quotation is made from its offer (canvas "From the supplier offer to
@@ -128,11 +128,11 @@ export const salesSettings = z.object({
    */
   exportVatRefundPercent: z.coerce.number().min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine((n) => Math.round(n * 100) === n * 100, "Use at most 2 decimals").default(0),
   /**
-   * New factory offers start with these: prices without tax (the tax % is added on top) or with
-   * tax included, and the tax %. 0 unless the factories charge tax (e.g. 13% VAT in China).
+   * New supplier offers start with these: prices without tax (the tax % is added on top) or with
+   * tax included, and the tax %. 0 unless the suppliers charge tax (e.g. 13% VAT in China).
    */
-  factoryTaxIncluded: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).default(false),
-  factoryTaxRate: z.coerce.number().min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine((n) => Math.round(n * 100) === n * 100, "Use at most 2 decimals").default(0),
+  supplierTaxIncluded: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).default(false),
+  supplierTaxRate: z.coerce.number().min(0, "Cannot be negative").max(100, "Cannot be more than 100%").refine((n) => Math.round(n * 100) === n * 100, "Use at most 2 decimals").default(0),
   /** The customer's copy of a quotation shows each line's unit price and amount, not only the total (review 24 Nov, S-21). */
   quoteUnitPrices: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()).default(false),
   /** Payment terms that go on every new quotation (beyond the deposit and balance). */
@@ -153,7 +153,7 @@ export const reminderSettings = z.object({
   dueSoonDays: days(3, 60),
   /** Orders: still Confirmed without the deposit after this many days. */
   depositDays: days(DEFAULT_ORDER_REMINDER_DAYS.depositDays, 180),
-  /** Orders: In production this long when the factory gave no ready date. */
+  /** Orders: In production this long when the supplier gave no ready date. */
   productionDays: days(DEFAULT_ORDER_REMINDER_DAYS.productionDays, 365),
   /** Orders: Shipped with money still due this many days after the ship date. */
   balanceDays: days(DEFAULT_ORDER_REMINDER_DAYS.balanceDays, 365),

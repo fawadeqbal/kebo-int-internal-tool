@@ -3,7 +3,7 @@ import {
   BANK_CONTRACT_STATUSES,
   CLAIM_STATUSES,
   CURRENCIES,
-  FACTORY_REQUEST_STATUSES,
+  SUPPLIER_REQUEST_STATUSES,
   ORDER_DOCUMENT_KINDS,
   ORDER_DOCUMENT_STATUSES,
   PAYMENT_ROUTES,
@@ -25,26 +25,26 @@ const maybe = <T extends z.ZodTypeAny>(s: T) => s.optional();
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
   z.preprocess((v) => (v === "" ? null : v), z.enum(values).nullable());
 
-/* ---------------------------------------------------------------- asking factories */
+/* ---------------------------------------------------------------- asking suppliers */
 
-/** Send the inquiry's spec to these factories (one request each; a factory already asked is left as it is). */
-export const factoryRequestsInput = z.object({
-  factoryIds: z.array(id("Choose the suppliers to ask")).min(1, "Choose at least one supplier").max(30),
+/** Send the inquiry's spec to these suppliers (one request each; a supplier already asked is left as it is). */
+export const supplierRequestsInput = z.object({
+  supplierIds: z.array(id("Choose the suppliers to ask")).min(1, "Choose at least one supplier").max(30),
   channel: optionalEnum(REQUEST_CHANNELS).optional().transform((v) => v ?? null),
   sentOn: optionalDate,
   replyBy: optionalDate,
   note: optionalText(500),
 });
-export type FactoryRequestsInput = z.infer<typeof factoryRequestsInput>;
+export type SupplierRequestsInput = z.infer<typeof supplierRequestsInput>;
 
-export const factoryRequestUpdateInput = z.object({
-  status: maybe(z.enum(FACTORY_REQUEST_STATUSES)),
+export const supplierRequestUpdateInput = z.object({
+  status: maybe(z.enum(SUPPLIER_REQUEST_STATUSES)),
   channel: maybe(optionalEnum(REQUEST_CHANNELS)),
   replyBy: maybe(optionalDate),
-  factoryQuoteId: maybe(optionalId),
+  supplierQuoteId: maybe(optionalId),
   note: maybe(optionalText(500)),
 });
-export type FactoryRequestUpdateInput = z.infer<typeof factoryRequestUpdateInput>;
+export type SupplierRequestUpdateInput = z.infer<typeof supplierRequestUpdateInput>;
 
 /* ---------------------------------------------------------------- payment route and bank contract */
 
@@ -82,11 +82,11 @@ export type BankContractInput = z.infer<typeof bankContractInput>;
 export const BANK_CONTRACT_FIELDS = bankContractInput.keyof().options;
 
 /**
- * When we placed the order with the factory (empty: not yet) and the factory's own number for it. Only the
+ * When we placed the order with the supplier (empty: not yet) and the supplier's own number for it. Only the
  * fields sent change (the phone app sends the date alone).
  */
-export const factoryOrderInput = z.object({ factoryOrderedOn: optionalDate.optional(), factoryOrderNo: optionalText(60).optional() });
-export type FactoryOrderInput = z.infer<typeof factoryOrderInput>;
+export const supplierOrderInput = z.object({ supplierOrderedOn: optionalDate.optional(), supplierOrderNo: optionalText(60).optional() });
+export type SupplierOrderInput = z.infer<typeof supplierOrderInput>;
 
 /** Send a purchase order to its supplier: the day, their order number, how, and why when the deposit is not verified yet. */
 export const sendPurchaseOrderInput = z.object({
@@ -258,7 +258,7 @@ export type DeliveryAllGoodInput = z.infer<typeof deliveryAllGoodInput>;
 export const satAllPassedInput = z.object({ satDoneOn: optionalDate.optional(), satSignedBy: optionalText(120).optional() });
 export type SatAllPassedInput = z.infer<typeof satAllPassedInput>;
 
-/** What a claim is worth (in the order's currency) and who bears it: the factory, us or the customer. */
+/** What a claim is worth (in the order's currency) and who bears it: the supplier, us or the customer. */
 const claimMoney = { amount: maybe(optionalAmount), bearer: maybe(optionalEnum(CLAIM_BEARERS)) };
 
 export const claimInput = z.object({

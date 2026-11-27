@@ -1,7 +1,7 @@
-import { factoryTaxMinor, formatMinor, withTaxMinor, type Minor } from "@kebo/money";
+import { supplierTaxMinor, formatMinor, withTaxMinor, type Minor } from "@kebo/money";
 
 /**
- * Tax is only on factory items. Each factory offer says whether its prices are
+ * Tax is only on supplier items. Each supplier offer says whether its prices are
  * without tax (the tax % is added on top: price + tax is what one unit costs
  * us) or have the tax included (the price is the cost; the tax inside is only
  * shown). The offer has a tax % for its lines; a line can have its own.
@@ -22,7 +22,7 @@ export function taxSentence(unitPriceMinor: Minor, taxRate: number, currency: st
   const rate = Number(taxRate) || 0;
   if (rate <= 0) return `${formatMinor(unitPriceMinor, currency)}, no tax`;
   if (taxIncluded)
-    return `${formatMinor(unitPriceMinor, currency)}, tax ${rate}% included (${formatMinor(factoryTaxMinor(unitPriceMinor, rate, true), currency)})`;
+    return `${formatMinor(unitPriceMinor, currency)}, tax ${rate}% included (${formatMinor(supplierTaxMinor(unitPriceMinor, rate, true), currency)})`;
   return `${formatMinor(unitPriceMinor, currency)} + ${rate}% tax = ${formatMinor(withTaxMinor(unitPriceMinor, rate), currency)}`;
 }
 
@@ -32,7 +32,7 @@ export function offerTaxText(taxRate: number | string, taxIncluded: boolean): st
   return taxIncluded ? `${rate}% · included in the prices` : `${rate}% · added on top`;
 }
 
-/** Under the factory in the offers table, when the rate is not 0: "+13% tax" / "tax incl. 13%". */
+/** Under the supplier in the offers table, when the rate is not 0: "+13% tax" / "tax incl. 13%". */
 export function offerTaxTag(taxRate: number | string, taxIncluded: boolean): string | null {
   const rate = Number(taxRate) || 0;
   if (rate <= 0) return null;

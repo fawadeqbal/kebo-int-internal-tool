@@ -122,7 +122,7 @@ export class OrdersController {
     return this.orders.setAgreed(user, id, body);
   }
 
-  /** { on?, lines: [{ lineId, receivedQty }] } — how many of each goods line came in from the factory so far. */
+  /** { on?, lines: [{ lineId, receivedQty }] } — how many of each goods line came in from the supplier so far. */
   @SignedIn("checked inside: orders.update, sourcing.manage")
   @Put(":id/receipt")
   receipt(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(receiptInput)) body: ReceiptInput) {

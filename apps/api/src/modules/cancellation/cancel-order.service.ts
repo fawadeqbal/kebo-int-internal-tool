@@ -39,8 +39,8 @@ export class CancelOrderService {
    * Money already received is released from the order (its payments crossed out,
    * the transfers stand); what happens to it is said: kept as the customer's
    * credit (the default), refunded (now, or later from the credit), or kept as a
-   * cancellation fee. Money paid to the factory
-   * is a refund expected from the factory (the default) or a loss on the order
+   * cancellation fee. Money paid to the supplier
+   * is a refund expected from the supplier (the default) or a loss on the order
    * (an expense, borne by us).
    */
   async cancel(user: SessionUser, id: string, reason: string, money: Partial<CancelOrderInput> = {}) {
@@ -53,16 +53,16 @@ export class CancelOrderService {
       await tx.$queryRaw`select id from orders where id = ${id}::uuid for update`;
       const o = await this.orders.load(user, id, tx);
       if (o.status === "cancelled") throw new DomainError("This order is already cancelled.");
-      // Money in from the customer (in the order's currency), and money out to the factories (per factory and currency).
+      // Money in from the customer (in the order's currency), and money out to the suppliers (per supplier and currency).
       const inMinor = o.allocations.reduce((t, p) => t + decimalToMinor(p.amount), 0);
-      const factoryPaid = (
+      const supplierPaid = (
         await tx.allocation.findMany({
           where: { purchaseOrderId: id, ...livePurchase },
           include: { movement: { include: { party: { select: { id: true, name: true } } } } },
         })
-      ).map((a) => ({ factoryId: a.movement.partyId!, factory: a.movement.party!, currency: a.movement.currency, amount: a.share }));
+      ).map((a) => ({ supplierId: a.movement.partyId!, factory: a.movement.party!, currency: a.movement.currency, amount: a.share }));
       const customerMoney = inMinor > 0 ? (money.customerMoney ?? "credit") : null;
-      const factoryMoney = factoryPaid.length ? (money.factoryMoney ?? "refund_due") : null;
+      const supplierMoney = supplierPaid.length ? (money.supplierMoney ?? "refund_due") : null;
       const posted: LedgerRef[] = [{ type: "order_all", id }];
       if (customerMoney) {
         // What paid the order is released: the customer's credit again, then kept as a fee or paid back from it.
@@ -90,11 +90,11 @@ export class CancelOrderService {
             }),
           });
       }
-      if (factoryMoney === "loss") {
-        // One expense per factory and currency, borne by us (no account: the money already left with the factory payment).
+      if (supplierMoney === "loss") {
+        // One expense per supplier and currency, borne by us (no account: the money already left with the supplier payment).
         const byKey = new Map<string, { factory: { id: string; name: string }; currency: string; minor: number }>();
-        for (const p of factoryPaid) {
-          const k = `${p.factoryId}:${p.currency}`;
+        for (const p of supplierPaid) {
+          const k = `${p.supplierId}:${p.currency}`;
           const cur = byKey.get(k) ?? { factory: p.factory, currency: p.currency, minor: 0 };
           cur.minor += decimalToMinor(p.amount);
           byKey.set(k, cur);
@@ -108,7 +108,7 @@ export class CancelOrderService {
               orderId: id,
               customerId: o.customerId,
               inquiryId: o.inquiryId,
-              factoryId: x.factory.id,
+              supplierId: x.factory.id,
               category: "other",
               step: "factory",
               borneBy: "us",
@@ -124,19 +124,19 @@ export class CancelOrderService {
       }
       await tx.order.update({ where: { id }, data: { status: "cancelled" } });
       // Why and how: its own row (order_cancellations), written only here.
-      await tx.orderCancellation.create({ data: { orderId: id, reason, customerMoney, factoryMoney } });
+      await tx.orderCancellation.create({ data: { orderId: id, reason, customerMoney, supplierMoney } });
       await tx.quotationRevision.update({ where: { id: o.revisionId }, data: { status: "void" } });
       await this.audit.record(tx, {
         userId: user.id,
         action: "cancel",
         entityType: "order",
         entityId: id,
-        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${formatMinor(inMinor, o.currency)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${factoryMoney ? ` · paid to the supplier: ${factoryMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
+        summary: `Cancelled order ${o.refNo}${customerMoney ? ` · ${formatMinor(inMinor, o.currency)} received: ${customerMoney === "credit" ? "kept as credit" : customerMoney === "fee" ? "kept as a fee" : money.refundNow ? "refunded" : "to refund"}` : ""}${supplierMoney ? ` · paid to the supplier: ${supplierMoney === "loss" ? "a loss" : "refund expected"}` : ""}`,
         reason,
         oldValues: { status: o.status },
-        newValues: { status: "cancelled", customerMoney, factoryMoney },
+        newValues: { status: "cancelled", customerMoney, supplierMoney },
       });
-      // The ledger: the order and its factories' parts reversed; the money in kept as credit, refunded or a fee.
+      // The ledger: the order and its suppliers' parts reversed; the money in kept as credit, refunded or a fee.
       await this.ledger.post(tx, posted, { userId: user.id, reason });
       const inquiry = await tx.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId } });
       const moved = await this.stages.after(tx, inquiry, "order_cancelled", user.id);

@@ -105,17 +105,17 @@ export interface ChargeState {
 export interface OptionState {
   key: string;
   /** null: the customer's items, priced by hand. */
-  factoryQuoteId: string | null;
+  supplierQuoteId: string | null;
   /** The lead time's words: an older option's, kept until days are typed (with days they are worked out). */
   leadTime: string;
   /** The lead time we promise as days from a moment. */
   leadDays: string;
   leadFrom: LeadFrom;
   discount: string;
-  /** Our price per line, by factory line id (or customer item id). */
+  /** Our price per line, by supplier line id (or customer item id). */
   prices: Record<string, string>;
   charges: ChargeState[];
-  /** Costs between the factory's basis and ours, by step (to the port, sea freight…). */
+  /** Costs between the supplier's basis and ours, by step (to the port, sea freight…). */
   costs: Partial<Record<BasisStep, CostState>>;
 }
 
@@ -173,7 +173,7 @@ export function fromDraft(d: RevisionDraft): EditorState {
     notes: str(d.notes),
     options: d.options.map((o, i) => ({
       key: `option-${i}`,
-      factoryQuoteId: o.factoryQuoteId,
+      supplierQuoteId: o.supplierQuoteId,
       leadTime: str(o.leadTime),
       leadDays: str(o.leadDays),
       leadFrom: o.leadFrom ?? "after_payment",
@@ -196,10 +196,10 @@ export function fromDraft(d: RevisionDraft): EditorState {
   };
 }
 
-/** What the option's factory offer pays for vs the basis we sell on (null: no factory offer, or its basis is not said). */
+/** What the option's supplier offer pays for vs the basis we sell on (null: no supplier offer, or its basis is not said). */
 export function gapOf(o: OptionState, offers: QuoteOffers, selling: Incoterm) {
-  if (!o.factoryQuoteId) return null;
-  return basisGap(offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.basis ?? null, selling);
+  if (!o.supplierQuoteId) return null;
+  return basisGap(offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.basis ?? null, selling);
 }
 
 /** The words a step gets when it is shown to the customer as its own line. */
@@ -230,10 +230,10 @@ export function extraOf(o: OptionState, offers: QuoteOffers, selling: Incoterm, 
   return out;
 }
 
-/** The lines an option offers: the factory's (locked), or the customer's items when there are no factory prices. */
+/** The lines an option offers: the supplier's (locked), or the customer's items when there are no supplier prices. */
 export function linesOf(o: OptionState, offers: QuoteOffers): OfferLine[] | null {
-  if (!o.factoryQuoteId) return offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
-  return offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.lines ?? null;
+  if (!o.supplierQuoteId) return offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
+  return offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.lines ?? null;
 }
 
 export function payload(s: EditorState, offers: QuoteOffers) {
@@ -265,7 +265,7 @@ export function payload(s: EditorState, offers: QuoteOffers) {
     warrantyFrom: s.warrantyFrom,
     notes: s.notes,
     options: s.options.map((o) => ({
-      factoryQuoteId: o.factoryQuoteId,
+      supplierQuoteId: o.supplierQuoteId,
       // With days the words are worked out from them; without, an older option's words are kept.
       leadDays: wholeOrNull(o.leadDays),
       leadFrom: o.leadFrom,
@@ -423,8 +423,8 @@ export function withFacts(s: EditorState): { state: EditorState; leadWords: Reco
  * The quotation's form, the same for "New quotation R1" and "Edit quotation R1", in the groups every offer,
  * quotation, order and purchase order uses (design "terms that travel"): which offers to quote (each ticked one
  * an option) · The quotation · Delivery · Payment · Warranty · Conditions. Delivery has each option's lead time
- * beside what its factory gives; Payment is the order's plan (how they pay, the parts, a usual one in one tap);
- * where we promise more than the factory gives, it says so before the quotation is sent. The prices are not
+ * beside what its supplier gives; Payment is the order's plan (how they pay, the parts, a usual one in one tap);
+ * where we promise more than the supplier gives, it says so before the quotation is sent. The prices are not
  * here: they have their own editor (Edit lines). The whole draft is saved.
  */
 export function RevisionEditor({
@@ -453,7 +453,7 @@ export function RevisionEditor({
   only?: boolean;
   /** Every step, at this one (a part's window when something to fix is in another part). */
   onAllSteps?: () => void;
-  /** The window of a first revision: every factory offer that has lines starts ticked. */
+  /** The window of a first revision: every supplier offer that has lines starts ticked. */
   tickAll?: boolean;
   /** The window's footer, on the left ("Once sent, a change needs a new revision."). */
   footNote?: ReactNode;
@@ -475,9 +475,9 @@ export function RevisionEditor({
   const [opened] = useState(() => {
     const st = fromDraft(initial);
     if (!tickAll) return withFacts(st);
-    const has = new Set(st.options.map((o) => o.factoryQuoteId));
+    const has = new Set(st.options.map((o) => o.supplierQuoteId));
     const more = initialOffers.offers
-      .filter((o) => !has.has(o.factoryQuoteId) && o.lines.length > 0)
+      .filter((o) => !has.has(o.supplierQuoteId) && o.lines.length > 0)
       .map((o) => newOption(o, priced(o.lines, {}, initialOffers.defaultMargin)));
     return withFacts({ ...st, options: [...st.options, ...more] });
   });
@@ -530,14 +530,14 @@ export function RevisionEditor({
   const totalsOf = (o: OptionState) => optionTotals(o, offers, s.incoterm, currency);
 
   // The list keeps the order it opened with (options A, B… first, then the other offers), so a tick never moves a row.
-  const [firstOrder] = useState(() => s.options.map((o) => o.factoryQuoteId));
+  const [firstOrder] = useState(() => s.options.map((o) => o.supplierQuoteId));
   const place = (id: string) => {
     const i = firstOrder.indexOf(id);
     return i < 0 ? firstOrder.length : i;
   };
-  const listed = [...offers.offers].sort((a, b) => place(a.factoryQuoteId) - place(b.factoryQuoteId));
-  const addOption = (factoryQuoteId: string | null) => {
-    const offer = offers.offers.find((o) => o.factoryQuoteId === factoryQuoteId);
+  const listed = [...offers.offers].sort((a, b) => place(a.supplierQuoteId) - place(b.supplierQuoteId));
+  const addOption = (supplierQuoteId: string | null) => {
+    const offer = offers.offers.find((o) => o.supplierQuoteId === supplierQuoteId);
     const lines = offer?.lines ?? offers.items.map((i) => ({ ...i, requestedItemId: i.id, answersNo: i.no, unitCost: null }));
     const prices = priced(lines, {}, marginOk ? marginNumber : offers.defaultMargin);
     setS((st) => ({ ...st, options: [...st.options, offer ? newOption(offer, prices) : { ...newOption(null, prices) }] }));
@@ -549,7 +549,7 @@ export function RevisionEditor({
   const typedIn = useRef<{ currency: string; options: OptionState[]; shown: string } | null>(null);
   /**
    * Another currency: every price, discount and charge is converted at the
-   * Settings rates (USD 1,000 → PKR 280,000), and the factory costs are
+   * Settings rates (USD 1,000 → PKR 280,000), and the supplier costs are
    * fetched again in the new currency. Without a rate the numbers are kept.
    */
   const changeCurrency = async (to: string) => {
@@ -588,15 +588,15 @@ export function RevisionEditor({
     }
   };
 
-  /* ---- each option against its factory: what we promise beside what it gives */
+  /* ---- each option against its supplier: what we promise beside what it gives */
   const parts = rowsAsParts(s.parts);
   const partsBad = partsProblem(s.parts);
   const many = s.options.length > 1;
   const offerOf = (o: OptionState) =>
-    o.factoryQuoteId ? (offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId) ?? null) : null;
+    o.supplierQuoteId ? (offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId) ?? null) : null;
   const nameOf = (o: OptionState) => {
     const off = offerOf(o);
-    return o.factoryQuoteId ? (off ? shortName(off.factory.name) : "A removed offer") : "The customer's items";
+    return o.supplierQuoteId ? (off ? shortName(off.factory.name) : "A removed offer") : "The customer's items";
   };
   const oursOf = (o: OptionState): OurTerms => ({
     leadDays: wholeOf(o.leadDays),
@@ -611,9 +611,9 @@ export function RevisionEditor({
     const off = offerOf(o);
     if (!off?.terms) return null;
     const c = totalsOf(o).costing;
-    // What the factory is paid: the option's cost without the costs to reach our basis (freight and the like).
-    const factoryMinor = c.costMinor - c.extraCostMinor;
-    return { factory: shortName(off.factory.name), ...off.terms, costMinor: factoryMinor > 0 ? factoryMinor : null };
+    // What the supplier is paid: the option's cost without the costs to reach our basis (freight and the like).
+    const supplierMinor = c.costMinor - c.extraCostMinor;
+    return { factory: shortName(off.factory.name), ...off.terms, costMinor: supplierMinor > 0 ? supplierMinor : null };
   };
   const checksOf = (key: "payment" | "warranty") =>
     s.options.flatMap((o, i) => {
@@ -630,7 +630,7 @@ export function RevisionEditor({
   const totalsText = s.options.map((o, i) => `${many ? `${optionLetter(i)} ` : ""}${fmt(totalsOf(o).totals.total)}`).join(" · ");
   const presets = s.paymentRoute === "letter_of_credit" ? [...CUSTOMER_PRESETS, LC_PRESET] : CUSTOMER_PRESETS;
 
-  /* ---- the steps window: each step with what it holds, and its check against the factory */
+  /* ---- the steps window: each step with what it holds, and its check against the supplier */
   const shown = s.options[Math.min(active, s.options.length - 1)]!;
   const shownTotals = totalsOf(shown);
   const stepsInfo: StepInfo<QuoteStep>[] = QUOTE_STEPS.map(({ key, label }) => {
@@ -697,7 +697,7 @@ export function RevisionEditor({
             <PanelSection quiet={!!step} title="Options: which offers to quote" first className="sm:grid-cols-1">
               <ul className="flex flex-col divide-y divide-line rounded-xl border border-line" aria-label="Supplier offers">
                 {listed.map((off) => {
-                  const i = s.options.findIndex((o) => o.factoryQuoteId === off.factoryQuoteId);
+                  const i = s.options.findIndex((o) => o.supplierQuoteId === off.supplierQuoteId);
                   const on = i >= 0;
                   const t = on ? totalsOf(s.options[i]!) : null;
                   const none = off.lines.length === 0;
@@ -711,7 +711,7 @@ export function RevisionEditor({
                     showCosts && t && t.costing.marginPercent !== null ? `margin ${t.costing.marginPercent.toFixed(1)}%` : null,
                   ].filter(Boolean);
                   return (
-                    <li key={off.factoryQuoteId}>
+                    <li key={off.supplierQuoteId}>
                       <label
                         className={cn("flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm", none && "cursor-default opacity-60")}
                         title={last ? "A quotation keeps at least one option" : undefined}
@@ -723,8 +723,8 @@ export function RevisionEditor({
                           disabled={none || last}
                           onChange={() =>
                             on
-                              ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== off.factoryQuoteId) }))
-                              : addOption(off.factoryQuoteId)
+                              ? setS((x) => ({ ...x, options: x.options.filter((o) => o.supplierQuoteId !== off.supplierQuoteId) }))
+                              : addOption(off.supplierQuoteId)
                           }
                         />
                         <span className="w-4 shrink-0 font-bold">{on ? optionLetter(i) : ""}</span>
@@ -737,23 +737,23 @@ export function RevisionEditor({
                     </li>
                   );
                 })}
-                {(s.options.some((o) => o.factoryQuoteId === null) || offers.offers.length === 0) && (
+                {(s.options.some((o) => o.supplierQuoteId === null) || offers.offers.length === 0) && (
                   <li>
                     <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm">
                       <input
                         type="checkbox"
                         className="size-[18px] shrink-0 accent-primary"
-                        checked={s.options.some((o) => o.factoryQuoteId === null)}
-                        disabled={s.options.length === 1 && s.options[0]!.factoryQuoteId === null}
+                        checked={s.options.some((o) => o.supplierQuoteId === null)}
+                        disabled={s.options.length === 1 && s.options[0]!.supplierQuoteId === null}
                         onChange={() =>
-                          s.options.some((o) => o.factoryQuoteId === null)
-                            ? setS((x) => ({ ...x, options: x.options.filter((o) => o.factoryQuoteId !== null) }))
+                          s.options.some((o) => o.supplierQuoteId === null)
+                            ? setS((x) => ({ ...x, options: x.options.filter((o) => o.supplierQuoteId !== null) }))
                             : addOption(null)
                         }
                       />
                       <span className="w-4 shrink-0 font-bold">
-                        {s.options.some((o) => o.factoryQuoteId === null)
-                          ? optionLetter(s.options.findIndex((o) => o.factoryQuoteId === null))
+                        {s.options.some((o) => o.supplierQuoteId === null)
+                          ? optionLetter(s.options.findIndex((o) => o.supplierQuoteId === null))
                           : ""}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -789,12 +789,12 @@ export function RevisionEditor({
               )}
               {initial.options
                 .map((o, i) => ({ o, i }))
-                .filter(({ o }) => requireChanges && !s.options.some((x) => x.factoryQuoteId === o.factoryQuoteId))
+                .filter(({ o }) => requireChanges && !s.options.some((x) => x.supplierQuoteId === o.supplierQuoteId))
                 .map(({ o, i }) => (
-                  <Notice key={o.factoryQuoteId ?? "items"} tone="todo">
+                  <Notice key={o.supplierQuoteId ?? "items"} tone="todo">
                     Option {optionLetter(i)}
-                    {o.factoryQuoteId
-                      ? ` (${offers.offers.find((x) => x.factoryQuoteId === o.factoryQuoteId)?.factory.name ?? "its offer"})`
+                    {o.supplierQuoteId
+                      ? ` (${offers.offers.find((x) => x.supplierQuoteId === o.supplierQuoteId)?.factory.name ?? "its offer"})`
                       : ""}{" "}
                     and the prices you set for it will be removed when you save.
                   </Notice>
@@ -1068,12 +1068,12 @@ export function RevisionEditor({
   );
 }
 
-/** A new option for an offer (or the customer's items): its prices, and the factory's lead time promised from the same moment. */
+/** A new option for an offer (or the customer's items): its prices, and the supplier's lead time promised from the same moment. */
 function newOption(offer: QuoteOffers["offers"][number] | null, prices: Record<string, string>): OptionState {
   const days = offer?.leadDays ?? null;
   return {
     key: rowKey(),
-    factoryQuoteId: offer?.factoryQuoteId ?? null,
+    supplierQuoteId: offer?.supplierQuoteId ?? null,
     leadTime: days === null ? (offer?.leadTime ?? "") : "",
     leadDays: days === null ? "" : String(days),
     leadFrom: offer?.leadFrom ?? "after_payment",
@@ -1095,15 +1095,15 @@ export function Fig({ label, children, strong, className }: { label: string; chi
 }
 
 /**
- * Between the factory's price basis and the one we sell on: the costs to add
+ * Between the supplier's price basis and the one we sell on: the costs to add
  * (to the port, sea freight…), each in its own currency, or as a line the
  * customer sees. Warns when the basis is not said, when a cost is still empty,
- * and when the factory's price pays for something we do not sell.
+ * and when the supplier's price pays for something we do not sell.
  */
 export function BasisCosts({
   letter,
-  factoryBasis,
-  factoryPlace,
+  supplierBasis,
+  supplierPlace,
   selling,
   sellingPlace,
   currency,
@@ -1120,8 +1120,8 @@ export function BasisCosts({
   /** Without its own frame and title (inside the price editor's card). */
   bare?: boolean;
   letter: string;
-  factoryBasis: Incoterm | null;
-  factoryPlace: string | null;
+  supplierBasis: Incoterm | null;
+  supplierPlace: string | null;
   selling: Incoterm;
   sellingPlace: string;
   currency: string;
@@ -1135,14 +1135,14 @@ export function BasisCosts({
   onAsLine: (step: BasisStep, costMinor: number) => void;
 }) {
   const ours = basisText(selling, sellingPlace.trim() || null);
-  const gap = basisGap(factoryBasis, selling);
+  const gap = basisGap(supplierBasis, selling);
   return (
     <section aria-label={`Getting it to ${ours}`} className={cn("flex flex-col gap-2", !bare && "rounded-lg border border-line p-3")}>
       {!bare && (
         <h4 className="flex flex-wrap items-baseline gap-x-2 text-sm font-medium">
           Getting it to {ours}
           <span className="text-xs font-normal text-muted">
-            the supplier&apos;s price is {factoryBasis ? basisText(factoryBasis, factoryPlace) : "on an Incoterm not said"} · internal
+            the supplier&apos;s price is {supplierBasis ? basisText(supplierBasis, supplierPlace) : "on an Incoterm not said"} · internal
           </span>
         </h4>
       )}
@@ -1157,7 +1157,7 @@ export function BasisCosts({
           {gap.extra.length > 0 && (
             <p className="flex items-start gap-1.5 rounded-md bg-warn-soft px-3 py-2 text-xs text-text">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
-              Their {factoryBasis} price already pays for {gap.extra.map((x) => BASIS_STEP_LABEL[x].toLowerCase()).join(" and ")}, which you
+              Their {supplierBasis} price already pays for {gap.extra.map((x) => BASIS_STEP_LABEL[x].toLowerCase()).join(" and ")}, which you
               do not sell on {selling}: ask them for a {selling} price, or you pay for it.
             </p>
           )}

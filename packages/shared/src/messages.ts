@@ -46,7 +46,7 @@ export interface Message {
   sentence: string;
   /** The record it is about: its number and what it is. */
   where?: { ref: string; title: string } | null;
-  /** Who it concerns: the customer, the contact, the factory, who handles it, who did it. */
+  /** Who it concerns: the customer, the contact, the supplier, who handles it, who did it. */
   people?: MessageRow[];
   /** The money, when money is part of it. */
   money?: MessageRow[];

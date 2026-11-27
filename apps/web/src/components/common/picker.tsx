@@ -49,7 +49,7 @@ export function Picker<T extends PickerOption>({
   inputId: string;
   placeholder: string;
   listLabel: string;
-  /** The card's icon (a building, a factory). */
+  /** The card's icon (a building, a supplier). */
   icon: ReactNode;
   /** What is chosen: the card's two lines; null shows the search. */
   chosen: { name: string; sub?: ReactNode } | null;

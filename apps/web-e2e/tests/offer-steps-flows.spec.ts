@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { accessibilityProblems, watchErrors, answerWhy } from "./check";
 
 /**
- * Design "RFQ Desk — factory offer" (18 Nov 2026, the inquiry's rules): a factory's offer is typed in one steps
- * window — Factory · Prices · Delivery & payment · Conditions, then Review and Add the offer. A new offer's lines
+ * Design "RFQ Desk — supplier offer" (18 Nov 2026, the inquiry's rules): a supplier's offer is typed in one steps
+ * window — Supplier · Prices · Delivery & payment · Conditions, then Review and Add the offer. A new offer's lines
  * go in the same save (a wrong line saves nothing and says which). Its page has a box per part, each with its own
  * Edit (that part only) and history; an edit marks each change, counts them, and asks why once.
  */
@@ -41,19 +41,19 @@ test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, R
   for (const step of ["Supplier", "Prices", "Delivery & payment", "Warranty & conditions", "Review"]) await expect(rail.getByRole("button", { name: new RegExp(step) })).toBeVisible();
   await expect(rail.getByRole("button", { name: /Supplier/ })).toHaveAttribute("aria-current", "step");
 
-  // Who: a factory not on the list yet.
-  const factory = `Wuxi Steps ${deal.tag}`;
-  await win.getByRole("combobox", { name: /Supplier/ }).fill(factory);
-  await win.getByRole("option", { name: `New supplier “${factory}”` }).click();
+  // Who: a supplier not on the list yet.
+  const supplier = `Wuxi Steps ${deal.tag}`;
+  await win.getByRole("combobox", { name: /Supplier/ }).fill(supplier);
+  await win.getByRole("option", { name: `New supplier “${supplier}”` }).click();
   // The New supplier form, as a new customer on an inquiry: the name typed, how to reach them; Add and use adds it now.
   const form = win.getByRole("region", { name: "New supplier" });
-  await expect(form.getByLabel("Name")).toHaveValue(factory);
+  await expect(form.getByLabel("Name")).toHaveValue(supplier);
   await form.getByLabel("Contact person").fill("Mr Chen");
   await form.getByLabel("WeChat").fill(`chen-${deal.tag}`);
   expect(await accessibilityProblems(page), "the New supplier form meets WCAG 2.2 AA").toEqual([]);
   await win.getByRole("button", { name: "Add and use" }).click();
   await expect(form).toHaveCount(0);
-  await expect(win.getByText(factory)).toBeVisible();
+  await expect(win.getByText(supplier)).toBeVisible();
   await expect(win.getByText("Mr Chen")).toBeVisible();
   await win.getByRole("button", { name: /^Next/ }).click();
 
@@ -105,8 +105,8 @@ test("a new offer: Factory, Prices, Delivery & payment, Warranty & conditions, R
   await win.getByRole("button", { name: "Add the offer" }).click();
   await expect(win).toBeHidden();
   await expect(page).toHaveURL(/\/offers\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { level: 1, name: factory })).toBeVisible();
-  await expect(page.getByText(`Offer from ${factory} added`)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: supplier })).toBeVisible();
+  await expect(page.getByText(`Offer from ${supplier} added`)).toBeVisible();
   // The page: the same boxes as the steps.
   for (const box of ["Supplier", "Delivery & payment", "Prices", "Warranty & conditions"]) await expect(page.getByRole("region", { name: box, exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Prices", exact: true })).toContainText("Change parts");
@@ -127,7 +127,7 @@ test("a box's Edit opens only that part and asks why once something changed; Edi
   };
   const items = (await (await page.request.get(`/api/inquiries/${deal.id}`)).json()).items;
   const offer = await send(`/inquiries/${deal.id}/factory-quotes`, {
-    newFactoryName: `Hefei Steps ${deal.tag}`,
+    newSupplierName: `Hefei Steps ${deal.tag}`,
     receivedOn: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
     currency: "CNY",
     // A lead time already saved, so typing another one is a change (an empty one filled is only Added).

@@ -123,7 +123,7 @@ describe("items, reasons and history", () => {
   it("asks why once a supplier has priced the item, and keeps the reason in the history", async () => {
     const created = await api(app, sana)
       .post(`/inquiries/${inquiryId}/factory-quotes`, {
-        newFactoryName: `Zhangjiagang Fill ${tag}`,
+        newSupplierName: `Zhangjiagang Fill ${tag}`,
         receivedOn: "2026-10-20",
         currency: "CNY",
         lines: [
@@ -162,7 +162,7 @@ describe("items, reasons and history", () => {
 
   it("keeps another spec of an item as a choice beside it, left out of the offer's total", async () => {
     const created = await api(app, sana)
-      .post(`/inquiries/${inquiryId}/factory-quotes`, { newFactoryName: `Spec Works ${tag}`, receivedOn: "2026-10-21", currency: "CNY" })
+      .post(`/inquiries/${inquiryId}/factory-quotes`, { newSupplierName: `Spec Works ${tag}`, receivedOn: "2026-10-21", currency: "CNY" })
       .expect(201);
     const id = created.body.id as string;
     await api(app, sana)
@@ -179,29 +179,29 @@ describe("items, reasons and history", () => {
       .post(`/factory-quotes/${id}/lines`, { lines: [{ description: "A", quantity: 1, unitPrice: 1, specOf: 1 }, { description: "B", quantity: 1, unitPrice: 1 }] })
       .expect(400);
     const s = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body as {
-      quotes: { id: string; factoryTotal: string; lines: { description: string; no: string; alternativeOfId: string | null; alternativeOfNo: string | null }[] }[];
+      quotes: { id: string; supplierTotal: string; lines: { description: string; no: string; alternativeOfId: string | null; alternativeOfNo: string | null }[] }[];
     };
     const offer = s.quotes.find((q) => q.id === id)!;
-    expect(Number(offer.factoryTotal)).toBe(256000 + 34200);
+    expect(Number(offer.supplierTotal)).toBe(256000 + 34200);
     const spec = offer.lines.find((l) => l.description === "Press, 41 stations")!;
     expect(spec.alternativeOfNo).toBe(offer.lines.find((l) => l.description === "Press, 35 stations")!.no);
     // Made a line of its own again, it counts.
     await api(app, sana).patch(`/factory-lines/${(spec as unknown as { id: string }).id}`, { alternativeOfId: null }).expect(200);
     const again = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body as typeof s;
-    expect(Number(again.quotes.find((q) => q.id === id)!.factoryTotal)).toBe(256000 + 34200 + 298000);
+    expect(Number(again.quotes.find((q) => q.id === id)!.supplierTotal)).toBe(256000 + 34200 + 298000);
     await api(app, sana).delete(`/factory-quotes/${id}`).expect(200);
   });
 
   it("numbers the quotation like the deal, and asks why prices it uses change", async () => {
     const draft = (await api(app, sana).get(`/inquiries/${inquiryId}/quotation/draft`).expect(200)).body;
     const r1 = (await api(app, sana).post(`/inquiries/${inquiryId}/quotation/revisions`, draft).expect(201)).body;
-    // The option is the factory's offer: its own lines (boiler, filling machine, capping machine), covering items 1 and 2.
+    // The option is the supplier's offer: its own lines (boiler, filling machine, capping machine), covering items 1 and 2.
     expect(r1.options[0].lines.map((l: { no: string; description: string }) => `${l.no} ${l.description}`)).toEqual(["1 Boiler", "2 Filling machine", "3 Capping machine"]);
     expect(r1.options[0].coverage).toEqual({ covered: ["1", "2"], missing: [] });
 
     const src = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes[0];
     quoteBody = {
-      factoryId: src.factory.id,
+      supplierId: src.factory.id,
       receivedOn: src.receivedOn,
       currency: src.currency,
       lines: src.lines.map((l: Record<string, unknown>) => ({
@@ -323,7 +323,7 @@ describe("items, reasons and history", () => {
     const mine = (await api(app, sana).get(`/factories?mine=true&q=Owned Works ${tag}`).expect(200)).body.rows;
     expect(mine.map((r: { id: string; owner: { id: string } }) => [r.id, r.owner.id])).toEqual([[f.id, me]]);
     expect((await api(app, bilal).get(`/factories?mine=true&q=Owned Works ${tag}`).expect(200)).body.rows).toHaveLength(0);
-    // A factory first added while entering its prices is looked after by whoever added it.
+    // A supplier first added while entering its prices is looked after by whoever added it.
     expect((await api(app, sana).get(`/factories?mine=true&q=Zhangjiagang Fill ${tag}`).expect(200)).body.rows).toHaveLength(1);
     // Handing it to someone else (or renaming it) says why; adding a phone does not.
     await api(app, sana).put(`/factories/${f.id}`, { name: f.name, ownerId: me, phone: "+86 512 5555" }).expect(200);

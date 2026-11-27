@@ -59,6 +59,6 @@ export interface Today {
 
 /** The record a follow-up or note card is on: the id field the API takes, and its id. */
 export interface RecordKey {
-  key: "inquiryId" | "orderId" | "customerId" | "factoryId";
+  key: "inquiryId" | "orderId" | "customerId" | "supplierId";
   id: string;
 }

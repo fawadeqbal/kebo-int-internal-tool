@@ -311,7 +311,7 @@ export class TreasuryService {
                 range
                   ? { OR: [{ payLater: false, spentOn: range }, { payLater: true, repaidOn: range }] }
                   : { OR: [{ payLater: false }, { payLater: true, repaidOn: { not: null } }] },
-                ...(party ? [{ OR: [{ customerId: party }, { factoryId: party }] }] : []),
+                ...(party ? [{ OR: [{ customerId: party }, { supplierId: party }] }] : []),
               ],
             },
             include: {

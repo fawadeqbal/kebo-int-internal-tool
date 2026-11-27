@@ -483,7 +483,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
   const individuals = old.customers.filter((c) => !c.company_name?.trim());
   for (const c of individuals) report.judge("Customers with no company name → type individual, named after the contact", c.contact_person);
 
-  /* ---- factories */
+  /* ---- suppliers */
   await tx.party.createMany({
     data: old.suppliers.map((s) => ({
       id: s.id,
@@ -714,7 +714,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     })),
   });
 
-  /* ---- factory prices: imported without tax (prices with tax are stored without it), each line's tax % added on top;
+  /* ---- supplier prices: imported without tax (prices with tax are stored without it), each line's tax % added on top;
           the offer's tax % is the one most of its lines have (13 without lines), as the factory_tax migration does */
   const quoteIncludesVat = new Map(old.supplierQuotes.map((s) => [s.id, s.prices_include_vat]));
   const quoteTaxRate = new Map<string, number>();
@@ -729,11 +729,11 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     for (const [id, c] of counts)
       quoteTaxRate.set(id, [...c.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]![0]);
   }
-  await tx.factoryQuote.createMany({
+  await tx.supplierQuote.createMany({
     data: old.supplierQuotes.map((s) => ({
       id: s.id,
       inquiryId: s.query_id,
-      factoryId: s.supplier_id,
+      supplierId: s.supplier_id,
       reference: s.reference,
       receivedOn: toDbDate(s.quoted_on),
       validUntil: s.valid_until ? toDbDate(s.valid_until) : null,
@@ -751,10 +751,10 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       updatedAt: s.updated_at,
     })),
   });
-  await tx.factoryQuoteLine.createMany({
+  await tx.supplierQuoteLine.createMany({
     data: old.supplierQuoteItems.map((l) => ({
       id: l.id,
-      factoryQuoteId: l.supplier_quote_id,
+      supplierQuoteId: l.supplier_quote_id,
       requestedItemId: l.query_item_id,
       description: l.description,
       model: l.model,
@@ -866,7 +866,7 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
       unitPrice: l.unit_price,
       lineTotal: l.line_total,
       unitCost: l.unit_cost,
-      factoryQuoteLineId: l.supplier_quote_item_id,
+      supplierQuoteLineId: l.supplier_quote_item_id,
       fxRate: l.fx_rate,
       sortOrder: l.sort_order,
     })),
@@ -1170,8 +1170,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     assignments: await tx.inquiryAssignment.count(),
     notes: await tx.note.count(),
     attachments: await tx.attachment.count(),
-    factoryQuotes: await tx.factoryQuote.count(),
-    factoryQuoteLines: await tx.factoryQuoteLine.count(),
+    supplierQuotes: await tx.supplierQuote.count(),
+    supplierQuoteLines: await tx.supplierQuoteLine.count(),
     quotations: await tx.quotation.count(),
     revisions: await tx.quotationRevision.count(),
     quoteLines: await tx.quoteLine.count(),
@@ -1202,8 +1202,8 @@ async function importAll(tx: Prisma.TransactionClient, old: Legacy, report: Repo
     { what: "query_assignments → inquiry_assignments", old: old.assignments.length, new: c.assignments },
     { what: "comments → notes", old: old.comments.length, new: c.notes },
     { what: "attachments → attachments", old: old.attachments.length, new: c.attachments },
-    { what: "supplier_quotes → factory_quotes", old: old.supplierQuotes.length, new: c.factoryQuotes },
-    { what: "supplier_quote_items → factory_quote_lines", old: old.supplierQuoteItems.length, new: c.factoryQuoteLines },
+    { what: "supplier_quotes → factory_quotes", old: old.supplierQuotes.length, new: c.supplierQuotes },
+    { what: "supplier_quote_items → factory_quote_lines", old: old.supplierQuoteItems.length, new: c.supplierQuoteLines },
     { what: "quotations → quotations (one per inquiry)", old: old.quotations.length, new: c.quotations },
     {
       what: "quotations → quotation_revisions",

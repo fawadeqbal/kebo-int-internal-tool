@@ -12,10 +12,10 @@ import { SettingsService } from "../settings/settings.service";
 import { NotificationsService } from "./notifications.service";
 import { DayBook } from "./day-book";
 import { dayShort, inquiryFacts, orderFacts, revisionFacts, type OrderFacts } from "./facts";
-import { factoryPayment, inquiryWaiting, neededBy, orderWaiting, ordersLate, paymentDue, quotationEnding, yourDay } from "./messages";
+import { supplierPayment, inquiryWaiting, neededBy, orderWaiting, ordersLate, paymentDue, quotationEnding, yourDay } from "./messages";
 import { goodsOf } from "../orders/orders.service";
 import { InsightsService } from "../insights/insights.service";
-import { factoryPlansOf, ordersOwingFactories, ordersWithMoneyDue } from "../billing/api";
+import { supplierPlansOf, ordersOwingSuppliers, ordersWithMoneyDue } from "../billing/api";
 import { chargedExpenses, fxOf, moneyFacts, positionOf } from "../billing/api";
 import { LimitsService } from "../../common/company/limits.service";
 import { readyOnOf, readySelect } from "@kebo/database";
@@ -81,7 +81,7 @@ export class RemindersService {
       book.add(i.assigneeId ? [i.assigneeId] : managers, "Inquiries waiting", { ref: i.refNo, party: i.customerName, what: `Still new: ${i.title}`, when: `${days} days`, late: true });
     }
 
-    // 2. Asking factories for too long without a quotation sent.
+    // 2. Asking suppliers for too long without a quotation sent.
     const sourcing = await this.prisma.db.inquiry.findMany({
       where: {
         deletedAt: null,
@@ -92,7 +92,7 @@ export class RemindersService {
       select: {
         id: true,
         stageChanges: { where: { toStage: "sourcing" }, orderBy: { changedAt: "asc" }, take: 1, select: { changedAt: true } },
-        _count: { select: { factoryQuotes: true, factoryRequests: true } },
+        _count: { select: { supplierQuotes: true, supplierRequests: true } },
       },
     });
     for (const x of sourcing) {
@@ -100,7 +100,7 @@ export class RemindersService {
       if (!i) continue;
       const since = x.stageChanges[0]?.changedAt ?? now;
       const days = daysBetween(dateIn(since, this.clock.timeZone), today);
-      await send(inquiryWaiting(i, "sourcing", days, { in: x._count.factoryQuotes, asked: x._count.factoryRequests }), [handler(i.assigneeId ?? managers[0])], `sourcing:${i.id}:${today}`);
+      await send(inquiryWaiting(i, "sourcing", days, { in: x._count.supplierQuotes, asked: x._count.supplierRequests }), [handler(i.assigneeId ?? managers[0])], `sourcing:${i.id}:${today}`);
       book.add([i.assigneeId ?? managers[0]], "Inquiries waiting", { ref: i.refNo, party: i.customerName, what: `No quotation yet: ${i.title}`, when: `${days} days`, late: true });
     }
 
@@ -151,7 +151,7 @@ export class RemindersService {
         expenses: chargedExpenses,
         customer: { select: { name: true } },
         inquiry: { select: { id: true, assigneeId: true } },
-        lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true, factoryId: true } },
+        lines: { select: { type: true, description: true, quantity: true, receivedQty: true, unit: true, supplierId: true } },
         shipments: { select: { departedOn: true } },
         ...readySelect,
       },
@@ -234,21 +234,21 @@ export class RemindersService {
       }
     }
 
-    // 7. What we owe factories: due within the reminder days, or late. To who handles the order and the
-    //    managers, only those who see costs (the factory's prices).
-    const owing = await ordersOwingFactories(this.prisma, fx);
+    // 7. What we owe suppliers: due within the reminder days, or late. To who handles the order and the
+    //    managers, only those who see costs (the supplier's prices).
+    const owing = await ordersOwingSuppliers(this.prisma, fx);
     const costPeople = new Set(await this.notifications.idsWith("sourcing.manage"));
     for (const id of owing) {
       const facts = await orderOf(id);
       if (!facts) continue;
-      const plansOfFactories = await factoryPlansOf(this.prisma.db, id, s.sales.factoryAdvancePercent, today, s.reminders.dueSoonDays, fx);
-      for (const f of plansOfFactories)
+      const plansOfSuppliers = await supplierPlansOf(this.prisma.db, id, s.sales.supplierAdvancePercent, today, s.reminders.dueSoonDays, fx);
+      for (const f of plansOfSuppliers)
         for (const r of f.rows) {
           if (r.status !== "due" && r.status !== "late") continue;
           const lateBy = r.status === "late" && r.due ? daysBetween(r.due, today) : null;
           const who = [facts.handlerId, ...managers].filter((u): u is string => !!u && costPeople.has(u));
           const contact = await this.prisma.db.contact.findFirst({ where: { partyId: f.factory.id, deletedAt: null }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { name: true, phone: true, whatsapp: true, wechat: true } });
-          const m = factoryPayment(
+          const m = supplierPayment(
             facts,
             { factory: f.factory.name, contact: contact ? [contact.name, contact.wechat ? `WeChat ${contact.wechat}` : contact.whatsapp || contact.phone].filter(Boolean).join(" · ") : null, currency: f.currency, owed: f.owed, paid: f.paid },
             { label: r.label, open: r.open, due: r.due, lateBy },

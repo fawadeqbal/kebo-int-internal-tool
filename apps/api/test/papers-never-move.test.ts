@@ -25,7 +25,7 @@ describe("documents that never move", () => {
   let manager: string;
   let me: string;
   let customerId: string;
-  let factoryId: string;
+  let supplierId: string;
   let today = "";
   const tag = Date.now().toString(36);
   const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -48,7 +48,7 @@ describe("documents that never move", () => {
     const item = (await api(app, sana).get(`/inquiries/${inquiry.id}`)).body.items[0];
     await api(app, sana)
       .post(`/inquiries/${inquiry.id}/factory-quotes`, {
-        factoryId,
+        supplierId,
         receivedOn: day(-5),
         currency: "CNY",
         lines: [{ requestedItemId: item.id, description: "NJP-800", quantity: 1, unitPrice: 200000, taxRate: 0 }],
@@ -101,7 +101,7 @@ describe("documents that never move", () => {
         })
         .expect(201)
     ).body.id;
-    factoryId = (await api(app, sana).post("/factories", { name: `Steady Works ${tag}` }).expect(201)).body.id;
+    supplierId = (await api(app, sana).post("/factories", { name: `Steady Works ${tag}` }).expect(201)).body.id;
   });
 
   afterAll(async () => {

@@ -77,7 +77,7 @@ describe("payments: to pay suppliers", () => {
     };
     expect(row.customerMoney).toMatchObject({ ...m.factories.customer, route: m.route.route, currency: m.currency, received: m.received });
     expect(toMinor(row.customerMoney.total)).toBe(toMinor(m.received) + toMinor(m.due));
-    // The same parts as the order's Factory step shows for that supplier.
+    // The same parts as the order's Supplier step shows for that supplier.
     const plan = m.factories.plans.find((p) => p.factory.id === row.supplier.id && p.currency === row.currency)!;
     const mine = list.rows.filter((r) => r.order.id === row.order.id && r.supplier.id === row.supplier.id && r.currency === row.currency);
     expect(mine.map((r) => toMinor(r.open))).toEqual(plan.rows.filter((r) => toMinor(r.open) > 0).map((r) => toMinor(r.open)));

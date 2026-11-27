@@ -1,7 +1,7 @@
 import type { PartyType, InquiryStage, LostReason, OrderStatus, OrderWord, Permission, Role, SignInResult } from "@kebo/shared";
 import type { Person } from "./types";
 
-/** API response shapes for customers, factories, people and administration (keep in step with apps/api). */
+/** API response shapes for customers, suppliers, people and administration (keep in step with apps/api). */
 
 export interface Contact {
   id: string;
@@ -58,7 +58,7 @@ export interface CustomerDetail {
   orders: { id: string; refNo: string; status: OrderStatus; word: OrderWord; total: string; currency: string; orderedOn: string }[];
 }
 
-export interface Factory {
+export interface Supplier {
   id: string;
   /** SUP-0007 */
   supplierCode: string | null;
@@ -70,17 +70,17 @@ export interface Factory {
   address: string | null;
   bankDetails: string | null;
   notes: string | null;
-  /** The person in our team who looks after this factory. */
+  /** The person in our team who looks after this supplier. */
   ownerId: string | null;
   owner: { id: string; name: string } | null;
   createdAt: string;
 }
 
-export interface FactoryRow extends Factory {
+export interface SupplierRow extends Supplier {
   _count: { quotes: number };
 }
 
-export interface FactoryDetail extends Factory {
+export interface SupplierDetail extends Supplier {
   /** When it last changed: sent back with a save, so one over someone else's change is refused. */
   updatedAt: string;
   quotes: {
@@ -227,7 +227,7 @@ export interface NotificationItem {
   createdAt: string;
 }
 
-/** GET /insights/facts/owed: what each customer owes us (or we owe each factory) today, in the main currency. */
+/** GET /insights/facts/owed: what each customer owes us (or we owe each supplier) today, in the main currency. */
 export interface Owed {
   side: "receivable" | "payable";
   currency: string;

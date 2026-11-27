@@ -21,9 +21,9 @@ import {
   splitDeposit,
   toMinor,
   withTaxMinor,
-  factoryUnitCostMinor,
+  supplierUnitCostMinor,
   quoteUnitCostMinor,
-  factoryTaxMinor,
+  supplierTaxMinor,
   orderProfit,
   orderCosting,
   payInstalments,
@@ -132,11 +132,11 @@ describe("costing", () => {
 
   it("costs a factory price without tax exactly as before (tax added on top)", () => {
     for (const [price, rate] of [[100_00, 13], [1_15, 13], [100_50, "13.00"], [10_00, 12.5], [1_01, 0.5], [185_000_00, 13], [9_500_00, 9], [0, 13]] as const)
-      expect(factoryUnitCostMinor(price, rate)).toBe(withTaxMinor(price, rate));
-    expect(factoryUnitCostMinor(100_00, 13, false)).toBe(113_00);
-    expect(factoryUnitCostMinor(100_00, 0, false)).toBe(100_00);
-    expect(factoryTaxMinor(100_50, 13)).toBe(13_07); // 113.57 − 100.50
-    expect(factoryTaxMinor(302_000_00, 0)).toBe(0);
+      expect(supplierUnitCostMinor(price, rate)).toBe(withTaxMinor(price, rate));
+    expect(supplierUnitCostMinor(100_00, 13, false)).toBe(113_00);
+    expect(supplierUnitCostMinor(100_00, 0, false)).toBe(100_00);
+    expect(supplierTaxMinor(100_50, 13)).toBe(13_07); // 113.57 − 100.50
+    expect(supplierTaxMinor(302_000_00, 0)).toBe(0);
   });
 
   it("costs a supplier price to quote on: with its tax, less the export VAT refund on the price before tax", () => {
@@ -154,14 +154,14 @@ describe("costing", () => {
   });
 
   it("costs a factory price with tax included as the price itself, the tax inside shown only", () => {
-    expect(factoryUnitCostMinor(113_00, 13, true)).toBe(113_00);
-    expect(factoryUnitCostMinor(185_000_00, 13, true)).toBe(185_000_00);
-    expect(factoryUnitCostMinor(100_00, 0, true)).toBe(100_00);
-    expect(factoryTaxMinor(113_00, 13, true)).toBe(13_00);
-    expect(factoryTaxMinor(302_000_00, 13, true)).toBe(34_743_36); // 302,000 − 302,000 / 1.13 = 34,743.3628…
-    expect(factoryTaxMinor(302_000_00, "13.00", true)).toBe(34_743_36);
-    expect(factoryTaxMinor(100_00, 0, true)).toBe(0);
-    expect(factoryTaxMinor(10_00, 12.5, true)).toBe(1_11); // 10 − 8.888… = 1.111…
+    expect(supplierUnitCostMinor(113_00, 13, true)).toBe(113_00);
+    expect(supplierUnitCostMinor(185_000_00, 13, true)).toBe(185_000_00);
+    expect(supplierUnitCostMinor(100_00, 0, true)).toBe(100_00);
+    expect(supplierTaxMinor(113_00, 13, true)).toBe(13_00);
+    expect(supplierTaxMinor(302_000_00, 13, true)).toBe(34_743_36); // 302,000 − 302,000 / 1.13 = 34,743.3628…
+    expect(supplierTaxMinor(302_000_00, "13.00", true)).toBe(34_743_36);
+    expect(supplierTaxMinor(100_00, 0, true)).toBe(0);
+    expect(supplierTaxMinor(10_00, 12.5, true)).toBe(1_11); // 10 − 8.888… = 1.111…
   });
 
   it("multiplies money by quantities and percentages exactly", () => {
@@ -290,7 +290,7 @@ describe("order profit", () => {
       costedRevenueMinor: 9_000_00,
       goodsCostMinor: 7_000_00,
       receivedMinor: 3_000_00,
-      factoryPaidMinor: 2_000_00,
+      supplierPaidMinor: 2_000_00,
       expensesMinor: 500_00,
     });
     // 9,000 − 7,000 − 500: the 1,000 without a cost is never profit.
@@ -320,7 +320,7 @@ describe("order profit", () => {
       goodsCostMinor: 10_000_00,
       basisCostMinor: 3_000_00,
     });
-    const base = { ...c, receivedMinor: 0, factoryPaidMinor: 0 };
+    const base = { ...c, receivedMinor: 0, supplierPaidMinor: 0 };
     expect(orderProfit({ ...base, expensesMinor: 0 })).toMatchObject({ earnedMinor: 1_000_00, marginPercent: 7.1 });
     // Freight of 2,800 paid later is part of the 3,000 planned; a 200 inspection is extra.
     expect(orderProfit({ ...base, expensesMinor: 3_000_00, basisPaidMinor: 2_800_00 })).toMatchObject({
@@ -339,7 +339,7 @@ describe("order profit", () => {
       costedRevenueMinor: 80_00,
       goodsCostMinor: 85_00,
       receivedMinor: 0,
-      factoryPaidMinor: 0,
+      supplierPaidMinor: 0,
       expensesMinor: 0,
     });
     // −5 / 80 = −6.25% → −6.3 (Math.round would give −6.2).

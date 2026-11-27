@@ -2,7 +2,7 @@
 
 import { Totals, type TotalsRow } from "@/components/records/totals";
 import { useMemo, type ReactNode } from "react";
-import { factoryUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
+import { supplierUnitCostMinor, formatMinor, multiplyMinor, toMinor } from "@kebo/money";
 import { hsMismatch, LINE_CONDITION_LABEL, LINE_CONDITION_TONE, LINE_CONDITIONS, type LineCondition } from "@kebo/shared";
 import { Badge, cn, Dash } from "@kebo/ui";
 import { BatchLines } from "@/components/edits/batch-lines";
@@ -15,8 +15,8 @@ import { ItemsBody, type ItemsPhoneRow } from "@/components/records/items-box";
 
 /**
  * The order's lines, kept once, opened by each step with its own columns:
- * - factory: the factory, its price and tax (read only; people who see factory prices)
- * - received: how many came in from the factory, when, and the status (Production)
+ * - supplier: the supplier, its price and tax (read only; people who see supplier prices)
+ * - received: how many came in from the supplier, when, and the status (Production)
  * - packing: packed in, packages, gross, net, CBM (Shipping)
  * - delivered: how many reached the customer, in what condition, a note (Delivery & SAT)
  * - customs: the item's name in Chinese and its two HS codes, the customer's and China's (Documents)
@@ -68,9 +68,9 @@ function valuesOf(l: OrderLineView): LineValues {
     quantity: raw(l.quantity),
     unit: l.unit,
     factory: l.factory?.name ?? "",
-    factoryPrice: l.factoryPrice ? raw(l.factoryPrice.unitPrice) : "",
-    factoryCurrency: l.factoryPrice?.currency ?? "",
-    taxRate: l.factoryPrice ? raw(l.factoryPrice.taxRate) : "",
+    supplierPrice: l.supplierPrice ? raw(l.supplierPrice.unitPrice) : "",
+    supplierCurrency: l.supplierPrice?.currency ?? "",
+    taxRate: l.supplierPrice ? raw(l.supplierPrice.taxRate) : "",
     receivedQty: raw(l.receivedQty),
     // Typed back in this table (readDate takes "02 Nov 2026"), so always written that way.
     receivedOn: l.receivedOn ? formatDate(l.receivedOn) : "",
@@ -99,7 +99,7 @@ function phoneLine(set: LineSet, v: LineValues): string {
     return `Delivered ${n(v.deliveredQty) || 0} of ${qty}${v.condition ? ` · ${LINE_CONDITION_LABEL[v.condition as LineCondition]}` : ""}`;
   if (set === "customs")
     return [v.descriptionZh ? head(v.descriptionZh) : "No Chinese name", `HS ${v.hsCode || "—"}`, v.hsCodeCn && `China ${v.hsCodeCn}`].filter(Boolean).join(" · ");
-  return v.factoryPrice ? `${v.factory} · ${formatMinor(toMinor(v.factoryPrice), v.factoryCurrency || "")}` : qty;
+  return v.supplierPrice ? `${v.factory} · ${formatMinor(toMinor(v.supplierPrice), v.supplierCurrency || "")}` : qty;
 }
 
 function columnsOf(set: LineSet): LineColumn[] {
@@ -139,13 +139,13 @@ function columnsOf(set: LineSet): LineColumn[] {
         ...base,
         { key: "factory", label: "Supplier", width: "9rem", phoneHidden: true },
         {
-          key: "factoryPrice",
+          key: "supplierPrice",
           label: "Supplier price",
           width: "8.5rem",
           align: "right",
-          format: (_v, r) => (r.values.factoryPrice ? formatMinor(toMinor(r.values.factoryPrice), r.values.factoryCurrency || "") : dash),
+          format: (_v, r) => (r.values.supplierPrice ? formatMinor(toMinor(r.values.supplierPrice), r.values.supplierCurrency || "") : dash),
         },
-        { key: "taxRate", label: "Tax", width: "4.5rem", align: "right", phoneHidden: true, format: (v) => (v.factoryPrice && Number(v.taxRate) ? `${n(v.taxRate)}%` : dash) },
+        { key: "taxRate", label: "Tax", width: "4.5rem", align: "right", phoneHidden: true, format: (v) => (v.supplierPrice && Number(v.taxRate) ? `${n(v.taxRate)}%` : dash) },
       ];
     case "received":
       return [
@@ -359,12 +359,12 @@ function StepFigures({ set, lines, extra }: { set: LineSet; lines: OrderLineView
     const gross = new Map<string, number>();
     const net = new Map<string, number>();
     for (const l of lines) {
-      const p = l.factoryPrice;
+      const p = l.supplierPrice;
       if (!p?.currency) continue;
       const unit = toMinor(p.unitPrice);
       const rate = Number(p.taxRate) || 0;
       const before = p.taxIncluded && rate ? Math.round(unit / (1 + rate / 100)) : unit;
-      gross.set(p.currency, (gross.get(p.currency) ?? 0) + multiplyMinor(factoryUnitCostMinor(unit, p.taxRate, p.taxIncluded), l.quantity));
+      gross.set(p.currency, (gross.get(p.currency) ?? 0) + multiplyMinor(supplierUnitCostMinor(unit, p.taxRate, p.taxIncluded), l.quantity));
       net.set(p.currency, (net.get(p.currency) ?? 0) + multiplyMinor(before, l.quantity));
     }
     const say = (m: Map<string, number>) => [...m].map(([c, x]) => formatMinor(x, c)).join(" + ");

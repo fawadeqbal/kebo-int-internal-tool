@@ -12,13 +12,13 @@ const maybe = <T extends z.ZodTypeAny>(s: T) => s.optional();
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) => z.preprocess((v) => (v === "" ? null : v), z.enum(values).nullable());
 
 /**
- * Production, for one factory of the order (factoryId empty: the goods of an order whose lines name no
- * factory): when and how the ready date was told, the factory test, where the goods were received.
+ * Production, for one supplier of the order (supplierId empty: the goods of an order whose lines name no
+ * supplier): when and how the ready date was told, the factory test, where the goods were received.
  * The ready date itself is the order's (PATCH /orders/:id/details).
  */
-export const factoryFactsInput = z
+export const supplierFactsInput = z
   .object({
-    factoryId: optionalId,
+    supplierId: optionalId,
     readyToldOn: maybe(optionalDate),
     readyToldVia: maybe(optionalEnum(REQUEST_CHANNELS)),
     readyNote: maybe(optionalText(500)),
@@ -30,4 +30,4 @@ export const factoryFactsInput = z
     goodsReceivedAt: maybe(optionalText(160)),
   })
   .refine((v) => !v.fatResult || !!v.fatDoneOn || v.fatDoneOn === undefined, { message: "Say the day the test was done", path: ["fatDoneOn"] });
-export type FactoryFactsInput = z.infer<typeof factoryFactsInput>;
+export type SupplierFactsInput = z.infer<typeof supplierFactsInput>;

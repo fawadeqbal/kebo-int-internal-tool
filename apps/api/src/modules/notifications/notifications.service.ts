@@ -11,7 +11,7 @@ import { CompanyMail } from "../../common/notify/company-mail";
 import { sendPush } from "../../common/notify/fcm";
 import { fromDbDateOrNull } from "@kebo/database";
 import { toMinor } from "@kebo/money";
-import { factoryPlansOf, fxOf } from "../billing/api";
+import { supplierPlansOf, fxOf } from "../billing/api";
 import { day, inquiryFacts, money, orderFacts, revisionFacts } from "./facts";
 import { inquiryLost, inquiryNew, inquiryYours, paymentIn, purchaseOrderSent, quotationAccepted, quotationRejected, quotationSent, shipped } from "./messages";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -31,7 +31,7 @@ export interface NewNotification {
 export const links = {
   deal: (id: string) => `/inquiries/${id}`,
   order: (id: string) => `/orders/${id}`,
-  /** The order's Money tab (payments in, the plan, factory payments). */
+  /** The order's Money tab (payments in, the plan, supplier payments). */
   orderMoney: (id: string) => `/orders/${id}/payment`,
 };
 
@@ -344,7 +344,7 @@ export class NotificationsService implements OnModuleInit {
     });
     if (!o || !po) return;
     const s = await this.settings.get();
-    const plan = (await factoryPlansOf(this.prisma.db, o.id, s.sales.factoryAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")))).find(
+    const plan = (await supplierPlansOf(this.prisma.db, o.id, s.sales.supplierAdvancePercent, this.clock.today(), s.reminders.dueSoonDays, fxOf(s, await this.limits.allows("expenses")))).find(
       (f) => f.factory.id === po.supplierId,
     );
     const c = po.supplier.contacts[0];

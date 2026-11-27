@@ -21,16 +21,16 @@ import {
   copyOfferLinesAction,
   editOfferLineAction,
   moveOfferLineAction,
-  removeFactoryQuoteAction,
+  removeSupplierQuoteAction,
   removeOfferLineAction,
-  saveFactoryQuoteAction,
-  searchFactoriesAction,
+  saveSupplierQuoteAction,
+  searchSuppliersAction,
 } from "../../sourcing/actions";
 
 export const generateMetadata = inquiryTitle("Supplier offer");
 
 /**
- * One factory offer on its own page (design 17 Nov: each on its own page). Its top: the factory, its reference,
+ * One supplier offer on its own page (design 17 Nov: each on its own page). Its top: the supplier, its reference,
  * when it came and how long it holds, its tax; Quote this offer; ‹ 2 of 5 › through the inquiry's offers. Its
  * lines (Edit lines) and its details (Edit); beside them the quotations made from it and when it was asked.
  */
@@ -46,7 +46,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
   const base = `/inquiries/${d.id}`;
   const edits = await editsOf("factory_quote", x.id);
   const cover = coverOf(x, s.items);
-  const asked = (requests?.items ?? []).find((r) => r.factoryQuoteId === x.id) ?? null;
+  const asked = (requests?.items ?? []).find((r) => r.supplierQuoteId === x.id) ?? null;
   const lines = {
     add: addOfferLinesAction.bind(null, d.id),
     edit: editOfferLineAction.bind(null, d.id),
@@ -58,7 +58,7 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
   // The quotations made from this offer (their newest revision quotes it).
   const quotedIn = (q?.quotations ?? []).flatMap((y) => {
     const c = y.revisions.find((r) => r.status === "draft") ?? y.revisions[0];
-    return c && c.options.some((o) => o.factoryQuoteId === x.id) ? [{ id: y.id, refNo: y.refNo, number: c.number, status: c.status }] : [];
+    return c && c.options.some((o) => o.supplierQuoteId === x.id) ? [{ id: y.id, refNo: y.refNo, number: c.number, status: c.status }] : [];
   });
   // Every Edit on the page opens the offer's steps window on its step (Lines · Delivery · Payment · Warranty & conditions).
   const kit: OfferKit = {
@@ -66,9 +66,9 @@ export default async function OfferOwnPage({ params, searchParams }: { params: P
     today,
     mainCurrency: s.currency,
     rates: settings.sales.exchangeRates,
-    searchFactories: searchFactoriesAction,
-    saveAction: saveFactoryQuoteAction.bind(null, d.id, x.id),
-    removeAction: removeFactoryQuoteAction.bind(null, d.id, x.id),
+    searchSuppliers: searchSuppliersAction,
+    saveAction: saveSupplierQuoteAction.bind(null, d.id, x.id),
+    removeAction: removeSupplierQuoteAction.bind(null, d.id, x.id),
     removeFile: lines.removeFile,
     items: s.items,
     others: s.quotes.filter((o) => o.id !== x.id && o.lines.length),
