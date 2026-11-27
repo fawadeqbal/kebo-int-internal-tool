@@ -458,7 +458,7 @@ export async function loadCustomers(p: Period, today: string) {
       ]),
     },
   ];
-  return { ...data, sheets, failed: failedWhat(count) };
+  return { ...data, sheets, failedParts: [count].filter(isFailed) };
 }
 
 /* ------------------------------------------------------------------------------------------- Suppliers */
@@ -524,7 +524,7 @@ export async function loadSuppliers(p: Period) {
       ]),
     },
   ];
-  return { ...data, sheets, failed: failedWhat(count) };
+  return { ...data, sheets, failedParts: [count].filter(isFailed) };
 }
 
 /* ------------------------------------------------------------------------------------------- People */

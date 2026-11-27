@@ -236,7 +236,7 @@ async function Body({
       const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
       const [d, sPart] = await Promise.all([loadCustomers(p, today), seeMoney ? spendingOf(p) : null]);
       const s = dataOf(sPart);
-      const failed = [d.failed, failedWhat(sPart)].filter(Boolean).join(" and ") || null;
+      const failed = failedWhat(sPart, ...d.failedParts);
       const spent = s ? new Map(s.customers.map((x) => [x.customer.id, Number(x.spent)])) : null;
       return (
         <>
@@ -247,9 +247,10 @@ async function Body({
     }
     case "factories": {
       const d = await loadSuppliers(p);
+      const failed = failedWhat(...d.failedParts);
       return (
         <>
-          {d.failed && <CouldNotLoad what={d.failed} />}
+          {failed && <CouldNotLoad what={failed} />}
           <SuppliersSection d={d} p={p} page={page} base={path} params={keep} />
         </>
       );
