@@ -858,7 +858,7 @@ model Attachment {
   /// Added on an order (Documents v3: uploaded or dropped on a step): the order and the step it belongs to.
   orderId         String?          @map("order_id") @db.Uuid
   order           Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  /// payment | supplier | production | shipping | documents | delivery
+  /// payment | factory | production | shipping | documents | delivery (stored values: "factory" stays until the database step of the rename)
   step            String?          @db.VarChar(20)
   /// The section of the order's page the file belongs to (see @kebo/shared ORDER_SECTIONS): booking, vessel, fat…
   section         String?          @db.VarChar(30)

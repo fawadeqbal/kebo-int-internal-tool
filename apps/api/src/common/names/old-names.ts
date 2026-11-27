@@ -23,7 +23,7 @@ interface NamedResponse {
   json(body: unknown): unknown;
 }
 
-/** Says it reads the new names (this web, a newer phone app): `x-names: supplier`. */
+/** Says it reads the new names: `x-names: supplier`. Today's web does; no phone build does yet (the next release will). */
 const knowsNewNames = (headers: NamedRequest["headers"]): boolean => headers["x-names"] === "supplier";
 
 /** A phone app from before the change: the phone app's user agent, and no word that it knows the new names. */

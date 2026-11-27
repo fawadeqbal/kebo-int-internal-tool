@@ -101,7 +101,7 @@ async function saveShipment(orderId: string, shipmentId: string | null, v: Recor
 
 /**
  * One value ("+ Add") or a whole card (Edit) of a step's view. `target`:
- * shipment:<id> | shipment:new | contract | supplier | order | delivery.
+ * shipment:<id> | shipment:new | contract | factory | order | delivery.
  */
 export async function fieldsAction(orderId: string, target: string, _prev: ActionState, form: FormData): Promise<ActionState> {
   const v = formValues(form);
