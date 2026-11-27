@@ -30,6 +30,8 @@ describe("where an order stands (the header's line)", () => {
     expect(orderStanding(f, today)).toMatchObject({ late: true, tone: "bad", notes: ["ship by 26 Nov"] });
     expect(orderStanding({ ...f, shipBy: today }, today)).toMatchObject({ late: false, tone: "info" }); // the day itself is not late
     expect(orderStanding({ ...f, word: "Confirmed" }, today)).toMatchObject({ late: true, tone: "bad" });
+    // Goods in does not make it on time: it is late until something leaves.
+    expect(orderStanding({ ...f, goodsIn: true }, today)).toEqual({ notes: ["goods in", "ship by 26 Nov"], late: true, tone: "bad" });
   });
 
   it("once the goods have left: only whether it is paid, and never late", () => {
@@ -38,6 +40,7 @@ describe("where an order stands (the header's line)", () => {
     expect(orderStanding({ ...gone, due: 0 }, today).notes).toEqual(["paid in full"]);
     expect(orderStanding({ ...gone, due: -5 }, today).notes).toEqual(["paid in full"]); // paid over
     expect(orderStanding({ ...gone, due: null }, today).notes).toEqual([]); // this person does not see the money
+    expect(orderStanding({ ...gone, word: "Arrived", due: 0 }, today)).toEqual({ notes: ["paid in full"], late: false, tone: "info" });
     expect(orderStanding({ ...gone, word: "Delivered", due: 0 }, today)).toEqual({ notes: ["paid in full"], late: false, tone: "ok" });
   });
 
