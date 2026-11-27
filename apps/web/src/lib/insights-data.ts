@@ -2,8 +2,8 @@ import "server-only";
 import { api } from "./api";
 import { countryName } from "./countries";
 import { can, EXPENSE_CATEGORY_LABEL, type Permission } from "@kebo/shared";
-import { addDays } from "@kebo/utils";
-import { lastMonths, monthEnd, monthStart, periodOf, SECTIONS, type Period, type Section } from "./insights-period";
+import { addDays, lastMonths, monthEnd, monthStart } from "@kebo/utils";
+import { periodOf, SECTIONS, type Period, type Section } from "./insights-period";
 import type { SheetSpec } from "./sheet-spec";
 import type { Receivables } from "./types-insights";
 import type { LeaksReport, OpenBills, SpendingReport, ToPayList } from "./types-money";
@@ -40,7 +40,7 @@ export async function loadOverview(p: Period, money: boolean, month?: string) {
   const span = { from: p.from, to: p.to };
   const prev = { from: p.prevFrom, to: p.prevTo };
   const twelve = { from: monthStart(p.to, -11), to: p.to };
-  const drill = month && /^\d{4}-\d{2}$/.test(month) ? { from: `${month}-01`, to: monthEnd(`${month}-01`) } : null;
+  const drill = month && /^\d{4}-\d{2}$/.test(month) ? { from: monthStart(month), to: monthEnd(month) } : null;
   /** A list that is only there for some people or plans: without it, its card is left out. */
   const maybe = <T>(get: () => Promise<T>) => get().catch(() => null);
   const [cur, before, cashNow, cashBefore, monthly, monthlyCash, orders, owed, toPay, bills, report, reportBefore, funnelNow, funnelBefore, monthOrders] = await Promise.all([

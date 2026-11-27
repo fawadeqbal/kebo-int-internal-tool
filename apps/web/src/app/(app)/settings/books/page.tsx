@@ -1,4 +1,5 @@
 import { Card, CardBody, CardHeader } from "@kebo/ui";
+import { lastMonths } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
 import { SettingsPage } from "../section";
@@ -8,11 +9,9 @@ export const metadata = { title: "Closed months · Settings" };
 
 /** The months before a day, as choices: "October 2026" for 2026-10, the latest first. */
 function monthsUpTo(latest: string, count = 18) {
-  const [y, m] = latest.split("-").map(Number);
-  return Array.from({ length: count }, (_, k) => {
-    const d = new Date(Date.UTC(y!, m! - 1 - k, 1));
-    return { value: d.toISOString().slice(0, 7), label: d.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) };
-  });
+  return lastMonths(latest, count)
+    .reverse()
+    .map((m) => ({ value: m, label: new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) }));
 }
 
 /**

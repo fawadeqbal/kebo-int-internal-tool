@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Injectable, Put } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { DomainError, type ISODate } from "@kebo/utils";
+import { DomainError, monthEnd, monthStart, type ISODate } from "@kebo/utils";
 import { fromDbDate, toDbDate } from "@kebo/database";
 import { CurrentUser, RequirePermissions, SignedIn } from "../../common/auth/decorators";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -29,11 +29,6 @@ const closeInput = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
-const monthEnd = (month: string): ISODate => {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y!, m!, 0)).toISOString().slice(0, 10) as ISODate;
-};
-
 /**
  * The month close (Settings › Closed months): money dated on or before `closedThrough` stays as it was reported. The
  * database refuses a payment, cost, transfer or allocation dated then (migration month_close); here the date
@@ -55,7 +50,7 @@ export class BooksService {
       closedBy: b?.closedBy?.name ?? null,
       closedAt: b ? b.closedAt.toISOString() : null,
       reason: b?.reason ?? null,
-      latest: monthEnd(new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7)),
+      latest: monthEnd(monthStart(today, -1)),
     };
   }
 

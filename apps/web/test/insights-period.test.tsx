@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { change, lastMonths, periodOf, sectionOfTab, spanLabel } from "@/lib/insights-period";
+import { change, periodOf, sectionOfTab, spanLabel } from "@/lib/insights-period";
 
 /** Insights' one period for every figure, and the one before it to compare with. */
 describe("Insights period", () => {
@@ -36,21 +36,7 @@ describe("Insights period", () => {
     expect(change(-50, -100)).toBe(50);
   });
 
-  it("lists the 12 months of the chart and labels spans", () => {
-    expect(lastMonths("2026-11-30")).toEqual([
-      "2025-12",
-      "2026-01",
-      "2026-02",
-      "2026-03",
-      "2026-04",
-      "2026-05",
-      "2026-06",
-      "2026-07",
-      "2026-08",
-      "2026-09",
-      "2026-10",
-      "2026-11",
-    ]);
+  it("labels spans", () => {
     expect(spanLabel("2025-12-01", "2026-11-30")).toBe("1 Dec 2025 – 30 Nov 2026");
   });
 

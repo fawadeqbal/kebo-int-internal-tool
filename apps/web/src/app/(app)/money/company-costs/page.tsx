@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
 import { buildHref, Card, EmptyState, LinkTabs, PageHeader, Pager, StatRow, StatTile, toPage, toPageSize, Stack } from "@kebo/ui";
-import { addDays } from "@kebo/utils";
+import { lastMonths, monthEnd, monthOf, monthStart } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money, whole, companyToday, countOf } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -26,7 +26,7 @@ const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "nume
 type Search = { p?: string; kind?: string; removed?: string; page?: string; size?: string; q?: string };
 
 /** The first and the last day of a month ("2026-11"). */
-const span = (month: string) => ({ from: `${month}-01`, to: addDays(`${addDays(`${month}-28`, 4).slice(0, 7)}-01`, -1) });
+const span = (month: string) => ({ from: monthStart(month), to: monthEnd(month) });
 
 /**
  * Finance › Expenses (design "money, simple", board MCompany): what the company spends that is not a
@@ -44,7 +44,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const today = companyToday();
   const thisMonth = today.slice(0, 7);
   const month = /^\d{4}-\d{2}$/.test(sp.p ?? "") && sp.p! <= thisMonth ? sp.p! : thisMonth;
-  const prev = addDays(`${month}-01`, -1).slice(0, 7);
+  const prev = monthOf(month, -1);
   // Removed costs have a tab of their own, as on Payments (review 26 Nov): the other tabs list the live ones.
   const removed = sp.removed === "1";
   const category = !removed && (EXPENSE_CATEGORIES as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as ExpenseCategory) : undefined;
@@ -155,8 +155,8 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
           thisMonth,
           label: monthName,
           // This month and the eleven before it.
-          options: Array.from({ length: 12 }, (_, i) => addDays(`${thisMonth}-15`, -30 * i).slice(0, 7))
-            .filter((m, i, all) => all.indexOf(m) === i)
+          options: lastMonths(thisMonth)
+            .reverse()
             .map((m) => ({ value: m, label: MONTH_YEAR.format(new Date(`${m}-01T00:00:00Z`)) })),
         }}
         // What the tab lists (the removed ones are under Removed), so the tabs and the pages add up (M-27).

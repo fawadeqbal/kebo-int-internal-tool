@@ -1,5 +1,5 @@
 import { roundHalfAway, type Minor } from "@kebo/money";
-import type { ISODate } from "@kebo/utils";
+import { addDays, monthEnd, monthStart, type ISODate } from "@kebo/utils";
 
 /*
  * Home's "What stands out" and "Cash in the next four weeks", as plain functions of numbers already read:
@@ -24,13 +24,6 @@ const WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eig
 export const countWord = (n: number) => WORDS[n] ?? String(n);
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
 const pct = (part: Minor, whole: Minor) => (whole > 0 ? roundHalfAway((part / whole) * 1000) / 10 : null);
-export const addDays = (day: ISODate, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10) as ISODate;
-/** The first day of the month `n` months after `day`'s. */
-export const monthStart = (day: ISODate, n = 0) => {
-  const d = new Date(`${day.slice(0, 7)}-01T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + n);
-  return d.toISOString().slice(0, 10) as ISODate;
-};
 
 type Money = (minor: Minor) => string;
 
@@ -167,7 +160,7 @@ export function weeksAhead(a: {
       const mm = start.slice(0, 7);
       if (r.lastOn.slice(0, 7) >= mm || r.skip === mm) continue;
       // The 31st in a month of 30 days is its last day.
-      const last = addDays(monthStart(start, 1), -1);
+      const last = monthEnd(start);
       const on = `${mm}-${day}` > last ? last : `${mm}-${day}`;
       const w = weekOf(on);
       if (w >= 0) sums[w]!.out += r.minor;

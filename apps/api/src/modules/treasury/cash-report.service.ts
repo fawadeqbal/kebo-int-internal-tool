@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { decimalToMinor, fromDbDate, toDbDate } from "@kebo/database";
 import { convert, fromMinor, fxRate, type Minor } from "@kebo/money";
 import { can } from "@kebo/shared";
-import { ForbiddenError, type ISODate } from "@kebo/utils";
+import { ForbiddenError, monthEnd, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -161,10 +161,6 @@ export class CashReportService {
         t += inMain(bal, a.currency);
       }
       return t;
-    };
-    const monthEnd = (ym: string): ISODate => {
-      const d = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0));
-      return d.toISOString().slice(0, 10) as ISODate;
     };
 
     const total = empty();

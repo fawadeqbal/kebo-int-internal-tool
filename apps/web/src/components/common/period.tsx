@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Segmented } from "@kebo/ui";
-import { addDays } from "@kebo/utils";
+import { monthEnd, monthOf } from "@kebo/utils";
 
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -12,9 +12,9 @@ export function periodOf(asked: string | undefined, today: string) {
   const period = /^\d{4}(-\d{2})?$/.test(asked ?? "") && asked! <= thisMonth ? asked! : thisMonth;
   const isYear = period.length === 4;
   const from = isYear ? `${period}-01-01` : `${period}-01`;
-  const to = isYear ? `${period}-12-31` : addDays(`${addDays(`${period}-28`, 4).slice(0, 7)}-01`, -1);
-  const prev = isYear ? String(Number(period) - 1) : addDays(from, -1).slice(0, 7);
-  const next = isYear ? String(Number(period) + 1) : addDays(`${period}-28`, 4).slice(0, 7);
+  const to = isYear ? `${period}-12-31` : monthEnd(period);
+  const prev = isYear ? String(Number(period) - 1) : monthOf(period, -1);
+  const next = isYear ? String(Number(period) + 1) : monthOf(period, 1);
   const hasNext = isYear ? next <= today.slice(0, 4) : next <= thisMonth;
   const name = isYear ? period : MONTH_YEAR.format(new Date(`${period}-01T00:00:00Z`));
   return { period, isYear, from, to: to > today ? today : to, prev, next, hasNext, name, thisMonth };

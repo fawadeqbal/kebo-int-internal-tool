@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Card, cn, DataRow, EmptyState, PageHeader, ButtonLink, PhoneList, PhoneRow, StatusBadge, Td, Th, THead, buttonClass, StatTile, CardHeader, linkClass, subTitleClass } from "@kebo/ui";
+import { monthStart, todayIn } from "@kebo/utils";
 import { platformApi } from "@/lib/api";
 import { date, dateTime } from "@/lib/format";
 import type { Dashboard, Overview } from "@/lib/types-platform";
@@ -17,12 +18,7 @@ const WATCH: Record<Dashboard["watch"][number]["reason"], { label: string; meani
   ending: { label: "Ends soon", meaning: "warn" },
   renews: { label: "Renews", meaning: "info" },
 };
-const lastMonthName = () => {
-  const d = new Date();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() - 1);
-  return d.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
-};
+const lastMonthName = () => new Date(`${monthStart(todayIn("UTC"), -1)}T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
 
 /**
  * The platform at a glance (design system: Dashboard frame, approved page

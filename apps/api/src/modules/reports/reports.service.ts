@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { fromDbDate, type Prisma } from "@kebo/database";
 import { fromMinor, toMinor } from "@kebo/money";
 import { can, OPEN_STAGES } from "@kebo/shared";
-import { addDays, ForbiddenError, type ISODate } from "@kebo/utils";
+import { addDays, ForbiddenError, lastMonths, monthEnd, monthStart, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -19,16 +19,6 @@ export interface Range {
 
 /** A calendar day for date columns (stored as dates, no time zone). */
 const day = (d: ISODate) => new Date(`${d}T00:00:00Z`);
-/** "2026-11" for the month `n` months after `d`'s. */
-const monthStartOf = (d: ISODate, n = 0) => {
-  const x = new Date(`${d.slice(0, 7)}-01T00:00:00Z`);
-  x.setUTCMonth(x.getUTCMonth() + n);
-  return x.toISOString().slice(0, 7);
-};
-/** The last day of `d`'s month. */
-const monthEnd = (d: ISODate): ISODate => addDays(`${monthStartOf(d, 1)}-01`, -1);
-/** The 12 months up to `d`'s: ["2025-12", …, "2026-11"]. */
-const monthsUpTo = (d: ISODate) => Array.from({ length: 12 }, (_, i) => monthStartOf(d, i - 11));
 
 @Injectable()
 export class ReportsService {
@@ -120,7 +110,7 @@ export class ReportsService {
    * and labels as Insights (Sales, Cash in, To receive, Overdue, Quoted value) for the same month.
    */
   private async moneyNow(user: SessionUser, today: ISODate) {
-    const month = { from: `${today.slice(0, 7)}-01` as ISODate, to: monthEnd(today) };
+    const month = { from: monthStart(today), to: monthEnd(today) };
     const [orders, cash, funnel, owed, work] = await Promise.all([
       this.facts.orderGroups(user, { ...month, period: "all", by: "company" }, true),
       this.facts.cash(user, month, true),
@@ -182,7 +172,7 @@ export class ReportsService {
   async report(user: SessionUser, r: Range, staffId?: string) {
     if (!can(user, "reports.view")) throw new ForbiddenError();
     const span = { from: r.from, to: r.to, ...(staffId ? { personId: staffId } : {}) };
-    const twelve = { ...span, from: `${monthStartOf(r.to, -11)}-01` as ISODate };
+    const twelve = { ...span, from: monthStart(r.to, -11) };
     const [funnel, inquiries, byChannel, byCategory, byPerson, orders, ordersByCustomer, ordersByCategory, ordersByPerson, months] = await Promise.all([
       this.facts.funnel(user, span),
       this.facts.inquiryGroups(user, { ...span, period: "all", by: "company" }),
@@ -215,7 +205,7 @@ export class ReportsService {
     const groups = (rows: OrderRow[]) =>
       [...rows].sort((a, b) => toMinor(b.sales) - toMinor(a.sales) || a.label.localeCompare(b.label)).map((g) => ({ key: g.label, ...money(g) }));
     const total = inquiries.rows[0];
-    const last = monthsUpTo(r.to);
+    const last = lastMonths(r.to);
     return {
       range: r,
       currency: orders.currency,

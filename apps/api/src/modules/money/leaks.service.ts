@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { livePurchase, decimalToMinor, fromDbDate, toDbDate, type Prisma } from "@kebo/database";
 import { formatMinor, fromMinor, roundHalfAway, toMinor, type Minor } from "@kebo/money";
 import { can, LOST_REASON_LABEL, type LostReason } from "@kebo/shared";
-import { daysBetween, ForbiddenError, type ISODate } from "@kebo/utils";
+import { daysBetween, ForbiddenError, lastMonths, monthStart, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
 import { Clock } from "../../common/time/clock.service";
 import { ReadCache } from "../../common/cache/read-cache";
@@ -13,12 +13,6 @@ import { convert } from "./order-money";
 
 /** part ÷ whole in %, one decimal, half away from zero (−6.25 → −6.3). */
 const pct = (part: number, whole: number) => (whole > 0 ? roundHalfAway((part / whole) * 1000) / 10 : null);
-/** "2026-11" for the month `n` months after `d`'s. */
-const monthOf = (d: ISODate, n = 0) => {
-  const x = new Date(`${d.slice(0, 7)}-01T00:00:00Z`);
-  x.setUTCMonth(x.getUTCMonth() + n);
-  return x.toISOString().slice(0, 7);
-};
 
 /** When a warning is raised. */
 const LIMITS = {
@@ -70,7 +64,7 @@ export class LeaksService {
     const to = q.to ?? today;
     const from = q.from ?? `${to.slice(0, 4)}-01-01`;
     const range = { gte: toDbDate(from), lte: toDbDate(to) };
-    const twelve = { from: `${monthOf(to, -11)}-01`, to };
+    const twelve = { from: monthStart(to, -11), to };
     const inMain = (e: { amount: Prisma.Decimal; rate: Prisma.Decimal }) => convert(decimalToMinor(e.amount), Number(e.rate));
     const monthName = (m: string) =>
       new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01T00:00:00Z`));
@@ -307,7 +301,7 @@ export class LeaksService {
       });
 
     /* ----- expenses against sales, month by month (12 months to the end of the period): Insights' sales and costs */
-    const trend = Array.from({ length: 12 }, (_, i) => monthOf(to, i - 11)).map((m) => {
+    const trend = lastMonths(to).map((m) => {
       const salesM = toMinor(monthly.rows.find((r) => r.period === m)?.sales ?? "0");
       const exp = toMinor(cash.months.find((r) => r.month === m)?.expenses ?? "0");
       return { month: m, sales: fromMinor(salesM), expenses: fromMinor(exp), percent: pct(exp, salesM), expMinor: exp };

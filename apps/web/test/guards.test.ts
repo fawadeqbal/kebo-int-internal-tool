@@ -63,6 +63,11 @@ const GUARDS: Record<keyof typeof known.counts, Guard> = {
     // (An attribute in the markup, not the same words in a selector: '[role="dialog"]'.)
     count: times(/(?<!\[)role="(?:dialog|alertdialog)"/g),
   },
+  handMonth: {
+    what: "month worked out by hand (.setUTCMonth, .setMonth)",
+    use: "monthStart, monthEnd, monthOf, lastMonths or addMonths from @kebo/utils: the rule is written once, and tested for month ends and leap years",
+    count: times(/\.set(?:UTC)?Month\(/g),
+  },
   apiOutsideData: {
     what: "page, layout or component that calls the API client itself",
     use: "a data file of its feature (lib/order-data.ts, lib/deal-data.ts…), so each read is written once",

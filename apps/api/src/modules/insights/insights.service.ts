@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { livePart, fromDbDate, routeOf, termsOf, termsSelect } from "@kebo/database";
 import { fromMinor, toMinor } from "@kebo/money";
 import { can, partToChase, PAYMENT_ROUTE_SHORT, planStatus, planWhen } from "@kebo/shared";
-import { daysBetween, DomainError, ForbiddenError, type ISODate } from "@kebo/utils";
+import { daysBetween, DomainError, ForbiddenError, monthEnd, type ISODate } from "@kebo/utils";
 import { orderAccess } from "../../common/auth/order-access";
 import { creditsAll } from "../treasury/api";
 import { CashService } from "../treasury/cash.service";
@@ -18,11 +18,6 @@ import { livePlansOf } from "../billing/api";
 import { FactsReadService } from "./facts/facts-read.service";
 
 const ymOf = (d: ISODate) => d.slice(0, 7);
-/** The last day of `d`'s month. */
-const monthEnd = (d: ISODate): ISODate => {
-  const [y, m] = d.slice(0, 7).split("-").map(Number) as [number, number];
-  return `${d.slice(0, 7)}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
-};
 /** The change from `before` to `now` in percent, as Insights shows it (null when there was nothing before). */
 const change = (now: number, before: number) => (before === 0 ? null : Math.round(((now - before) / Math.abs(before)) * 100));
 
