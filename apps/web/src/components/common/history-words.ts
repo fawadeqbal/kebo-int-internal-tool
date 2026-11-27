@@ -8,6 +8,9 @@ import { readableHistory } from "@/components/insights/readable-dates";
  */
 /** Field names as people say them. */
 const FIELD: Record<string, string> = {
+  // Rows saved before step B of the rename (28 Nov 2026) name these fields with the old word: read alike.
+  factory: "Supplier",
+  factories: "Suppliers",
   blNo: "B/L number",
   shippedOn: "Shipped on",
   departedOn: "Left on",

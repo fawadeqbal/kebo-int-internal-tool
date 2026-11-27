@@ -11,7 +11,7 @@ const { fromDraft, marginOf, optionTotals, pricedAll, startMargin } = await impo
 const line = (id: string, quantity: string, unitCost: string | null) => ({ id, no: id, parentId: null, requestedItemId: null, answersNo: null, description: `Item ${id}`, model: null, quantity, unit: "pcs", unitCost });
 const offer = (supplierQuoteId: string, lines: ReturnType<typeof line>[], basis: "FOB" | "EXW" = "FOB") => ({
   supplierQuoteId,
-  factory: { id: `f-${supplierQuoteId}`, name: `Supplier ${supplierQuoteId}` },
+  supplier: { id: `f-${supplierQuoteId}`, name: `Supplier ${supplierQuoteId}` },
   currency: "USD",
   basis,
   basisPlace: "Shanghai",

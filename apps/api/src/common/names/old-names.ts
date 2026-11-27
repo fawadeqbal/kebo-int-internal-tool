@@ -37,10 +37,11 @@ export const isOldPhone = (headers: NamedRequest["headers"]): boolean =>
   isMobileApp(String(headers["user-agent"] ?? "")) && !knowsNewNames(headers);
 
 /**
- * The API speaks both names. An old name in a body or in a query is read as the new one, from anyone. An answer
- * carries the old name beside each new one unless the asker says it reads the new names: phone apps installed
- * before the change do not say so, and neither does the web from before it, which runs beside the new API for
- * the moments of a deploy (without the old names it would read a form's fields as empty and save them empty).
+ * The API speaks both names. An old compound name in a body or in a query is read as the new one, from anyone (the
+ * bare word never is: in a body it may be a key of a table looked up by a stored value). An answer carries the old
+ * name beside each new one unless the asker says it reads the new names: phone apps installed before the change do
+ * not say so, and neither does the web from before it, which runs beside the new API for the moments of a deploy
+ * (without the old names it would read a form's fields as empty and save them empty).
  */
 export function oldNames() {
   return (req: NamedRequest, res: NamedResponse, next: () => void) => {
@@ -56,13 +57,12 @@ export function oldNames() {
       for (const [key, v] of query) renamed.append(newName(key), v);
       req.url = `${req.url.slice(0, at)}?${renamed.toString()}`;
     }
-    // The old twins in answers: the compound names for those who do not say they know them, and the bare word for
-    // those who do not say they know that (an old phone; the web of the day before, during a deploy).
-    const compound = !knowsNewNames(req.headers);
-    const bare = !knowsBareNames(req.headers);
-    if (compound || bare) {
+    // The old twins in answers: the bare word (step B) for anyone who does not say `supplier.2` (an old phone; the
+    // web of the day before, during a deploy), and the compound names too for anyone who says neither value.
+    if (!knowsBareNames(req.headers)) {
+      const compound = !knowsNewNames(req.headers);
       const json = res.json.bind(res);
-      res.json = (body: unknown) => json(bare ? withBareOldNamesToo(compound ? withOldNamesToo(body) : body) : withOldNamesToo(body));
+      res.json = (body: unknown) => json(withBareOldNamesToo(compound ? withOldNamesToo(body) : body));
     }
     next();
   };

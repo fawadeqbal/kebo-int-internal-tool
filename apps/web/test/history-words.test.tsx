@@ -12,3 +12,10 @@ describe("history reads as words, names and money (live audit 20 Nov)", () => {
     expect(readableHistory("Follow-up set · Assignee — → Fawad Iqbal · Follow Up — → 7f8c7189-f89a-4a49-9c80-e5b6c75faac4", style)).toBe("Follow-up set · Assignee — → Fawad Iqbal");
   });
 });
+
+describe("fields saved before step B of the rename (28 Nov 2026)", () => {
+  it("reads factory and factories as Supplier and Suppliers, as the new rows say", async () => {
+    const { fieldLabel } = await import("@/components/common/history-words");
+    expect([fieldLabel("factory"), fieldLabel("factories"), fieldLabel("supplier")]).toEqual(["Supplier", "Suppliers", "Supplier"]);
+  });
+});
