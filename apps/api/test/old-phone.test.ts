@@ -11,9 +11,9 @@ import { PrismaService } from "../src/database/prisma.service";
 
 /**
  * A phone app installed before "factory" became "supplier" in the API's field names (27 Nov 2026) still
- * sends `factoryId` and reads `factoryTotal`. The API reads old names as the new ones and answers with both
- * (src/common/names/old-names.ts); for the release that changes the names it does so for everyone, because the
- * old web runs beside the new API for a moment during the deploy.
+ * sends `factoryId` and reads `factoryTotal`. The API reads old names as the new ones, and answers with both
+ * unless the asker says it reads the new names (src/common/names/old-names.ts). The web from before the change
+ * does not say so either: it runs beside the new API for a moment during a deploy.
  */
 describe("a phone app from before the rename keeps working", () => {
   let app: INestApplication;
@@ -100,7 +100,7 @@ describe("a phone app from before the rename keeps working", () => {
     expect(asked.factoryQuoteId).toBe(made.id);
   });
 
-  it("the web's old names are read too, and its answers carry both (an old web beside the new API, during a deploy)", async () => {
+  it("the web from before the change: its old names are read, and its answers carry both (beside the new API, during a deploy)", async () => {
     const extra = (
       await api(app, sana)
         .post("/factories", { name: `Deploy Window ${tag}` })
@@ -116,6 +116,20 @@ describe("a phone app from before the rename keeps working", () => {
     const offer = (sourcing.quotes as Record<string, unknown>[])[0]!;
     expect(offer.supplierTotal).toBe("42000.00");
     expect(offer.factoryTotal).toBe("42000.00");
+  });
+
+  it("who says it reads the new names gets them alone: today's web, a newer phone app", async () => {
+    for (const agent of ["Mozilla/5.0", DART]) {
+      const res = await request(app.getHttpServer())
+        .get(`/api/inquiries/${inquiryId}/sourcing`)
+        .set("authorization", `Bearer ${sana}`)
+        .set("user-agent", agent)
+        .set("x-names", "supplier")
+        .expect(200);
+      const offer = (res.body.quotes as Record<string, unknown>[])[0]!;
+      expect(offer.supplierTotal).toBe("42000.00");
+      expect("factoryTotal" in offer).toBe(false);
+    }
   });
 
   it("an uploaded form's old field name is read too: an offer's file stays on the offer", async () => {
@@ -196,7 +210,7 @@ describe("a phone app from before the rename keeps working", () => {
       asSent: { factoryIds: ["f1"], supplierQuoteId: "as it got it", factoryQuoteId: "edited" },
       sent: { supplierId: "f1", factoryId: "f1" },
     });
-    // Anyone else: old names in are read (new wins when both are there); the answer carries both too, for now.
+    // The web from before the change: old names in are read (new wins when both are there); the answer carries both.
     expect(
       run({ "user-agent": "Mozilla/5.0" }, "/api/expenses?factoryId=f1", {
         factoryIds: ["f1"],
@@ -208,6 +222,13 @@ describe("a phone app from before the rename keeps working", () => {
       body: { supplierIds: ["f1"], supplierQuoteId: "new" },
       asSent: { factoryIds: ["f1"], supplierQuoteId: "new", factoryQuoteId: "old" },
       sent: { supplierId: "f1", factoryId: "f1" },
+    });
+    // Today's web says it reads the new names: old names in are still read; the answer is left alone.
+    expect(run({ "user-agent": "Mozilla/5.0", "x-names": "supplier" }, "/api/expenses?factoryId=f1", { factoryIds: ["f1"] })).toEqual({
+      url: "/api/expenses?supplierId=f1",
+      body: { supplierIds: ["f1"] },
+      asSent: { factoryIds: ["f1"] },
+      sent: { supplierId: "f1" },
     });
   });
 });

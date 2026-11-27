@@ -23,16 +23,18 @@ interface NamedResponse {
   json(body: unknown): unknown;
 }
 
+/** Says it reads the new names (this web, a newer phone app): `x-names: supplier`. */
+const knowsNewNames = (headers: NamedRequest["headers"]): boolean => headers["x-names"] === "supplier";
+
 /** A phone app from before the change: the phone app's user agent, and no word that it knows the new names. */
 export const isOldPhone = (headers: NamedRequest["headers"]): boolean =>
-  isMobileApp(String(headers["user-agent"] ?? "")) && headers["x-names"] !== "supplier";
+  isMobileApp(String(headers["user-agent"] ?? "")) && !knowsNewNames(headers);
 
 /**
- * For the release that changes the names, the API speaks both: an old name in a body or in a query is read as
- * the new one, and every answer carries the old name beside each new one. Phone apps installed before the change
- * need both for good. The web needs them for the moments of a deploy when the old web still runs beside the new
- * API: it would read a form's fields as empty and save them empty, and its own `factoryId` would be dropped
- * without a word. Once the release is out, the answers' old names are for old phone apps only (the next change).
+ * The API speaks both names. An old name in a body or in a query is read as the new one, from anyone. An answer
+ * carries the old name beside each new one unless the asker says it reads the new names: phone apps installed
+ * before the change do not say so, and neither does the web from before it, which runs beside the new API for
+ * the moments of a deploy (without the old names it would read a form's fields as empty and save them empty).
  */
 export function oldNames() {
   return (req: NamedRequest, res: NamedResponse, next: () => void) => {
@@ -48,8 +50,10 @@ export function oldNames() {
       for (const [key, v] of query) renamed.append(newName(key), v);
       req.url = `${req.url.slice(0, at)}?${renamed.toString()}`;
     }
-    const json = res.json.bind(res);
-    res.json = (body: unknown) => json(withOldNamesToo(body));
+    if (!knowsNewNames(req.headers)) {
+      const json = res.json.bind(res);
+      res.json = (body: unknown) => json(withOldNamesToo(body));
+    }
     next();
   };
 }
