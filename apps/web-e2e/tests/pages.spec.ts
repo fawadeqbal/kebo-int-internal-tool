@@ -58,6 +58,11 @@ test("/factories still lands on /suppliers", async ({ page }) => {
   await page.waitForURL((u) => u.pathname === "/suppliers");
 });
 
+// A month that does not exist in the address (typed, or an old link): the page opens on this month, not the error page.
+for (const address of ["/payments?p=2025-13", "/money/company-costs?p=2025-13", "/reports?month=2025-13", "/payments?p=2025-00"]) {
+  test(`${address} opens on this month`, ({ page }) => open(page, address));
+}
+
 test.describe("old addresses", () => {
   for (const r of oldAddresses) {
     test(`${r.route} still lands on a page`, async ({ page }) => {

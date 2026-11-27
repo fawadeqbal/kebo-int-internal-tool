@@ -86,6 +86,9 @@ export function monthStart(date: ISODate, months = 0): ISODate {
 /** The last day of `date`'s month (28, 29, 30 or 31). A month ("2026-11") is read as any day in it. */
 export const monthEnd = (date: ISODate): ISODate => addDays(monthStart(date, 1), -1);
 
+/** A month as an address or a form writes it, "2026-11": a four-digit year and a month 01 to 12 (not "2025-13"). */
+export const isMonth = (v: unknown): v is string => typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+
 /** "2026-11": the month `months` after `date`'s. */
 export const monthOf = (date: ISODate, months = 0): string => monthStart(date, months).slice(0, 7);
 

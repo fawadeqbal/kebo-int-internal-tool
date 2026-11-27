@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Segmented } from "@kebo/ui";
-import { monthEnd, monthOf } from "@kebo/utils";
+import { isMonth, monthEnd, monthOf } from "@kebo/utils";
 
 const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -9,7 +9,7 @@ const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", { month: "long", year: "nume
 /** A month (YYYY-MM) or a year (YYYY) from ?p=, never after today. */
 export function periodOf(asked: string | undefined, today: string) {
   const thisMonth = today.slice(0, 7);
-  const period = /^\d{4}(-\d{2})?$/.test(asked ?? "") && asked! <= thisMonth ? asked! : thisMonth;
+  const period = (/^\d{4}$/.test(asked ?? "") || isMonth(asked)) && asked! <= thisMonth ? asked! : thisMonth;
   const isYear = period.length === 4;
   const from = isYear ? `${period}-01-01` : `${period}-01`;
   const to = isYear ? `${period}-12-31` : monthEnd(period);

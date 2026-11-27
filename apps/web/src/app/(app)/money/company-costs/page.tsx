@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@kebo/shared";
 import { buildHref, Card, EmptyState, LinkTabs, PageHeader, Pager, StatRow, StatTile, toPage, toPageSize, Stack } from "@kebo/ui";
-import { lastMonths, monthEnd, monthOf, monthStart } from "@kebo/utils";
+import { isMonth, lastMonths, monthEnd, monthOf, monthStart } from "@kebo/utils";
 import { api } from "@/lib/api";
 import { money, whole, companyToday, countOf } from "@/lib/format";
 import { crumbsFor } from "@/lib/nav";
@@ -43,7 +43,7 @@ export default async function CompanyCostsPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const today = companyToday();
   const thisMonth = today.slice(0, 7);
-  const month = /^\d{4}-\d{2}$/.test(sp.p ?? "") && sp.p! <= thisMonth ? sp.p! : thisMonth;
+  const month = isMonth(sp.p) && sp.p <= thisMonth ? sp.p : thisMonth;
   const prev = monthOf(month, -1);
   // Removed costs have a tab of their own, as on Payments (review 26 Nov): the other tabs list the live ones.
   const removed = sp.removed === "1";

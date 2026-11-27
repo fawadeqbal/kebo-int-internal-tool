@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, LoaderCircle, Search, X } from "lucide-react";
 import { cn, RULES, searchFrameClass, controlSizes, EmptyLine, Button, linkClass, CountDot } from "@kebo/ui";
-import { monthOf } from "@kebo/utils";
+import { isMonth, monthOf } from "@kebo/utils";
 import { useFocusTrap } from "./dialog";
 import { FloatingMenu, useIsPhone } from "./floating";
 
@@ -40,8 +40,6 @@ export interface FilterMonth {
 /** How long the search waits after the last key before it looks: longer than the gap between a slow typist's
  * letters (a phone's keyboard too), short enough to feel at once when the typing stops. Enter looks at once. */
 export const SEARCH_PAUSE_MS = 600;
-
-const isMonth = (v: string) => /^\d{4}-\d{2}$/.test(v);
 
 /** A choice in a filter's menu: a tick on the one chosen now. */
 function Choice({ label, on, onPick }: { label: string; on: boolean; onPick: () => void }) {
