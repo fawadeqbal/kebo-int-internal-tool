@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import { sameSite } from "@/lib/file-proxy";
 import { UUID } from "@/lib/ids";
+import { bodyOf } from "@/lib/quiet";
 
 const REF = /^(attachment|payment|factory_payment|expense):[0-9a-f-]{36}$/i;
 
@@ -11,7 +12,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const files = (new URL(req.url).searchParams.get("files") ?? "").split(",").filter((f) => REF.test(f));
   const res = await apiFetch(`/orders/${id}/files/zip`, { query: files.length ? { files: files.join(",") } : undefined });
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
+    const body = await bodyOf(res);
     return new Response(body?.error ?? (res.status === 404 ? "Not found" : "Not allowed"), { status: res.status });
   }
   const headers = new Headers();
@@ -45,6 +46,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (typeof v === "string" && v.trim()) body.set(k, v.trim());
   }
   const res = await apiFetch(`/orders/${id}/files`, { method: "POST", body });
-  const json = await res.json().catch(() => ({ error: `Upload failed (${res.status})` }));
+  const json = (await bodyOf<unknown>(res)) ?? { error: `Upload failed (${res.status})` };
   return Response.json(json, { status: res.status });
 }

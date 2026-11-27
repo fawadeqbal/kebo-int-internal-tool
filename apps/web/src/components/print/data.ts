@@ -1,5 +1,5 @@
 import "server-only";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { CompanySnapshot, CustomerNow, CustomerSnapshot } from "@/lib/types-orders";
 import { localPath } from "@/lib/paths";
 import { getSettings } from "@/lib/loaders";
@@ -39,13 +39,6 @@ export function backTo(back: string | undefined, fallback: string) {
   return localPath(back, fallback);
 }
 
-/** Optional reads (e.g. supplier details for people who may not see suppliers) fall back to nothing. */
-export async function optional<T>(fn: () => Promise<T>): Promise<T | null> {
-  try {
-    return await fn();
-  } catch (e) {
-    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return null;
-    throw e;
-  }
-}
+/** Optional reads (e.g. supplier details for people who may not see suppliers) fall back to nothing (lib/part.ts). */
+export { optional } from "@/lib/part";
 

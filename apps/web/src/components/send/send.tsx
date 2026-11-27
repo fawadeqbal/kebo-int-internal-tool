@@ -11,6 +11,7 @@ import { useConfirm } from "@/components/common/dialog";
 import { PANEL_FORM, PanelBody, SidePanel, useClosePanel, WhatHappens, WindowFooter } from "@/components/common/panel";
 import { saveHref } from "@/components/window/doc-window";
 import type { ActionState } from "@/lib/actions";
+import { ignore } from "@/lib/quiet";
 
 /*
  * Email and Share (design "Email and Share", 26 Nov 2026): two buttons for everything that goes out, the same in
@@ -433,15 +434,14 @@ export function useShare(p: ShareProps) {
       const digits = (p.to?.phone ?? "").replace(/\D/g, "");
       if (via === "whatsapp") window.open(`https://wa.me/${digits}?text=${encodeURIComponent(p.message)}`, "_blank", "noopener");
       if (via === "telegram") window.open(`tg://msg?text=${encodeURIComponent(p.message)}`, "_self");
+      let copied = false;
       if (via === "wechat") {
-        await navigator.clipboard?.writeText(p.message).catch(() => undefined);
+        copied = (await navigator.clipboard?.writeText(p.message).then(() => true, ignore("copying the message for WeChat"))) ?? false;
         window.location.assign("weixin://");
       }
-      toast(
-        via === "download"
-          ? `${names} downloaded.`
-          : `${APP_WORD[via]} ${via === "wechat" ? "opens: the message is copied, paste it" : "opens with the message"}; ${names} downloaded: attach it there.`,
-      );
+      const opens =
+        via !== "wechat" ? "opens with the message" : copied ? "opens: the message is copied, paste it" : "opens, but the message could not be copied";
+      toast(via === "download" ? `${names} downloaded.` : `${APP_WORD[via]} ${opens}; ${names} downloaded: attach it there.`);
       shared(via);
     } catch (e) {
       if (!(e instanceof DOMException && e.name === "AbortError")) toast({ message: e instanceof Error ? e.message : "Could not share it.", kind: "fail" });

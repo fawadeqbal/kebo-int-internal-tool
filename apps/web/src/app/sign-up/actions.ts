@@ -3,6 +3,7 @@
 import { originFromForm } from "@/lib/origin";
 import { apiFetch } from "@/lib/api";
 import { formValues, type ActionState } from "@/lib/actions";
+import { bodyOf } from "@/lib/quiet";
 
 /** Self sign-up: an email to confirm, then a trial company. The password is never sent back. */
 export async function signUpAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -21,7 +22,7 @@ export async function signUpAction(_prev: ActionState, form: FormData): Promise<
       origin: originFromForm(form),
     }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   const { password: _p, ...kept } = v;
   if (!res.ok) return { ok: false, message: body.error ?? "Could not sign up. Please try again.", errors: body.fieldErrors, values: kept };
   return { ok: true, message: `Check your inbox (${v.email}): press the button in our email to start your trial.` };

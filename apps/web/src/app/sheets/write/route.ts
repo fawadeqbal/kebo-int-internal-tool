@@ -1,6 +1,7 @@
 import { writeSheet } from "@/lib/sheets";
 import { SHEET_LIMITS, type SheetCol, type SheetSpec } from "@/lib/sheet-spec";
 import { sheetGuard } from "../guard";
+import { bodyOf } from "@/lib/quiet";
 
 const MAX_ROWS = 20_000;
 const MAX_TEXT = 32_000;
@@ -47,7 +48,7 @@ function specOf(body: unknown): SheetSpec | null {
 export async function POST(req: Request) {
   const stop = await sheetGuard(req);
   if (stop) return stop;
-  const spec = specOf(await req.json().catch(() => null));
+  const spec = specOf(await bodyOf<unknown>(req));
   if (!spec) return Response.json({ error: "Could not make the file." }, { status: 400 });
   const file = await writeSheet(spec);
   const name = `${spec.name.replace(/[^\p{L}\p{N} ._()-]+/gu, "-").trim() || "sheet"}.xlsx`;

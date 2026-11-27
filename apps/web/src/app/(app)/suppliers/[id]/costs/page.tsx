@@ -43,7 +43,7 @@ export default async function SupplierCosts({ params }: { params: Promise<{ id: 
   const today = companyToday();
   const ledgerOn = can(me, "ledger.view");
   const insights = can(me, "reports.view") && (await hasFeature("insights"));
-  const [f, costsPart, payables, posPart, ledgerPart] = await Promise.all([
+  const [f, costsPart, payablesPart, posPart, ledgerPart] = await Promise.all([
     supplierOf(id),
     part("its other costs", () => api.get<ExpenseList>("/expenses", { supplierId: id })),
     supplierPayablesOf(id),
@@ -53,7 +53,8 @@ export default async function SupplierCosts({ params }: { params: Promise<{ id: 
   const costs = dataOf(costsPart);
   const pos = dataOf(posPart);
   const ledger = dataOf(ledgerPart);
-  const failed = failedWhat(costsPart, posPart, ledgerPart);
+  const payables = dataOf(payablesPart) ?? [];
+  const failed = failedWhat(costsPart, payablesPart, posPart, ledgerPart);
   const orders = (pos?.rows ?? []).filter((o) => o.status !== "cancelled");
   const cur = orders[0]?.currency ?? payables[0]?.currency ?? ledger?.currencies[0]?.currency ?? "CNY";
 

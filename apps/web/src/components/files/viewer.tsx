@@ -6,6 +6,7 @@ import { Download, FileText } from "lucide-react";
 import { fileSize } from "@kebo/shared";
 import { buttonClass, capsClass, cn, linkClass } from "@kebo/ui";
 import { useIsPhone } from "@/components/common/floating";
+import { ignore } from "@/lib/quiet";
 import { orderWindowOfPrint } from "@/lib/doc-links";
 import {
   choicesOf,
@@ -229,7 +230,7 @@ function useHeadOf(f: ViewFile) {
           name: named ? decodeURIComponent(named) : null,
         });
       })
-      .catch(() => {});
+      .catch(ignore("the file's type, size and name for its label (it shows without them)"));
     return () => {
       live = false;
     };

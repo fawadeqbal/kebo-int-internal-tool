@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { api } from "@/lib/api";
 import type { EditRecordType } from "@/lib/types-edits";
 
@@ -19,6 +20,10 @@ export async function recordEditAction(input: {
     const r = await api.post<{ n: number }>("/edits", input);
     return { ok: true, n: r.n };
   } catch (e) {
+    unstable_rethrow(e);
+    console.error(
+      `[edits] the note of a change on ${input.type} ${input.id} (${input.card}) was not kept: ${e instanceof Error ? e.message : e}`,
+    );
     return { ok: false, message: e instanceof Error ? e.message : "The edit was saved but not counted." };
   }
 }

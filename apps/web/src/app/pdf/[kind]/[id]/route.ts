@@ -8,6 +8,7 @@ import type { LedgerStatement } from "@/lib/types-ledger";
 import { attachmentHeaders, pdfName, withChromium } from "../../render";
 import { UUID } from "@/lib/ids";
 import { copyOf } from "@/components/print/copies";
+import { bodyOf } from "@/lib/quiet";
 
 /**
  * A document as a PDF: its print page rendered by headless Chromium with the
@@ -35,9 +36,11 @@ const TOKEN = /^[A-Za-z0-9._~+/=-]{16,4096}$/;
 /** The API, as the person asking (their token from the cookie or the header). */
 async function ask<T>(token: string, path: string, query?: Record<string, string | undefined>): Promise<T> {
   const res = await apiFetch(path, { auth: false, headers: { authorization: `Bearer ${token}` }, query });
-  const body = await res.json().catch(() => null);
+  const body = await bodyOf<T & { error?: string }>(res);
   if (!res.ok) throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`, body ?? {});
-  return body as T;
+  // An OK answer that cannot be read is a failure, as in api.get (lib/api.ts), not a document of nothing.
+  if (body === null) throw new ApiError(502, "The server's answer could not be read");
+  return body;
 }
 
 type Target = { name: string; path: string };

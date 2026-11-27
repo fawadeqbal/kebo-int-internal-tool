@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
 import { apiFetch, SESSION_COOKIE } from "@/lib/api";
+import { bodyOf } from "@/lib/quiet";
 
 /** A platform admin's one-time link into a company at its own address: becomes a session here. */
 export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get("token") ?? "";
   const res = await apiFetch("/auth/enter", { method: "POST", auth: false, body: JSON.stringify({ token }) });
-  const body = (await res.json().catch(() => ({}))) as { token?: string; expiresInSeconds?: number; error?: string };
+  const body = (await bodyOf<{ token?: string; expiresInSeconds?: number; error?: string }>(res)) ?? {};
   if (!res.ok || !body.token)
     return new Response(body.error ?? "This link has expired. Open the company again from the platform.", {
       status: 401,

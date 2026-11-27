@@ -6,11 +6,13 @@ import { originOf } from "@/lib/origin";
 import { MarketingPage, type SitePlan } from "@/components/site/marketing";
 import { contactAction } from "./actions";
 import { siteLinks } from "./links";
+import { signUpOpen } from "@/app/sign-up/open";
+import { ignore } from "@/lib/quiet";
 
 type Published = { content: SiteContent; plans: SitePlan[] };
 
 async function published(): Promise<Published> {
-  const res = await apiFetch("/platform/public/site", { auth: false }).catch(() => null);
+  const res = await apiFetch("/platform/public/site", { auth: false }).catch(ignore("the published site (the default words are shown)"));
   return res?.ok ? ((await res.json()) as Published) : { content: DEFAULT_SITE, plans: [] };
 }
 
@@ -35,26 +37,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** The marketing page (<BASE_DOMAIN>): the published words and plans. Each view is counted, without cookies. */
 export default async function SitePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [sp, h, site, signUp] = await Promise.all([
-    searchParams,
-    headers(),
-    published(),
-    apiFetch("/platform/public/sign-up", { auth: false })
-      .then((r) => (r.ok ? (r.json() as Promise<{ open: boolean }>) : { open: false }))
-      .catch(() => ({ open: false })),
-  ]);
+  const [sp, h, site, open] = await Promise.all([searchParams, headers(), published(), signUpOpen()]);
   const origin = originOf(sp, h.get("referer"), "/");
   // Counted by the API (bots left out); never holds the page up.
   await apiFetch("/platform/public/visit", {
     method: "POST",
     auth: false,
     body: JSON.stringify({ path: "/", userAgent: h.get("user-agent"), origin }),
-  }).catch(() => null);
+  }).catch(ignore("counting the visit"));
   return (
     <MarketingPage
       content={site.content}
       plans={site.plans}
-      links={siteLinks(origin, signUp.open)}
+      links={siteLinks(origin, open)}
       origin={origin}
       contactAction={contactAction}
     />

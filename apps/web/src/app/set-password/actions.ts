@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import type { ActionState } from "@/lib/actions";
+import { bodyOf } from "@/lib/quiet";
 
 /** Sets the password from the emailed link, then off to sign in. The password is never sent back. */
 export async function setPasswordAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -16,7 +17,7 @@ export async function setPasswordAction(_prev: ActionState, form: FormData): Pro
     body: JSON.stringify({ token, password }),
     auth: false,
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   if (!res.ok) return { ok: false, message: body.error ?? "Could not set the password.", errors: body.fieldErrors };
   redirect(
     platform ? "/platform/login?toast=Password+set.+Sign+in." : `/login?toast=${encodeURIComponent("Your password is set. Sign in.")}`,

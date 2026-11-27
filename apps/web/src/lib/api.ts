@@ -82,7 +82,15 @@ export async function apiFetch(path: string, init: RequestInit & { query?: Query
 async function parse<T>(res: Response, platform = false): Promise<T> {
   // Empty (204, or a save that returns nothing): null. Words that are not JSON: an OK answer that cannot be read is
   // a failure (a part says "Could not load"), not "nothing" (review of #444); a refusal keeps its status.
-  const text = res.status === 204 ? "" : await res.text().catch(() => "");
+  let text = "";
+  if (res.status !== 204) {
+    try {
+      text = await res.text();
+    } catch (e) {
+      // The answer broke off: an OK one is a failure (as words that are not JSON); a refusal keeps its status.
+      if (res.ok) throw new ApiError(502, `The server's answer could not be read (${e instanceof Error ? e.message : "cut off"})`);
+    }
+  }
   let body = null;
   if (text) {
     try {

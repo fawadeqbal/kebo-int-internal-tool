@@ -30,6 +30,7 @@ import { useFileViewer, type ViewFile } from "@/components/files/viewer";
 import { EmailPanel, ShareNow, type Outgoing, type Recipient } from "@/components/send/send";
 import { emailOutAction, noteSentAction, noteSharedAction } from "@/app/(app)/send-actions";
 import { fileAttachAction, fileRemoveAction, fileUpdateAction } from "@/app/(app)/orders/files-actions";
+import { bodyOf } from "@/lib/quiet";
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -69,7 +70,7 @@ export async function uploadToOrder(
   for (const [k, v] of Object.entries(meta)) if (v) body.set(k, v);
   try {
     const res = await fetch(`/files/orders/${orderId}`, { method: "POST", body });
-    const json = (await res.json().catch(() => null)) as { id?: string; sourceId?: string; error?: string } | null;
+    const json = await bodyOf<{ id?: string; sourceId?: string; error?: string }>(res);
     if (res.ok) return { id: json?.id, sourceId: json?.sourceId };
     return { error: res.status === 413 ? "This file is too large." : (json?.error ?? `Upload failed (${res.status})`) };
   } catch {
@@ -656,7 +657,7 @@ function FileDialog({ dialog, n, tools, onClose }: { dialog: Dialog; n: number; 
                 const res = await fetch(`/files/orders/${orderId}/${f.source}/${f.sourceId}`, { method: "POST", body });
                 if (res.ok) return null;
                 return {
-                  error: ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Upload failed (${res.status})`,
+                  error: (await bodyOf(res))?.error ?? `Upload failed (${res.status})`,
                 };
               } catch {
                 return { error: "The connection dropped. Try again." };

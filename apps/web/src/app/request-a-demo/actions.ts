@@ -3,6 +3,7 @@
 import { apiFetch } from "@/lib/api";
 import { formValues, type ActionState } from "@/lib/actions";
 import { originFromForm } from "@/lib/origin";
+import { bodyOf } from "@/lib/quiet";
 
 /** The public "Request a demo" form: becomes a lead for the platform admin. */
 export async function requestDemoAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -23,7 +24,7 @@ export async function requestDemoAction(_prev: ActionState, form: FormData): Pro
       origin: originFromForm(form),
     }),
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await bodyOf(res)) ?? {};
   if (!res.ok) return { ok: false, message: body.error ?? "Could not send. Please try again.", errors: body.fieldErrors, values: v };
   return { ok: true, message: "Thank you. We will contact you within one working day to set up your demo." };
 }

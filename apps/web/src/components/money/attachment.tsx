@@ -11,6 +11,7 @@ import type { ActionState } from "@/lib/actions";
 import type { AttachedFileInfo } from "@/lib/types-money";
 import { FileChip, useFileTools } from "@/components/files/file-tools";
 import { VIEWABLE } from "@/lib/format";
+import { bodyOf } from "@/lib/quiet";
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
@@ -25,7 +26,7 @@ export async function uploadFile(url: string, file: File): Promise<string | null
     const res = await fetch(url, { method: "POST", body });
     if (res.ok) return null;
     if (res.status === 413) return "This file is too large.";
-    return ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `Upload failed (${res.status})`;
+    return (await bodyOf(res))?.error ?? `Upload failed (${res.status})`;
   } catch {
     return "The connection dropped. Try again.";
   }

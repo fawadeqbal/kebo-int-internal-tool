@@ -31,7 +31,8 @@ const usersOf = cache(() => api.get<UserRow[]>("/users"));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const u = (await usersOf().catch(() => [] as UserRow[])).find((x) => x.id === id);
+  // The tab's title only (the page itself says when the people cannot be read).
+  const u = dataOf(await part("the person's name for the tab", () => usersOf()))?.find((x) => x.id === id);
   return { title: u?.name ?? "Person" };
 }
 

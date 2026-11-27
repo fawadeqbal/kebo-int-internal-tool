@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { api, SESSION_COOKIE } from "@/lib/api";
 import { withChromium } from "@/app/pdf/render";
 import { attempt, formBody, formValues, reasonOf, type ActionState } from "@/lib/actions";
+import { dataOf, part } from "@/lib/part";
 import type { DealDetail } from "@/lib/types";
 import { LOST_REASON_LABEL, SENT_VIA_TEXT, type LostReason, type SentVia, type ShareVia } from "@kebo/shared";
 import type { NewQuotationsResult, QuotationView, QuoteOffers } from "@/lib/types-deals";
@@ -70,7 +71,8 @@ export async function deleteDraftAction(dealId: string, quotationId: string, rev
   const r = await attempt(null, () => api.delete(`/revisions/${revisionId}`), "Draft deleted.");
   if (!r.ok) return r;
   refresh(dealId);
-  const left = await api.get<QuotationView>(`/inquiries/${dealId}/quotation`).catch(() => null);
+  // Where to go: not read (logged), the inquiry's list of quotations.
+  const left = dataOf(await part("the quotations left", () => api.get<QuotationView>(`/inquiries/${dealId}/quotation`)));
   redirect(left?.quotations.some((q) => q.id === quotationId) ? `/inquiries/${dealId}/quotations/${quotationId}` : `/inquiries/${dealId}/quotation`);
 }
 
@@ -108,7 +110,8 @@ export async function moveRevisionAction(dealId: string, revisionId: string, _pr
   refresh(dealId);
   const name = revisionName(r.data as RevisionAnswer);
   if (v.to === "accepted") {
-    const deal = await api.get<DealDetail>(`/inquiries/${dealId}`).catch(() => null);
+    // The new order, for its link: not read (logged), the note says it was accepted without one.
+    const deal = dataOf(await part("the new order", () => api.get<DealDetail>(`/inquiries/${dealId}`)));
     const order = deal?.orders.find((o) => o.status !== "cancelled");
     if (order) {
       revalidatePath(`/orders/${order.id}`, "layout");

@@ -236,7 +236,7 @@ async function Body({
       const chip: CustomerChip = (CUSTOMER_CHIPS as readonly string[]).includes(sp.chip ?? "") ? (sp.chip as CustomerChip) : "all";
       const [d, sPart] = await Promise.all([loadCustomers(p, today), seeMoney ? spendingOf(p) : null]);
       const s = dataOf(sPart);
-      const failed = failedWhat(sPart);
+      const failed = failedWhat(sPart, ...d.failedParts);
       const spent = s ? new Map(s.customers.map((x) => [x.customer.id, Number(x.spent)])) : null;
       return (
         <>

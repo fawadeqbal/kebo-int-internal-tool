@@ -18,6 +18,7 @@ export const customerOf = cache((id: string) => load(() => api.get<CustomerDetai
 export const customerPaymentsOf = cache((id: string) => part("their payments", () => api.get<CustomerPayments>("/payments", { customerId: id })));
 
 export const supplierOf = cache((id: string) => load(() => api.get<SupplierDetail>(`/factories/${id}`)));
-/** What we still owe this supplier (Finance › Payables, one row per supplier and currency). */
-export const supplierPayablesOf = cache(async (id: string) => (await api.get<Payable[]>("/money/payables", { factory: id }).catch(() => [] as Payable[])) ?? []);
-export const partyNotesOf = cache((kind: "customers" | "factories", id: string) => api.get<Note[]>(`/${kind}/${id}/notes`).catch(() => [] as Note[]));
+/** What we still owe this supplier (Finance › Payables, one row per supplier and currency); a Failed: not read, and the tab says so. */
+export const supplierPayablesOf = cache((id: string) => part("what we still owe them", () => api.get<Payable[]>("/money/payables", { factory: id })));
+/** The record's notes and calls; a Failed: not read, and the list says so (never "No notes yet"). */
+export const partyNotesOf = cache((kind: "customers" | "factories", id: string) => part("the notes", () => api.get<Note[]>(`/${kind}/${id}/notes`)));
