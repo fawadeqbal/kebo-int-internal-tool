@@ -28,18 +28,18 @@ export const isOldPhone = (headers: NamedRequest["headers"]): boolean =>
   isMobileApp(String(headers["user-agent"] ?? "")) && headers["x-names"] !== "supplier";
 
 /**
- * Old names on the way in, from anyone: a field in the body or a name in the address's query that still says
- * `factoryId` is read as `supplierId`. Phone apps installed before the change send them, and so does the web
- * for the moments of a deploy when the old web still runs beside the new API (an unknown name would be dropped
- * without a word). On the way out, only an old phone app gets the old names beside the new ones.
+ * For the release that changes the names, the API speaks both: an old name in a body or in a query is read as
+ * the new one, and every answer carries the old name beside each new one. Phone apps installed before the change
+ * need both for good. The web needs them for the moments of a deploy when the old web still runs beside the new
+ * API: it would read a form's fields as empty and save them empty, and its own `factoryId` would be dropped
+ * without a word. Once the release is out, the answers' old names are for old phone apps only (the next change).
  */
 export function oldNames() {
   return (req: NamedRequest, res: NamedResponse, next: () => void) => {
-    const phone = isOldPhone(req.headers);
     if (req.body !== undefined && req.body !== null && typeof req.body === "object") {
       req.bodyAsSent = req.body;
       // An old phone app sets the name it knows and sends the other back as it got it: its own name is the one meant.
-      req.body = withNewNames(req.body, phone ? "old" : "new");
+      req.body = withNewNames(req.body, isOldPhone(req.headers) ? "old" : "new");
     }
     const at = req.url.indexOf("?");
     if (at >= 0 && /factor(?:y|ies)/i.test(req.url.slice(at))) {
@@ -48,10 +48,8 @@ export function oldNames() {
       for (const [key, v] of query) renamed.append(newName(key), v);
       req.url = `${req.url.slice(0, at)}?${renamed.toString()}`;
     }
-    if (phone) {
-      const json = res.json.bind(res);
-      res.json = (body: unknown) => json(withOldNamesToo(body));
-    }
+    const json = res.json.bind(res);
+    res.json = (body: unknown) => json(withOldNamesToo(body));
     next();
   };
 }

@@ -31,7 +31,7 @@ export function configureApp(app: INestApplication, env: Env) {
   // Room for the company stamp image in the settings (a data URL of up to ~400 KB).
   // The browser's Content-Security-Policy reports come as JSON of their own types (POST /api/telemetry/csp).
   (app as NestExpressApplication).useBodyParser("json", { limit: "1mb", type: ["application/json", "application/csp-report", "application/reports+json"] });
-  // Old field names are still read (old phone apps; the old web during a deploy), after the body is parsed.
+  // "Factory" names are still read, and answered beside the new ones (see oldNames), after the body is parsed.
   app.use(oldNames());
   app.enableCors({ origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false, credentials: true });
   app.useGlobalFilters(new ErrorFilter());

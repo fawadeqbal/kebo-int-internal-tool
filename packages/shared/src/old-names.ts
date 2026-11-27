@@ -10,15 +10,19 @@
  */
 import { RENAMED } from "./old-names.renamed";
 
-/** The names that changed, both ways. A Map: a key such as "constructor" is not a name that changed. */
-const NEW_OF = new Map(Object.entries(RENAMED));
-const OLD_OF = new Map(Object.entries(RENAMED).map(([old, now]) => [now, old]));
+/**
+ * The names that changed, both ways. Built on first use (a page that never reads an old name does not carry the
+ * list). Maps: a key such as "constructor" is not a name that changed.
+ */
+let lists: { newOf: Map<string, string>; oldOf: Map<string, string> } | undefined;
+const names = () =>
+  (lists ??= { newOf: new Map(Object.entries(RENAMED)), oldOf: new Map(Object.entries(RENAMED).map(([old, now]) => [now, old])) });
 
 /** `factoryId` → `supplierId`. A name that did not change comes back as it is. */
-export const newName = (key: string): string => NEW_OF.get(key) ?? key;
+export const newName = (key: string): string => names().newOf.get(key) ?? key;
 
 /** `supplierId` → `factoryId`: what a phone app from before the change calls it. `supplierCode` stays: it was always that. */
-export const oldName = (key: string): string => OLD_OF.get(key) ?? key;
+export const oldName = (key: string): string => names().oldOf.get(key) ?? key;
 
 /** A list of field names saved before the change (the history's "what changed"). */
 export const newNames = (keys: readonly string[]): string[] => keys.map(newName);
@@ -30,32 +34,40 @@ const plain = (v: unknown): v is Record<string, unknown> => {
   return proto === Object.prototype || proto === null;
 };
 
+/** JSON deeper than this is not ours (a body of 5,000 nested lists is somebody's test): it is left as it is. */
+const DEEPEST = 64;
+
 /**
  * Old names read as new ones, all the way down. When a thing carries both spellings of one name, `wins` says
  * which value is kept: "new" for saved JSON; "old" for a body from an old phone app, which sets only the name it
  * knows and sends the other back as it got it.
  */
-export function withNewNames<T>(value: T, wins: "new" | "old" = "new"): T {
-  if (Array.isArray(value)) return value.map((v) => withNewNames(v, wins)) as T;
+export function withNewNames<T>(value: T, wins: "new" | "old" = "new", depth = 0): T {
+  if (depth > DEEPEST) return value;
+  if (Array.isArray(value)) return value.map((v) => withNewNames(v, wins, depth + 1)) as T;
   if (!plain(value)) return value;
   const entries: [string, unknown][] = [];
   for (const [key, v] of Object.entries(value)) {
     const to = newName(key);
     if (wins === "new" && to !== key && Object.hasOwn(value, to)) continue; // its new twin is here: that one is kept
-    if (wins === "old" && to === key && Object.hasOwn(value, oldName(key)) && oldName(key) !== key) continue; // its old twin is here
-    entries.push([to, withNewNames(v, wins)]);
+    if (wins === "old" && to === key && oldName(key) !== key && Object.hasOwn(value, oldName(key))) continue; // its old twin is here
+    entries.push([to, withNewNames(v, wins, depth + 1)]);
   }
   // fromEntries defines each key as the object's own (a key named __proto__ is data here, never a prototype).
   return Object.fromEntries(entries) as T;
 }
 
-/** Every new name with its old twin beside it, all the way down (an answer for an old phone app). */
-export function withOldNamesToo<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(withOldNamesToo) as T;
+/**
+ * Every new name with its old twin beside it, all the way down: an answer, or a row saved, that code from before
+ * the change can still read (an old phone app; the old web or a rolled-back API in the days around the change).
+ */
+export function withOldNamesToo<T>(value: T, depth = 0): T {
+  if (depth > DEEPEST) return value;
+  if (Array.isArray(value)) return value.map((v) => withOldNamesToo(v, depth + 1)) as T;
   if (!plain(value)) return value;
   const entries: [string, unknown][] = [];
   for (const [key, v] of Object.entries(value)) {
-    const w = withOldNamesToo(v);
+    const w = withOldNamesToo(v, depth + 1);
     entries.push([key, w]);
     const old = oldName(key);
     if (old !== key && !Object.hasOwn(value, old)) entries.push([old, w]);

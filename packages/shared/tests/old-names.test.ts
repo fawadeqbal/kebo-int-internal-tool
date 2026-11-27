@@ -94,11 +94,26 @@ describe("old names: JSON saved before the rename, and phone apps installed befo
     expect(Object.getPrototypeOf(withOldNamesToo(body))).toBe(Object.prototype);
   });
 
+  it("JSON nested deeper than anything of ours is left as it is, not walked to the bottom", () => {
+    const deep = JSON.parse("[".repeat(5000) + "]".repeat(5000)) as unknown;
+    expect(() => withNewNames(deep)).not.toThrow();
+    expect(() => withOldNamesToo(deep)).not.toThrow();
+    // Sixty levels down a name is still read; a hundred down it is not ours.
+    const nest = (levels: number): unknown => (levels ? { in: nest(levels - 1) } : { factoryId: "f1" });
+    const leaf = (v: unknown): unknown => (v && typeof v === "object" && "in" in v ? leaf((v as { in: unknown }).in) : v);
+    expect(leaf(withNewNames(nest(60)))).toEqual({ supplierId: "f1" });
+    expect(leaf(withNewNames(nest(100)))).toEqual({ factoryId: "f1" });
+  });
+
   it("settings saved before the rename keep their values", () => {
     // Settings › Sales as every company's row holds it today: with the old names, and not the defaults.
     const read = readSettings({ sales: { factoryAdvancePercent: 40, factoryTaxIncluded: true, factoryTaxRate: 13 } });
     expect(read.sales).toMatchObject({ supplierAdvancePercent: 40, supplierTaxIncluded: true, supplierTaxRate: 13 });
     // Saved again with today's names, and read again: the same.
     expect(readSettings({ sales: read.sales }).sales).toEqual(read.sales);
+    // As the API saves a group for now: both names, so the code from before the change reads its own.
+    const saved = withOldNamesToo(read.sales) as Record<string, unknown>;
+    expect(saved).toMatchObject({ supplierAdvancePercent: 40, factoryAdvancePercent: 40, supplierTaxRate: 13, factoryTaxRate: 13 });
+    expect(readSettings({ sales: saved }).sales).toEqual(read.sales);
   });
 });

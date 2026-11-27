@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { readSettings, SETTINGS, type Settings, type SettingsKey } from "@kebo/shared";
+import { readSettings, SETTINGS, type Settings, type SettingsKey, withOldNamesToo } from "@kebo/shared";
 import type { Prisma } from "@kebo/database";
 import { PrismaService } from "../../database/prisma.service";
 import { AuditService } from "../../common/audit/audit.service";
@@ -134,8 +134,9 @@ export class SettingsService {
     await this.prisma.tx(async (tx) => {
       await tx.setting.upsert({
         where: { companyId_key: { companyId: user.companyId, key } },
-        create: { key, value: stored as Prisma.InputJsonValue },
-        update: { value: stored as Prisma.InputJsonValue },
+        // Both names for now: if the deploy falls back, the API from before the change still reads the group.
+        create: { key, value: withOldNamesToo(stored) as Prisma.InputJsonValue },
+        update: { value: withOldNamesToo(stored) as Prisma.InputJsonValue },
       });
       await this.audit.record(tx, {
         userId: user.id,

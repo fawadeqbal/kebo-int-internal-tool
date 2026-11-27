@@ -51,11 +51,12 @@ describe("rows saved before the rename are read with today's names", () => {
       const row = await prisma.db.moneySubmission.findUniqueOrThrow({ where: { id: sent.id } });
       const { supplierId, ...rest } = row.body as Record<string, unknown>;
       expect(supplierId).toBe(supplier.id);
-      await prisma.db.moneySubmission.update({ where: { id: sent.id }, data: { body: { ...rest, factoryId: supplierId } as object } });
+      // Saved today it carries both names, so the API from before the change could still read it after a fallback.
+      expect(rest.factoryId).toBe(supplier.id);
+      await prisma.db.moneySubmission.update({ where: { id: sent.id }, data: { body: rest as object } });
     });
     const shown = (await api(app, manager).get(`/submissions/${sent.id}`).expect(200)).body as { body: Record<string, unknown> };
     expect(shown.body.supplierId).toBe(supplier.id);
-    expect("factoryId" in shown.body).toBe(false);
     await api(app, manager).post(`/submissions/${sent.id}/approve`).expect(200);
     const saved = await inCompany(() => prisma.db.expense.findFirstOrThrow({ where: { description }, select: { supplierId: true } }));
     expect(saved.supplierId).toBe(supplier.id);

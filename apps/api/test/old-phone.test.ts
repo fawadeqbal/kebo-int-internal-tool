@@ -11,8 +11,9 @@ import { PrismaService } from "../src/database/prisma.service";
 
 /**
  * A phone app installed before "factory" became "supplier" in the API's field names (27 Nov 2026) still
- * sends `factoryId` and reads `factoryTotal`. It is known by Dart's own user agent; the API reads its
- * old names as the new ones and answers with both (src/common/names/old-names.ts).
+ * sends `factoryId` and reads `factoryTotal`. The API reads old names as the new ones and answers with both
+ * (src/common/names/old-names.ts); for the release that changes the names it does so for everyone, because the
+ * old web runs beside the new API for a moment during the deploy.
  */
 describe("a phone app from before the rename keeps working", () => {
   let app: INestApplication;
@@ -99,7 +100,7 @@ describe("a phone app from before the rename keeps working", () => {
     expect(asked.factoryQuoteId).toBe(made.id);
   });
 
-  it("the web's old names are read too (an old web beside the new API, during a deploy); its answers carry the new names only", async () => {
+  it("the web's old names are read too, and its answers carry both (an old web beside the new API, during a deploy)", async () => {
     const extra = (
       await api(app, sana)
         .post("/factories", { name: `Deploy Window ${tag}` })
@@ -110,20 +111,27 @@ describe("a phone app from before the rename keeps working", () => {
       .expect(201);
     const list = (await api(app, sana).get(`/inquiries/${inquiryId}/factory-requests`).expect(200)).body;
     expect((list.items as { factory: { id: string } }[]).some((r) => r.factory.id === extra)).toBe(true);
+    // What the old web reads to fill a form is there under the name it knows, so it does not save it back empty.
     const sourcing = (await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body;
     const offer = (sourcing.quotes as Record<string, unknown>[])[0]!;
     expect(offer.supplierTotal).toBe("42000.00");
-    expect("factoryTotal" in offer).toBe(false);
+    expect(offer.factoryTotal).toBe("42000.00");
   });
 
-  it("a newer phone app that says it knows the new names is treated like the web", async () => {
-    const res = await request(app.getHttpServer())
-      .get(`/api/inquiries/${inquiryId}/sourcing`)
+  it("an uploaded form's old field name is read too: an offer's file stays on the offer", async () => {
+    const offerId = ((await api(app, sana).get(`/inquiries/${inquiryId}/sourcing`).expect(200)).body.quotes as { id: string }[])[0]!.id;
+    await request(app.getHttpServer())
+      .post(`/api/inquiries/${inquiryId}/files`)
       .set("authorization", `Bearer ${sana}`)
-      .set("user-agent", DART)
-      .set("x-names", "supplier")
-      .expect(200);
-    expect("factoryTotal" in (res.body.quotes as Record<string, unknown>[])[0]!).toBe(false);
+      .field("kind", "factory_quote")
+      .field("factoryQuoteId", offerId)
+      .attach("file", Buffer.from("%PDF-1.4 supplier offer"), { filename: "Ruian quote.pdf", contentType: "application/pdf" })
+      .expect(201);
+    const offer = (await api(app, sana).get(`/factory-quotes/${offerId}`).expect(200)).body as { files: { fileName: string }[] };
+    expect(offer.files.map((f) => f.fileName)).toEqual(["Ruian quote.pdf"]);
+    // Not among the deal's own documents, which people who do not see supplier prices can open.
+    const deal = (await api(app, sana).get(`/inquiries/${inquiryId}`).expect(200)).body as { files?: unknown[]; attachments?: unknown[] };
+    expect(deal.files ?? deal.attachments ?? []).toEqual([]);
   });
 
   it("a money save it repeats is known as the same save: by the body as the phone sent it", async () => {
@@ -188,7 +196,7 @@ describe("a phone app from before the rename keeps working", () => {
       asSent: { factoryIds: ["f1"], supplierQuoteId: "as it got it", factoryQuoteId: "edited" },
       sent: { supplierId: "f1", factoryId: "f1" },
     });
-    // Anyone else: old names in are read (new wins when both are there); the answer is left alone.
+    // Anyone else: old names in are read (new wins when both are there); the answer carries both too, for now.
     expect(
       run({ "user-agent": "Mozilla/5.0" }, "/api/expenses?factoryId=f1", {
         factoryIds: ["f1"],
@@ -199,7 +207,7 @@ describe("a phone app from before the rename keeps working", () => {
       url: "/api/expenses?supplierId=f1",
       body: { supplierIds: ["f1"], supplierQuoteId: "new" },
       asSent: { factoryIds: ["f1"], supplierQuoteId: "new", factoryQuoteId: "old" },
-      sent: { supplierId: "f1" },
+      sent: { supplierId: "f1", factoryId: "f1" },
     });
   });
 });
