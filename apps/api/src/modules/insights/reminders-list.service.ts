@@ -13,6 +13,7 @@ import {
   sectionReminders,
   LEFT_STATUSES,
   shipmentLeft,
+  orderTabPath,
 } from "@kebo/shared";
 import { addDays, daysBetween, type ISODate } from "@kebo/utils";
 import { PrismaService } from "../../database/prisma.service";
@@ -382,7 +383,7 @@ export class RemindersListService {
             title: `${o.refNo}: ${r.text}`,
             detail: `${ORDER_TAB_LABEL[r.tab]} · ${late} day${late === 1 ? "" : "s"} late`,
             due: r.due,
-            href: `/orders/${o.id}/${r.tab}`,
+            href: `/orders/${o.id}/${orderTabPath(r.tab)}`,
             action: "Open",
             who: nameOf(o.inquiry.assignee),
           });

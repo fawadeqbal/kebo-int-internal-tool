@@ -6,7 +6,7 @@ const id = "3f2b6a1e-9c4d-4e8f-a1b2-c3d4e5f60718";
 /** Remove this payment: the web takes only the addresses the API gives out (lib/void-path.ts). */
 describe("the addresses that remove a payment", () => {
   it("takes every one the API names (treasury's voidPath), supplier payments' new address included", () => {
-    for (const base of ["/payments", "/customer-credits", "/supplier-payments", "/expenses", "/money/transfers"])
+    for (const base of ["/payments", "/customer-receipts", "/customer-credits", "/supplier-payments", "/expenses", "/money/transfers"])
       expect(isVoidPath(`${base}/${id}/void`), base).toBe(true);
   });
 
