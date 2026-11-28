@@ -19,6 +19,11 @@ describe("the order page in one read", () => {
   let app: INestApplication;
   const people: Record<string, string> = {};
   let orders: { id: string; refNo: string }[] = [];
+  let featuresBefore: string[] = [];
+  const features = async (off: string[]) => {
+    await app.get(PrismaService).platform.company.update({ where: { id: FIRST_COMPANY_ID }, data: { featuresOff: off } });
+    app.get(CompaniesService).forget(FIRST_COMPANY_ID);
+  };
   // The web asks with the new names only (lib/api.ts); the old endpoints are asked the same way.
   const get = (who: string, path: string) => api(app, people[who]).get(path).set("x-names", "supplier.2");
 
@@ -43,9 +48,9 @@ describe("the order page in one read", () => {
 
   beforeAll(async () => {
     app = await startApp();
-    // Every feature on, so the costs part is read too (managers with the expenses feature).
-    await app.get(PrismaService).platform.company.update({ where: { id: FIRST_COMPANY_ID }, data: { featuresOff: [] } });
-    app.get(CompaniesService).forget(FIRST_COMPANY_ID);
+    // Every feature on, so the costs part is read too (managers with the expenses feature); put back afterwards.
+    featuresBefore = (await app.get(PrismaService).platform.company.findUniqueOrThrow({ where: { id: FIRST_COMPANY_ID } })).featuresOff;
+    await features([]);
     people.manager = await signIn(app, "manager@example.com", "Manager@12345");
     people.admin = await signIn(app, "admin@example.com", "Admin@12345");
     people.staff = await signIn(app, "bilal@example.com");
@@ -60,6 +65,7 @@ describe("the order page in one read", () => {
     expect(orders.length).toBeGreaterThan(1);
   });
   afterAll(async () => {
+    if (app) await features(featuresBefore);
     await app?.close();
   });
 
@@ -97,6 +103,17 @@ describe("the order page in one read", () => {
       if (who === "staff") expect([notTheirs > 0, refused > 0]).toEqual([true, true]);
     }, 60_000);
   }
+
+  it("with the expenses feature off, a manager's costs part is left out, as its endpoint refuses it", async () => {
+    const { id } = orders[0]!;
+    await features(["expenses"]);
+    try {
+      await get("manager", `/orders/${id}/costs`).expect(403);
+      expect(((await get("manager", `/orders/${id}/page`).expect(200)).body as Page).costs).toBeNull();
+    } finally {
+      await features([]);
+    }
+  });
 
   it("an order that is not there is the page's 404", async () => {
     await get("manager", "/orders/00000000-0000-4000-8000-000000000000/page").expect(404);

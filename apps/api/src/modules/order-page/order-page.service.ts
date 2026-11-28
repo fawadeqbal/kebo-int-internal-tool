@@ -1,5 +1,5 @@
 import { HttpException, Injectable, Logger } from "@nestjs/common";
-import { followUpListQuery } from "@kebo/shared";
+import { followUpListQuery, isFailed, type Failed } from "@kebo/shared";
 import { ForbiddenError, NotFoundError } from "@kebo/utils";
 import type { SessionUser } from "../../common/auth/session-user";
 import { OrdersService } from "../orders/orders.service";
@@ -14,10 +14,11 @@ import { FollowUpsService } from "../notes/follow-ups.service";
 import { UsersService } from "../users/users.service";
 import { CustomersService } from "../parties/customers.service";
 
-/** A part that could not be read: logged here, and said in its place on the page ("Could not load …"). */
-export type FailedPart = { readonly failed: true; readonly what: string };
-/** A part: what its own endpoint answers; null when this person may not see it (that endpoint's 403 or 404). */
-type Part<T> = T | null | FailedPart;
+/**
+ * A part: what its own endpoint answers; null when this person may not see it (that endpoint's 403 or 404); a
+ * Failed (@kebo/shared) when it could not be read: logged here, and said in its place on the page ("Could not load").
+ */
+type Part<T> = T | null | Failed;
 
 /** Not this person's to see: the endpoint would answer 403 or 404. */
 const notTheirs = (e: unknown) =>
@@ -67,15 +68,14 @@ export class OrderPageService {
       }
     };
     const readOnce = <T>(p: Part<T>): T | undefined => (p === null || isFailed(p) ? undefined : p);
-    // Read once, given to the parts that need them too (a failed one is read again there, and fails in its place).
-    const [money, papers] = await Promise.all([
-      part("the money", () => this.money.forOrder(user, id)),
-      part("the papers", () => this.papers.list(user, id)),
-    ]);
+    // Every part starts at once. The money and the papers are read once and given to the two parts that need them
+    // too (the stages' words, the files), which start when those are in; a failed one is read again there.
+    const money = part("the money", () => this.money.forOrder(user, id));
+    const papers = part("the papers", () => this.papers.list(user, id));
     const [sections, flow, files, costs, notes, purchaseOrders, followUps, customer, people] = await Promise.all([
-      part("where each stage stands", () => this.sections.view(user, id, { money: readOnce(money) })),
+      money.then((m) => part("where each stage stands", () => this.sections.view(user, id, { money: readOnce(m) }))),
       part("the flow", () => this.flow.get(user, id)),
-      part("the files", () => this.files.list(user, id, { papers: readOnce(papers) })),
+      papers.then((p) => part("the files", () => this.files.list(user, id, { papers: readOnce(p) }))),
       part("the costs", () => this.costs.forOrder(user, id)),
       part("the notes", () => this.notes.list(user, "order", id)),
       part("the purchase orders", () => this.flow.purchaseOrders(user, id)),
@@ -83,9 +83,19 @@ export class OrderPageService {
       part("the customer's contacts", async () => (await this.customers.get(user, order.customer.id)).contacts),
       part("the people to tell", () => this.users.people()),
     ]);
-    return { order, sections, flow, files, money, costs, papers, notes, purchaseOrders, followUps, customerContacts: customer, people };
+    return {
+      order,
+      sections,
+      flow,
+      files,
+      money: await money,
+      costs,
+      papers: await papers,
+      notes,
+      purchaseOrders,
+      followUps,
+      customerContacts: customer,
+      people,
+    };
   }
 }
-
-const isFailed = (v: unknown): v is FailedPart =>
-  !!v && typeof v === "object" && (v as { failed?: unknown }).failed === true && typeof (v as { what?: unknown }).what === "string";

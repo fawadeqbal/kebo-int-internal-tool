@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { api, ApiError } from "./api";
 import { load } from "./session";
-import { isFailed, type Failed } from "./failed";
+import { isFailed, type Failed } from "@kebo/shared";
 import type { OrderCosts, OrderMoney } from "./types-money";
 import type { OrderView, PaymentsView } from "./types-orders";
 import type { OrderDefaults, OrderFlow } from "./types-flow";
@@ -24,7 +24,7 @@ export interface OrderPurchaseOrders {
 type PagePart<T> = T | null | Failed;
 
 /** GET /orders/:id/page: the order, and each other part as its own endpoint answers it for this person. */
-export interface OrderPage {
+export interface OrderPageRead {
   order: OrderView;
   sections: PagePart<OrderSectionsView>;
   flow: PagePart<OrderFlow>;
@@ -45,12 +45,12 @@ export interface OrderPage {
  * (GET /orders/:id/page) instead of one per part, each loading the order again (architecture review 27 Nov). The
  * readers below take their part from it, so a layout, a tab and a card asking for the same part make no new call.
  *
- * Pages elsewhere that need one part of an order (a payment, a purchase order, money due) read only that part:
- * orderAloneOf, orderMoneyAloneOf, orderFilesAloneOf.
+ * A purchase order's page reads it too (it shows the order's stage data). Pages elsewhere that need one part of an
+ * order (a payment, a new payment, money due) read only that part: orderAloneOf, orderMoneyAloneOf.
  */
-export const orderPageOf = cache((id: string) => api.get<OrderPage>(`/orders/${id}/page`));
+export const orderPageOf = cache((id: string) => api.get<OrderPageRead>(`/orders/${id}/page`));
 
-type Part = Exclude<keyof OrderPage, "order">;
+type Part = Exclude<keyof OrderPageRead, "order">;
 
 /**
  * One part of the page's read, answered the way its own endpoint was: its data; an ApiError 403 when this person
@@ -58,11 +58,11 @@ type Part = Exclude<keyof OrderPage, "order">;
  * (part() says "Could not load" in its place; optional() goes on to the error page, as before). When the whole read
  * fails (the order is not theirs, the server is down), every part fails the same way.
  */
-async function partOf<K extends Part>(id: string, key: K): Promise<Exclude<OrderPage[K], null | Failed>> {
+async function partOf<K extends Part>(id: string, key: K): Promise<Exclude<OrderPageRead[K], null | Failed>> {
   const p = (await orderPageOf(id))[key];
   if (p === null) throw new ApiError(403, "Not there for this person");
   if (isFailed(p)) throw new ApiError(500, `The order page could not read ${p.what}`, { code: "part_failed" });
-  return p as Exclude<OrderPage[K], null | Failed>;
+  return p as Exclude<OrderPageRead[K], null | Failed>;
 }
 
 /** The order (its 404 and 403 are the page's: not found, or the forbidden page). */
@@ -80,7 +80,7 @@ export const orderFilesOf = cache((id: string) => partOf(id, "files"));
 export const orderSectionsOf = cache((id: string) => partOf(id, "sections"));
 /** The order's notes, newest first. */
 export const orderNotesOf = cache((id: string) => partOf(id, "notes"));
-/** The order's purchase orders (people who handle sourcing). */
+/** The order's purchase orders (one per supplier on its lines) and the deposit they wait for. */
 export const orderPurchaseOrdersOf = cache((id: string) => partOf(id, "purchaseOrders"));
 /** The order's open follow-ups. */
 export const orderOpenFollowUpsOf = cache((id: string) => partOf(id, "followUps"));
@@ -97,4 +97,3 @@ export const orderDefaultsOf = cache((id: string) => api.get<OrderDefaults>(`/or
 /* Pages elsewhere than the order's own: one endpoint each, not the order page's whole read. */
 export const orderAloneOf = cache((id: string) => load(() => api.get<OrderView>(`/orders/${id}`)));
 export const orderMoneyAloneOf = cache((id: string) => api.get<OrderMoney>(`/orders/${id}/money`));
-export const orderFilesAloneOf = cache((id: string) => api.get<OrderFiles>(`/orders/${id}/files`));
