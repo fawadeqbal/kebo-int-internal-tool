@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
 import { can } from "@kebo/shared";
-import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { orderFlowOf, orderMoneyOf, orderOf } from "@/lib/order-data";
-import { getPeople } from "@/lib/loaders";
+import { orderFlowOf, orderMoneyOf, orderNotesOf, orderOf, orderOpenFollowUpsOf, orderPeopleOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date, money } from "@/lib/format";
-import type { FollowUpList, Note } from "@/lib/types-notes";
 import { dueText } from "@/components/notes/kinds";
 import { today } from "@/components/orders/today";
 import { keyDates, orderPeople } from "@/components/orders/order-facts";
@@ -30,9 +27,9 @@ export async function OrderSide({ id }: { id: string }) {
   const [flow, m, notes, followUps, peoplePart] = await Promise.all([
     optional(() => orderFlowOf(id)),
     can(me, "sourcing.manage") ? optional(() => orderMoneyOf(id)) : Promise.resolve(null),
-    optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
-    optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id, open: "true" })),
-    part("the people to tell", () => getPeople()),
+    optional(() => orderNotesOf(id)),
+    optional(() => orderOpenFollowUpsOf(id)),
+    part("the people to tell", () => orderPeopleOf(id)),
   ]);
   const people = dataOf(peoplePart) ?? [];
   // The parts that could not be read, said once at the top (the rest works).

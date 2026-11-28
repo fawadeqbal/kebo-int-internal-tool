@@ -2,11 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { can } from "@kebo/shared";
 import { requireUser } from "@/lib/session";
-import { orderCostsOf, orderMoneyOf, orderOf } from "@/lib/order-data";
+import { orderCostsOf, orderMoneyOf, orderOf, orderPeopleOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import type { CostSetup } from "@/components/money/cost-window";
 import { today } from "./today";
-import { getSettings, getPeople } from "@/lib/loaders";
+import { getSettings } from "@/lib/loaders";
 
 /**
  * The order's costs and what its cost window needs, for managers with the
@@ -17,7 +17,7 @@ export const orderCostsSetup = cache(async (id: string) => {
   if (!can(me, "expenses.manage")) return null;
   const costs = await optional(() => orderCostsOf(id));
   if (!costs) return null;
-  const [settings, people, m, o] = await Promise.all([getSettings(), optional(getPeople), optional(() => orderMoneyOf(id)), optional(() => orderOf(id))]);
+  const [settings, people, m, o] = await Promise.all([getSettings(), optional(() => orderPeopleOf(id)), optional(() => orderMoneyOf(id)), optional(() => orderOf(id))]);
   const suppliers = new Map<string, string>();
   for (const r of m?.suppliers?.rows ?? []) suppliers.set(r.supplier.id, r.supplier.name);
   const setup: CostSetup = {

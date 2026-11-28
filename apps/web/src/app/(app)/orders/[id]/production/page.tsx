@@ -1,7 +1,6 @@
 import { RULES } from "@kebo/ui";
 import { can, dayMonth, FAT_RESULT_LABEL, FAT_RESULT_TONE, FAT_RESULTS, REQUEST_CHANNEL_LABEL, REQUEST_CHANNELS } from "@kebo/shared";
-import { getPeople } from "@/lib/loaders";
-import { orderSectionsOf } from "@/lib/order-data";
+import { orderPeopleOf, orderPurchaseOrdersOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
@@ -15,8 +14,6 @@ import { PanelButton } from "@/components/orders/step-view";
 import { supplierTestAction, goodsReceivedAction, readyDateAction } from "../../section-actions";
 import { stageData } from "../stage-data";
 import { orderTitle } from "@/lib/titles";
-import { api } from "@/lib/api";
-import type { PurchaseOrderView } from "@/components/orders/purchase-order-card";
 
 export const generateMetadata = orderTitle("Production");
 
@@ -33,10 +30,10 @@ export default async function OrderProduction({ params }: { params: Promise<{ id
   const { me, o, now, defaults } = d;
   const [sections, people, edits, pos] = await Promise.all([
     orderSectionsOf(id),
-    optional(() => getPeople()),
+    optional(() => orderPeopleOf(id)),
     editsOf("order", id),
     // The supplier's own lead time and the ready date it works out to (the PO tab shows the same date).
-    optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${id}/purchase-orders`)),
+    optional(() => orderPurchaseOrdersOf(id)),
   ]);
   const canEdit = can(me, "orders.update") && d.open;
   const rows = sections.production;

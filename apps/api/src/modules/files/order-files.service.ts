@@ -131,8 +131,11 @@ export class OrderFilesService {
 
   /* ---------------------------------------------------------------- reading */
 
-  /** GET /orders/:id/files — every file, grouped, with what it is attached to and what the person may do with it. */
-  async list(user: SessionUser, orderId: string) {
+  /**
+   * GET /orders/:id/files — every file, grouped, with what it is attached to and what the person may do with it.
+   * `papers`: the order's papers when the caller has read them already for this person (the order page's one read).
+   */
+  async list(user: SessionUser, orderId: string, given: { papers?: Awaited<ReturnType<PapersService["list"]>> } = {}) {
     const o = await this.orders.load(user, orderId);
     const db = this.prisma.db;
     const open = o.status !== "cancelled";
@@ -140,7 +143,7 @@ export class OrderFilesService {
     const seeExpenses = can(user, "expenses.manage") && (await this.limits.allows("expenses"));
     const [inquiry, papers, features, attachments, offers, payments, supplierPaid, expenses, docs] = await Promise.all([
       db.inquiry.findUniqueOrThrow({ where: { id: o.inquiryId }, select: { id: true, refNo: true, assigneeId: true, createdById: true } }),
-      this.papers.list(user, orderId),
+      given.papers ?? this.papers.list(user, orderId),
       this.limits.features(),
       db.attachment.findMany({
         where: { inquiryId: o.inquiryId, deletedAt: null, supplierQuoteId: null, OR: [{ orderId: null }, { orderId }] },

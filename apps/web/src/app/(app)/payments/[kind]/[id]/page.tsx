@@ -15,7 +15,7 @@ import { AttachedFile } from "@/components/money/attachment";
 import { MoneyHero } from "@/components/money/money-hero";
 import { AgainExpense, ChangeCustomerPayment, ChangeExpense, ChangeSupplierPayment } from "@/components/money/payment-change";
 import type { ExpenseView } from "@/lib/types-money";
-import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
+import { orderMoneyAloneOf, orderAloneOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { Me } from "@/lib/session";
 import { fieldLabel, hiddenChange, shown } from "@/components/common/history-words";
@@ -344,14 +344,14 @@ async function changeOf(me: Me, p: PaymentView, expense: ExpenseView | null): Pr
   if (p.voided) return null;
   const today = companyToday();
   if (p.kind === "customer" && p.orderId) {
-    const [pays, o] = await Promise.all([orderPaymentsOf(p.orderId), orderOf(p.orderId)]);
+    const [pays, o] = await Promise.all([orderPaymentsOf(p.orderId), orderAloneOf(p.orderId)]);
     // The payment on the order this entry is (it pays that one order in full).
     const x = pays.payments.find((y) => y.id === p.partId);
     if (!x || x.receiptId || !can(me, "payments.record")) return null;
     return <ChangeCustomerPayment action={editPaymentAction.bind(null, p.orderId, x.id, o.currency, x.updatedAt)} payment={x} currency={o.currency} today={today} />;
   }
   if (p.kind === "supplier" && p.orderId) {
-    const [m, people, settings] = await Promise.all([orderMoneyOf(p.orderId), getPeople(), getSettings()]);
+    const [m, people, settings] = await Promise.all([orderMoneyAloneOf(p.orderId), getPeople(), getSettings()]);
     const f = m.suppliers;
     const x = f?.payments.find((y) => y.id === p.id);
     if (!f || !x || !f.canRecord) return null;

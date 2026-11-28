@@ -31,7 +31,7 @@ import { api } from "@/lib/api";
 import { date, money, num2 as n2 } from "@/lib/format";
 
 import { getPeople, getSettings } from "@/lib/loaders";
-import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
+import { orderMoneyAloneOf, orderAloneOf, orderPaymentsOf } from "@/lib/order-data";
 import { hasFeature, type Me } from "@/lib/session";
 import type { Receivables } from "@/lib/types-insights";
 import type { OpenBills, ToPayList } from "@/lib/types-money";
@@ -306,7 +306,7 @@ export async function CustomersOwe({ sp, me, today }: { sp: Search; me: Me; toda
 
 /** The parts of one order's plan, inside the list: the same table as on the order's Payment tab. */
 async function OrderParts({ id, me, today, back, auto }: { id: string; me: Me; today: string; back: string; auto?: "pay" }) {
-  const [o, m, p, settings] = await Promise.all([orderOf(id), orderMoneyOf(id), orderPaymentsOf(id), getSettings()]);
+  const [o, m, p, settings] = await Promise.all([orderAloneOf(id), orderMoneyAloneOf(id), orderPaymentsOf(id), getSettings()]);
   const c = o.currency;
   // Someone who records money records it; Staff send it for a manager to verify (the same window).
   const records = can(me, "payments.record");
@@ -637,7 +637,7 @@ export async function WeOwe({ sp, me, today }: { sp: Search; me: Me; today: stri
 
 /** "Pay" on a supplier's part: the order's own Pay the supplier window, with the part filled in, open at once. */
 async function PayPart({ part, today }: { part: ToPayList["rows"][number]; today: string }) {
-  const [m, people, settings] = await Promise.all([orderMoneyOf(part.order.id), optional(getPeople), getSettings()]);
+  const [m, people, settings] = await Promise.all([orderMoneyAloneOf(part.order.id), optional(getPeople), getSettings()]);
   const owing = m.suppliers?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
   if (!m.suppliers?.canRecord || !owing.length) return null;
   return (

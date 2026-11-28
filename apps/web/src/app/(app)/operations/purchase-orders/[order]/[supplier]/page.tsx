@@ -4,8 +4,8 @@ import { ExternalLink, Printer } from "lucide-react";
 import { PAYMENT_METHOD_LABEL, RECORD_KIND, RECORD_TITLE } from "@kebo/shared";
 import { ButtonLink, StatusBadge, linkClass } from "@kebo/ui";
 import { api } from "@/lib/api";
-import { getPeople, getSettings } from "@/lib/loaders";
-import { orderFilesOf, orderMoneyOf, orderOf } from "@/lib/order-data";
+import { getSettings } from "@/lib/loaders";
+import { orderFilesOf, orderMoneyOf, orderOf, orderPeopleOf, orderPurchaseOrdersOf } from "@/lib/order-data";
 import type { OrderView } from "@/lib/types-orders";
 import { requirePermission } from "@/lib/session";
 import { optional } from "@/components/print/data";
@@ -14,7 +14,6 @@ import { PURCHASE_ORDER_STATUS, PURCHASE_ORDERS, type PurchaseOrderRow } from "@
 import { EmptySection, Section } from "@/components/order-sections/section";
 import { SectionFiles } from "@/components/order-sections/section-files";
 import { PaySupplierWindow } from "@/components/order-sections/supplier-windows";
-import type { PurchaseOrderView } from "@/components/orders/purchase-order-card";
 import { OrderLinesView } from "@/components/orders/order-lines";
 import { SidePanelCard, SideSection } from "@/components/orders/side-panel-parts";
 import { CustomerMoneyLine, SupplierPlanTable, supplierPlanWords } from "@/components/order-sections/supplier-plan";
@@ -28,8 +27,11 @@ import { RecordShell } from "@/components/records/record-frame";
 import { RecordTop } from "@/components/records/record-page";
 import { BoxNote } from "@/components/common/record-box";
 
-/** The order's purchase orders, read once per request (the page and its tab title). */
-const purchaseOrdersOf = cache((order: string) => optional(() => api.get<{ items: PurchaseOrderView[] }>(`/orders/${order}/purchase-orders`)));
+/**
+ * The order's purchase orders (the page and its tab title). Like the money, the files and the people here, they come
+ * from the order pages' one read, which stageData reads too.
+ */
+const purchaseOrdersOf = cache((order: string) => optional(() => orderPurchaseOrdersOf(order)));
 
 export async function generateMetadata({ params }: { params: Promise<{ order: string; supplier: string }> }) {
   const { order, supplier } = await params;
@@ -56,7 +58,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
     orderMoneyOf(order),
     purchaseOrdersOf(order),
     optional(() => api.get<PurchaseOrderRow[]>("/operations/purchase-orders", { all: "true", order })),
-    optional(() => getPeople()),
+    optional(() => orderPeopleOf(order)),
     getSettings(),
     optional(() => orderFilesOf(order)),
   ]);

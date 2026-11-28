@@ -6,7 +6,7 @@
     "hiddenFailure": 1,
     "handWiredWindow": 16,
     "handDate": 2,
-    "apiOutsideData": 75
+    "apiOutsideData": 71
   },
   "longFiles": [
     "components/deals/deal-form.tsx",

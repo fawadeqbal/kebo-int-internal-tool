@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, dayMonth, DELIVERY_CONDITION_LABEL, SAT_RESULT_LABEL, WARRANTY_FROM_LABEL, warrantyDates } from "@kebo/shared";
 import { Badge, RULES, linkClass, cn } from "@kebo/ui";
-import { getPeople } from "@/lib/loaders";
+import { orderPeopleOf } from "@/lib/order-data";
 import { date } from "@/lib/format";
 import { editsOf } from "@/lib/edit-data";
 import { optional } from "@/components/print/data";
@@ -34,7 +34,7 @@ export default async function OrderDelivery({ params }: { params: Promise<{ id: 
   const { me, o, flow, now } = d;
   if (!flow?.delivery) notFound();
   const dv = flow.delivery;
-  const [people, edits] = await Promise.all([optional(() => getPeople()), editsOf("order", id)]);
+  const [people, edits] = await Promise.all([optional(() => orderPeopleOf(id)), editsOf("order", id)]);
   const canEdit = can(me, "delivery.manage") && d.open;
   const goodsLines = o.lines.filter((l) => l.type === "goods");
   const delivered = goodsLines.filter((l) => Number(l.delivered?.qty) >= Number(l.quantity)).length;
