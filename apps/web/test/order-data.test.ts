@@ -46,6 +46,8 @@ describe("the order page's parts", () => {
   it("an order that is not there is the page's not-found; every part fails the same way", async () => {
     vi.spyOn(api, "get").mockRejectedValue(new ApiError(404, "Nothing has this number. Check the link."));
     await expect(orderOf("o1")).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+    // The order's own 404, not a part's 403.
+    await expect(orderMoneyOf("o1")).rejects.toMatchObject({ status: 404 });
     expect(await optional(() => orderMoneyOf("o1"))).toBeNull();
   });
 
