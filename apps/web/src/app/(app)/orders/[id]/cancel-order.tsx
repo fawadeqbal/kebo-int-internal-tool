@@ -1,5 +1,4 @@
-import { api } from "@/lib/api";
-import { orderMoneyOf, orderOf } from "@/lib/order-data";
+import { orderMoneyOf, orderOf, orderPurchaseOrdersOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { today } from "@/components/orders/today";
 import { cancelOrderAction } from "../actions";
@@ -11,10 +10,7 @@ import { CancelOrderForm } from "./forms";
  */
 export async function CancelOrder({ id }: { id: string }) {
   const o = await orderOf(id);
-  const [m, pos] = await Promise.all([
-    optional(() => orderMoneyOf(id)),
-    optional(() => api.get<{ items: { number: string }[] }>(`/orders/${id}/purchase-orders`)),
-  ]);
+  const [m, pos] = await Promise.all([optional(() => orderMoneyOf(id)), optional(() => orderPurchaseOrdersOf(id))]);
   const ended = [
     o.quotation ? `The quotation R${o.quotation.number} becomes \u201cvoid\u201d` : null,
     pos?.items.length ? `${pos.items.map((x) => x.number).join(", ")} ${pos.items.length === 1 ? "is" : "are"} cancelled` : null,

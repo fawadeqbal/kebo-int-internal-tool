@@ -10,7 +10,7 @@ import { date, money, companyToday, numberOnSave } from "@/lib/format";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { UUID } from "@/lib/ids";
-import { orderMoneyOf, orderOf, orderPaymentsOf } from "@/lib/order-data";
+import { orderMoneyAloneOf, orderAloneOf, orderPaymentsOf } from "@/lib/order-data";
 import { getPeople, getSettings } from "@/lib/loaders";
 import type { OrderRow } from "@/lib/types-orders";
 import { ReceiptForm, ReceivedForm } from "@/components/money/money-v2";
@@ -124,7 +124,7 @@ async function sideOf(kind: Kind, orderId: string | undefined) {
     expense: <>The expense counts on its order or inquiry; one paid from someone&rsquo;s own money is owed back to them.</>,
     transfer: <>Both accounts change at once; a transfer between currencies keeps the rate you enter.</>,
   };
-  const planPart = orderId && (kind === "in" || kind === "out") ? await part("the order's payment plan", () => orderMoneyOf(orderId)) : null;
+  const planPart = orderId && (kind === "in" || kind === "out") ? await part("the order's payment plan", () => orderMoneyAloneOf(orderId)) : null;
   // Not read: what is due on the order is not shown here, and it says so. (The form beside it reads the same plan,
   // cached once per request, so a failed plan is that page's error page as well, as before.)
   const plan = dataOf(planPart);
@@ -300,10 +300,10 @@ async function OnOrder({
       picker
     );
 
-  const [o, settings] = await Promise.all([orderOf(orderId), getSettings()]);
+  const [o, settings] = await Promise.all([orderAloneOf(orderId), getSettings()]);
   const fx = { main: settings.sales.currency, rates: settings.sales.exchangeRates };
   if (kind === "in") {
-    const [p, m] = await Promise.all([orderPaymentsOf(orderId), orderMoneyOf(orderId)]);
+    const [p, m] = await Promise.all([orderPaymentsOf(orderId), orderMoneyAloneOf(orderId)]);
     return (
       <>
         {picker}
@@ -322,7 +322,7 @@ async function OnOrder({
       </>
     );
   }
-  const [m, people] = await Promise.all([orderMoneyOf(orderId), getPeople()]);
+  const [m, people] = await Promise.all([orderMoneyAloneOf(orderId), getPeople()]);
   const owing = m.suppliers?.rows.filter((r) => Number(r.toPay) > 0) ?? [];
   return (
     <>

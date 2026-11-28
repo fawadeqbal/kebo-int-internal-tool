@@ -4,12 +4,10 @@ import { can, ORDER_TABS, orderNextStep, orderTabPath, orderStanding, RECORD_KIN
 import { ButtonLink, cn, Notice } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
-import { orderFilesOf, orderFlowOf, orderMoneyOf, orderOf, orderPapersOf, orderSectionsOf } from "@/lib/order-data";
+import { orderCustomerContactsOf, orderFilesOf, orderFlowOf, orderMoneyOf, orderOf, orderPapersOf, orderSectionsOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date } from "@/lib/format";
 import { orderName } from "@/lib/titles";
-import { api } from "@/lib/api";
-import type { CustomerDetail } from "@/lib/types-people";
 import { today } from "@/components/orders/today";
 import { MoreMenu, type MenuEntry } from "@/components/common/more-menu";
 import { RecordFrame } from "@/components/records/record-frame";
@@ -38,15 +36,15 @@ export default async function OrderLayout({ children, params }: { children: Reac
   const o = await orderOf(id);
   // Cancelling is a manager's: it sits last in ⋯, away from the everyday buttons.
   const canCancel = can(me, "orders.manage") && o.status !== "cancelled";
-  const [sections, flow, costs, files, customer] = await Promise.all([
+  const [sections, flow, costs, files, contacts] = await Promise.all([
     optional(() => orderSectionsOf(id)),
     optional(() => orderFlowOf(id)),
     orderCostsSetup(id),
     optional(() => orderFilesOf(id)),
     // Who the order's Email and Share go to: the customer's main contact (read as is: no page change if it cannot be).
-    optional(() => api.get<CustomerDetail>(`/customers/${o.customer.id}`)),
+    optional(() => orderCustomerContactsOf(id)),
   ]);
-  const contact = customer?.contacts.find((c) => c.isPrimary) ?? customer?.contacts[0] ?? null;
+  const contact = contacts?.find((c) => c.isPrimary) ?? contacts?.[0] ?? null;
   // Where the order stands, in words: the one word worked out from what is stored, then what orderStanding
   // (packages/shared) says beside it: the next two dates, or that it is paid.
   const now = today();

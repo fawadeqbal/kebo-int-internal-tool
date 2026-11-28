@@ -34,6 +34,7 @@ export * from "./schemas/sections";
 export * from "./schemas/papers";
 export * from "./schemas/notes";
 export * from "./schemas/plain-errors";
+export * from "./failed";
 export * from "./workflows/devices";
 export * from "./platform";
 export * from "./old-names";

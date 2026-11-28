@@ -13,6 +13,9 @@ import { SettingsService } from "../settings/settings.service";
 import { fxOf } from "../billing/api";
 import { factsInclude, orderFactsOf } from "./order-facts";
 
+/** The order's money as MoneyService reads it for one person. */
+type OrderMoney = Awaited<ReturnType<MoneyService["forOrder"]>>;
+
 /**
  * The order without checklists: where each stage of an order stands, read from
  * what is stored (see @kebo/shared workflows/order-sections). Nothing is kept
@@ -29,18 +32,21 @@ export class SectionsService {
     private readonly audit: AuditService,
   ) {}
 
-  /** What the suppliers are owed and paid, for people who may see supplier money (null otherwise). */
-  private async suppliersOf(user: SessionUser, orderId: string): Promise<SectionFacts["suppliers"]> {
+  /**
+   * What the suppliers are owed and paid, for people who may see supplier money (null otherwise). `money`: the
+   * order's money when the caller has read it already for this person (the order page's one read), not read twice.
+   */
+  private async suppliersOf(user: SessionUser, orderId: string, money?: OrderMoney): Promise<SectionFacts["suppliers"]> {
     if (!can(user, "sourcing.manage")) return null;
-    const m = await this.money.forOrder(user, orderId);
+    const m = money ?? (await this.money.forOrder(user, orderId));
     return m.suppliers ? m.suppliers.rows.map((r) => ({ name: r.supplier.name, currency: r.currency, owed: r.owed, paid: r.paid, toPay: r.toPay })) : [];
   }
 
   /** The order's facts: what every section's word is read from. */
-  async facts(user: SessionUser, id: string): Promise<{ status: string; facts: SectionFacts }> {
+  async facts(user: SessionUser, id: string, given: { money?: OrderMoney } = {}): Promise<{ status: string; facts: SectionFacts }> {
     const o = await this.prisma.db.order.findFirst({ where: { id, ...orderAccess(user) }, include: factsInclude });
     if (!o) throw new NotFoundError("Order");
-    const [suppliers, settings, expenses] = await Promise.all([this.suppliersOf(user, o.id), this.settings.get(), this.limits.allows("expenses")]);
+    const [suppliers, settings, expenses] = await Promise.all([this.suppliersOf(user, o.id, given.money), this.settings.get(), this.limits.allows("expenses")]);
     const facts = { ...orderFactsOf(o, suppliers, this.clock.timeZone, fxOf(settings, expenses), settings.reminders.lcCourierDays), papersOff: settings.papers.off };
     return { status: o.status, facts };
   }
@@ -50,8 +56,8 @@ export class SectionsService {
    * sentence of facts, what is still empty), and the small word beside each tab. A stage whose module
    * the company has switched off is left out.
    */
-  async view(user: SessionUser, id: string) {
-    const [{ status, facts }, features, production] = await Promise.all([this.facts(user, id), this.limits.features(), this.production(id)]);
+  async view(user: SessionUser, id: string, given: { money?: OrderMoney } = {}) {
+    const [{ status, facts }, features, production] = await Promise.all([this.facts(user, id, given), this.limits.features(), this.production(id)]);
     const on = orderSteps(features);
     const stands = stageStands(facts, this.clock.today()).filter((s) => on.includes(s.stage));
     return {

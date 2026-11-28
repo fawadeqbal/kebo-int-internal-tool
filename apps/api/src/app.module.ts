@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { SectionsModule } from "./modules/sections/sections.module";
+import { OrderPageModule } from "./modules/order-page/order-page.module";
 import { FlowModule } from "./modules/flow/flow.module";
 import { SearchModule } from "./modules/search/search.module";
 import { PapersModule } from "./modules/papers/papers.module";
@@ -44,6 +45,6 @@ import { TranslationsModule } from "./modules/translations/translations.module";
  * AuthCore (the guard every route passes through).
  */import { InsightsModule } from "./modules/insights/insights.module";
 @Module({
-  imports: [EnvModule, PrismaModule, CompaniesModule, OwnDomainModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, SectionsModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, TreasuryModule, CancellationModule, OperationsModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, SearchModule, PapersModule, TranslationsModule, OrderFilesModule, CompanyModule, PlatformModule],
+  imports: [EnvModule, PrismaModule, CompaniesModule, OwnDomainModule, LimitsModule, CommonModule, StorageModule, EventsModule, LedgerPostingModule, AuthCoreModule, HealthModule, AuthModule, SectionsModule, SettingsModule, UsersModule, PartiesModule, InquiriesModule, SourcingModule, QuotationsModule, OrdersModule, NotificationsModule, ReportsModule, HistoryModule, MoneyModule, TreasuryModule, CancellationModule, OperationsModule, ApprovalsModule, LedgerModule, NotesModule, SecurityModule, InsightsModule, FlowModule, SearchModule, PapersModule, TranslationsModule, OrderFilesModule, OrderPageModule, CompanyModule, PlatformModule],
 })
 export class AppModule {}

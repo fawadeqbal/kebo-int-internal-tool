@@ -3,9 +3,8 @@ import Link from "next/link";
 import { Mail, Printer } from "lucide-react";
 import { can, PAYMENT_METHOD_LABEL, WARRANTY_FROM_LABEL } from "@kebo/shared";
 import { ButtonLink, RefCode, RULES, linkClass, cn, Dash } from "@kebo/ui";
-import { api } from "@/lib/api";
-import { getPeople, getSettings } from "@/lib/loaders";
-import { orderMoneyOf } from "@/lib/order-data";
+import { getSettings } from "@/lib/loaders";
+import { orderMoneyOf, orderPeopleOf, orderPurchaseOrdersOf } from "@/lib/order-data";
 import { optional } from "@/components/print/data";
 import { date, dayMonth, money, plural } from "@/lib/format";
 import { OrderPage } from "@/components/order-sections/order-side";
@@ -48,10 +47,8 @@ export default async function OrderSupplier({ params }: { params: Promise<{ id: 
   const seesMoney = can(me, "sourcing.manage");
   const [m, pos, people, settings] = await Promise.all([
     orderMoneyOf(id),
-    optional(() =>
-      api.get<{ deposit: { asked: string; paid: string; verified: boolean }; items: PurchaseOrderView[] }>(`/orders/${id}/purchase-orders`),
-    ),
-    optional(() => getPeople()),
+    optional(() => orderPurchaseOrdersOf(id)),
+    optional(() => orderPeopleOf(id)),
     getSettings(),
   ]);
   const canEdit = can(me, "orders.update") && d.open;

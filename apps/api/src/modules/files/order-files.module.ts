@@ -18,5 +18,6 @@ import { MailOutService } from "./mail-out.service";
   imports: [InquiriesModule, OrdersModule, PapersModule, FlowModule, MoneyModule, TreasuryModule, ApprovalsModule],
   controllers: [OrderFilesController, FilesController, MailOutController],
   providers: [OrderFilesService, FilesService, MailOutService],
+  exports: [OrderFilesService],
 })
 export class OrderFilesModule {}

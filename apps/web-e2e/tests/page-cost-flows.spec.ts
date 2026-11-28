@@ -6,8 +6,9 @@ import { appRoutes, foundPages } from "./routes";
  * What a page costs the server: how many times the web app asks the API to draw it once (review 27 Nov 2026: an
  * order page asked 18 to 21 times, and each call loaded the order again). Every page stays at or under the
  * ceiling; the pages that are over it today are listed in page-cost.known.json with what they ask now, and may
- * only ask less. A page that needs more is asking for the same thing twice, or is missing a read of its own in
- * the API: one call that answers what the page shows.
+ * only ask less. The order's pages are listed too, under it: they read the order once (GET /orders/:id/page,
+ * 28 Nov), and their numbers keep it that way. A page that needs more is asking for the same thing twice, or is
+ * missing a read of its own in the API: one call that answers what the page shows.
  *
  * The page is asked for as plain HTML (no browser, so no links are fetched ahead), with a tag on its user-agent;
  * the web app passes the user-agent on, and the proxy's counting door (proxy.mjs) counts the calls that carry it.

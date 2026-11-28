@@ -2,11 +2,10 @@ import Link from "next/link";
 import { can, FLOW_STEPS, ORDER_TAB_LABEL, type FlowStep } from "@kebo/shared";
 import { api } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { getPeople } from "@/lib/loaders";
-import { orderOf, orderSectionsOf } from "@/lib/order-data";
+import { orderNotesOf, orderOf, orderPeopleOf, orderSectionsOf } from "@/lib/order-data";
 import { historyPage, whoOptions } from "@/lib/history";
 import type { DealDetail } from "@/lib/types";
-import type { FollowUpList, Note } from "@/lib/types-notes";
+import type { FollowUpList } from "@/lib/types-notes";
 import { optional } from "@/components/print/data";
 import { HistoryTable } from "@/components/common/history-list";
 import { FilterCard } from "@/components/common/filter-card";
@@ -38,9 +37,9 @@ export default async function OrderHistory({
   const [history, sections, notes, followUps, people, deal] = await Promise.all([
     historyPage("order", id, { page: toPage(sp.page), pageSize: toPageSize(sp.size), q: sp.q?.trim() || undefined, who: sp.who, step }),
     optional(() => orderSectionsOf(id)),
-    optional(() => api.get<Note[]>(`/orders/${id}/notes`)),
+    optional(() => orderNotesOf(id)),
     optional(() => api.get<FollowUpList>("/follow-ups", { orderId: id })),
-    optional(() => getPeople()),
+    optional(() => orderPeopleOf(id)),
     optional(() => api.get<DealDetail>(`/inquiries/${o.inquiry.id}`)),
   ]);
   const who = whoOptions(people ?? []);
