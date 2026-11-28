@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, FileText, RefreshCw, X } from "lucide-react";
-import { fileSize, FLOW_STEP_LABEL, inSentence, paperDone, paperOptionsQuery, STEP_PATH, type PaperCheck } from "@kebo/shared";
+import { fileSize, FLOW_STEP_LABEL, inSentence, orderTabPath, paperDone, paperOptionsQuery, STEP_PATH, type PaperCheck } from "@kebo/shared";
 import { Button, ButtonLink, capsClass, chipClass, cn, controlClass, controlSizes, Input, linkClass, Notice } from "@kebo/ui";
 import { toast } from "@kebo/ui/client";
 import { Switch } from "@/components/common/switch-list";
@@ -78,7 +78,7 @@ function CheckRow({
     />
   );
   const input = canFix && !c.ok && c.fix && c.fix !== "hs" && fix;
-  const href = !c.ok && c.href ? (c.href.startsWith("/") ? c.href : `${base}/${c.href}`) : null;
+  const href = !c.ok && c.href ? (c.href.startsWith("/") ? c.href : `${base}/${orderTabPath(c.href)}`) : null;
   return (
     <li className="flex flex-col gap-1.5 py-2.5">
       <div className="flex items-center gap-2.5 text-sm">

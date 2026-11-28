@@ -226,7 +226,7 @@ test("the order keeps what was agreed: their order, the agreed terms (a change a
   await expect(page.getByRole("region", { name: "How the documents print" }).getByText("Agreed payment conditions")).toBeVisible();
 
   // The supplier's side, in the same groups: its offer's terms until the purchase order is sent.
-  await page.goto(`/orders/${orderId}/factory`);
+  await page.goto(`/orders/${orderId}/supplier`);
   await expect(page.getByRole("region", { name: "Purchase order" }).getByText("Made from their offer")).toBeVisible();
   const supplier = page.getByRole("region", { name: "Agreed with the supplier" });
   await expect(supplier.getByText("30 days after the deposit")).toBeVisible();

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ORDER_TAB_LABEL, type OrderTab } from "@kebo/shared";
+import { ORDER_TAB_LABEL, orderTabPath, type OrderTab } from "@kebo/shared";
 import { TabRow } from "@/components/common/record-tabs";
 
 /** Pages that belong to a tab without being it (their own address, the tab's place in the line). */
@@ -26,7 +26,12 @@ export function OrderTabs({ base, tabs }: { base: string; tabs: { key: OrderTab;
   return (
     <TabRow
       label="Order"
-      items={tabs.map((t) => ({ href: t.key === "overview" ? base : `${base}/${t.key}`, label: ORDER_TAB_LABEL[t.key], tag: t.word, active: at === t.key }))}
+      items={tabs.map((t) => ({
+        href: t.key === "overview" ? base : `${base}/${orderTabPath(t.key)}`,
+        label: ORDER_TAB_LABEL[t.key],
+        tag: t.word,
+        active: at === orderTabPath(t.key),
+      }))}
     />
   );
 }

@@ -32,7 +32,7 @@ const PAGE_ICONS: Record<string, LucideIcon> = {
   "/reports/cash": Banknote,
   "/reports/spending": Receipt,
   "/reports/customers": Users,
-  "/reports/factories": Factory,
+  "/reports/suppliers": Factory,
   "/reports/people": Target,
   "/reports/funnel": Filter,
   "/settings/company": Building,

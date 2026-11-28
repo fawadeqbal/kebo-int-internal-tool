@@ -125,8 +125,8 @@ export async function supplierPaymentAction(
     form,
     () =>
       paymentId
-        ? api.patch(`/factory-payments/${paymentId}`, body, { version })
-        : api.post(`/orders/${orderId}/factory-payments`, body, { once: onceOf(form) }),
+        ? api.patch(`/supplier-payments/${paymentId}`, body, { version })
+        : api.post(`/orders/${orderId}/supplier-payments`, body, { once: onceOf(form) }),
     paymentId ? "Payment changed." : "Payment to the supplier recorded.",
   );
   if (!r.ok) return r;
@@ -169,7 +169,7 @@ export async function voidSupplierPaymentAction(
 ): Promise<ActionState> {
   const r = await attempt(
     form,
-    () => api.post(`/factory-payments/${paymentId}/void`, { reason: formValues(form).reason }),
+    () => api.post(`/supplier-payments/${paymentId}/void`, { reason: formValues(form).reason }),
     "Payment removed.",
   );
   if (!r.ok) return r;
@@ -247,7 +247,11 @@ export async function costChoicesAction(): Promise<ExpenseTargets | Failed | nul
 
 /** Removes the proof kept with a payment: `in` from a customer, `out` to a supplier. */
 export async function removePaymentFileAction(side: "in" | "out", paymentId: string, orderId: string): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/${side === "in" ? "payments" : "factory-payments"}/${paymentId}/file`), "File removed.");
+  const r = await attempt(
+    null,
+    () => api.delete(`/${side === "in" ? "payments" : "supplier-payments"}/${paymentId}/file`),
+    "File removed.",
+  );
   if (r.ok) refresh(orderId);
   return r;
 }
@@ -427,7 +431,7 @@ export async function saveTargetRowAction(
 
 /** The supplier's payment plan on an order (people who see supplier money): its parts as JSON `payload`. */
 export async function supplierPlanAction(orderId: string, _prev: ActionState, form: FormData): Promise<ActionState> {
-  const r = await attempt(form, () => api.put(`/orders/${orderId}/factory-plan`, formBody(form)), "Plan saved.");
+  const r = await attempt(form, () => api.put(`/orders/${orderId}/supplier-plan`, formBody(form)), "Plan saved.");
   if (r.ok) refresh(orderId);
   return r;
 }

@@ -29,7 +29,7 @@ export class SourcingController {
     return this.sourcing.forInquiry(user, id);
   }
 
-  @Post("inquiries/:id/factory-quotes")
+  @Post("inquiries/:id/supplier-quotes")
   @RequirePermissions("sourcing.manage")
   create(
     @CurrentUser() user: SessionUser,
@@ -39,7 +39,7 @@ export class SourcingController {
     return this.sourcing.create(user, id, body);
   }
 
-  @Put("factory-quotes/:id")
+  @Put("supplier-quotes/:id")
   @RequirePermissions("sourcing.manage")
   update(
     @CurrentUser() user: SessionUser,
@@ -49,7 +49,7 @@ export class SourcingController {
     return this.sourcing.update(user, id, body);
   }
 
-  @Get("factory-quotes/:id")
+  @Get("supplier-quotes/:id")
   @RequirePermissions("sourcing.manage")
   one(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.sourcing.quote(user, id);
@@ -57,38 +57,38 @@ export class SourcingController {
 
   /* One change at a time from the line table; each answers with the whole offer. */
 
-  @Post("factory-quotes/:id/lines")
+  @Post("supplier-quotes/:id/lines")
   @RequirePermissions("sourcing.manage")
   addLines(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierLinesInput)) body: SupplierLinesInput) {
     return this.sourcing.addLines(user, id, body);
   }
 
-  @Post("factory-quotes/:id/copy-lines")
+  @Post("supplier-quotes/:id/copy-lines")
   @RequirePermissions("sourcing.manage")
   copyLines(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(copyLinesInput)) body: CopyLinesInput) {
     return this.sourcing.copyLines(user, id, body);
   }
 
-  @Patch("factory-lines/:id")
+  @Patch("supplier-lines/:id")
   @RequirePermissions("sourcing.manage")
   editLine(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(supplierLinePatch)) body: SupplierLinePatch) {
     return this.sourcing.editLine(user, id, body);
   }
 
-  @Post("factory-lines/:id/move")
+  @Post("supplier-lines/:id/move")
   @RequirePermissions("sourcing.manage")
   moveLine(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(lineMoveInput)) body: LineMoveInput) {
     return this.sourcing.moveLine(user, id, body);
   }
 
-  @Delete("factory-lines/:id")
+  @Delete("supplier-lines/:id")
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")
   removeLine(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Query("reason") reason?: string) {
     return this.sourcing.removeLine(user, id, reason?.slice(0, 500));
   }
 
-  @Delete("factory-quotes/:id")
+  @Delete("supplier-quotes/:id")
   @HttpCode(200)
   @RequirePermissions("sourcing.manage")
   async remove(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Query("reason") reason?: string) {

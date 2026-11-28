@@ -68,7 +68,7 @@ describe("/insights?section=…&view=…", () => {
     [{ section: "money", view: "leaks" }, "/reports/profit"],
     [{ section: "cash" }, "/reports/cash"],
     [{ section: "customers" }, "/reports/customers"],
-    [{ section: "factories" }, "/reports/factories"],
+    [{ section: "factories" }, "/reports/suppliers"],
     [{ section: "people" }, "/reports/people"],
     [{ section: "people", view: "targets" }, "/reports/people/targets"],
     [{ section: "funnel" }, "/reports/funnel"],
@@ -87,7 +87,7 @@ describe("/insights?section=…&view=…", () => {
   it.each([
     [{ tab: "sales" }, "/reports/funnel"],
     [{ tab: "customers" }, "/reports/customers"],
-    [{ tab: "factories" }, "/reports/factories"],
+    [{ tab: "factories" }, "/reports/suppliers"],
     [{ tab: "profit" }, "/reports/profit"],
     [{ tab: "profit", sub: "pnl" }, "/reports/profit"],
     [{ tab: "profit", sub: "orders" }, "/reports/profit"],

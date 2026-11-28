@@ -96,7 +96,7 @@ export class SectionsService {
   }
 
   /**
-   * PUT /orders/:id/factory-facts — what Production's windows keep for one supplier of the order (only the
+   * PUT /orders/:id/supplier-facts — what Production's windows keep for one supplier of the order (only the
    * fields sent change). The ready date itself is the order's own (its plans follow it); this keeps when
    * and how it was told, the factory test, and where the goods were received.
    */

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Eye } from "lucide-react";
-import { can, ORDER_TABS, orderNextStep, orderStanding, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
+import { can, ORDER_TABS, orderNextStep, orderTabPath, orderStanding, RECORD_KIND, type FlowStep, type OrderTab } from "@kebo/shared";
 import { ButtonLink, cn, Notice } from "@kebo/ui";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
@@ -106,7 +106,7 @@ export default async function OrderLayout({ children, params }: { children: Reac
         closeCheck={closeCheck}
       />
     ) : step && step.key !== "reopen" ? (
-      <ButtonLink href={`${base}${step.path ? `/${step.path}` : step.tab === "overview" ? "" : `/${step.tab}`}${step.window ? `?do=${step.window}` : ""}`} variant="primary" scroll={false}>
+      <ButtonLink href={`${base}${step.path ? `/${step.path}` : step.tab === "overview" ? "" : `/${orderTabPath(step.tab)}`}${step.window ? `?do=${step.window}` : ""}`} variant="primary" scroll={false}>
         {step.label} <ArrowRight aria-hidden />
       </ButtonLink>
     ) : undefined;

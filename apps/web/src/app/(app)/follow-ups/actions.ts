@@ -16,7 +16,7 @@ async function happenedAt(local: string | undefined): Promise<string | undefined
 }
 
 /** The record's notes endpoint. */
-const NOTES_PATH = { orderId: "orders", customerId: "customers", supplierId: "factories", inquiryId: "inquiries" } as const;
+const NOTES_PATH = { orderId: "orders", customerId: "customers", supplierId: "suppliers", inquiryId: "inquiries" } as const;
 
 /** A note or call log on an order, customer or supplier: { body, kind, contactId, at }. */
 export async function addNoteAction(on: RecordKey, _prev: ActionState, form: FormData): Promise<ActionState> {

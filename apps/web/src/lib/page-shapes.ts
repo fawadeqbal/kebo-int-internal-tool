@@ -71,7 +71,7 @@ export const PAGE_SHAPES: Record<string, string> = {
   "/reports/cash": "header · tiles:4 · table",
   "/reports/profit": "header · tiles:4 · table",
   "/reports/customers": "header · table",
-  "/reports/factories": "header · table",
+  "/reports/suppliers": "header · table",
   "/reports/funnel": "header · table",
   "/reports/people": "header · table",
   "/reports/people/targets": "header · ~form:1",

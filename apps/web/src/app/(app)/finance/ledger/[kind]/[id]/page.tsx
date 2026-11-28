@@ -45,7 +45,7 @@ async function recipientOf(kind: LedgerPartyKind, id: string): Promise<Recipient
     return k ? { name: k.name, email: k.email, phone: k.whatsapp ?? k.phone } : null;
   }
   if (kind === "factory") {
-    const f = await optional(() => api.get<SupplierDetail>(`/factories/${id}`));
+    const f = await optional(() => api.get<SupplierDetail>(`/suppliers/${id}`));
     return f ? { name: f.contactPerson ?? f.name, email: f.email, phone: f.phone } : null;
   }
   return null;

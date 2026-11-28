@@ -195,7 +195,7 @@ export class NotesService {
     );
   }
 
-  /** POST /orders|customers|factories/:id/notes → the note as lists show it. */
+  /** POST /orders|customers|suppliers/:id/notes → the note as lists show it. */
   async add(user: SessionUser, type: RecordType, id: string, input: NoteInput) {
     const { row, target } = await this.create(user, type, id, input);
     return this.view(user, target, row);

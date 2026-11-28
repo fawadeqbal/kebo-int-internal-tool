@@ -184,7 +184,7 @@ export interface DeliveryView {
   claims: ClaimView[];
 }
 
-/** GET /inquiries/:id/factory-requests */
+/** GET /inquiries/:id/supplier-requests */
 export interface SupplierRequests {
   items: {
     id: string;

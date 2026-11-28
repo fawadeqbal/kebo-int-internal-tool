@@ -101,7 +101,7 @@ export default async function FollowUpsPage({
     // Every open inquiry, customer and supplier too (review 24 Nov: 100 inquiries, and no customers or suppliers).
     part("the open inquiries", () => allPages<DealRow>("/inquiries", { stage: "open" })),
     part("the customers", () => api.get<{ id: string; name: string }[]>("/customers/names")),
-    part("the suppliers", () => allPages<{ id: string; name: string }>("/factories", {})),
+    part("the suppliers", () => allPages<{ id: string; name: string }>("/suppliers", {})),
     // The other of Mine / Everyone, for its tab's count (the same search).
     viewAll
       ? part("the other tab's count", () =>

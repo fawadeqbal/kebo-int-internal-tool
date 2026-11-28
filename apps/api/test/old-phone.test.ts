@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, signIn, startApp } from "./app";
 import { CompaniesService } from "../src/common/company/companies.service";
 import { CompanyContext } from "../src/common/company/company-context";
-import { isOldPhone, oldNames } from "../src/common/names/old-names";
+import { isOldPhone, newPath, oldNames } from "../src/common/names/old-names";
 import { PrismaService } from "../src/database/prisma.service";
 
 /**
@@ -130,6 +130,48 @@ describe("a phone app from before the rename keeps working", () => {
       expect(offer.supplierTotal).toBe("42000.00");
       expect("factoryTotal" in offer).toBe(false);
     }
+  });
+
+  it("its old addresses are the new ones (R1b): the same answer from /factory-quotes and /supplier-quotes", async () => {
+    const quoteId = String(
+      (
+        (await request(app.getHttpServer()).get(`/api/inquiries/${inquiryId}/sourcing`).set("authorization", `Bearer ${sana}`).expect(200))
+          .body.quotes as { id: string }[]
+      )[0]!.id,
+    );
+    const at = async (path: string) =>
+      (
+        await request(app.getHttpServer())
+          .get(path)
+          .set("authorization", `Bearer ${sana}`)
+          .set("user-agent", DART)
+          .set("x-names", "supplier.2")
+          .expect(200)
+      ).body;
+    const old = await at(`/api/factory-quotes/${quoteId}`);
+    expect(old).toEqual(await at(`/api/supplier-quotes/${quoteId}`));
+    expect((await at("/api/factories?pageSize=1")).rows).toEqual((await at("/api/suppliers?pageSize=1")).rows);
+    expect(newPath("/api/factory-quotes/q1/lines")).toBe("/api/supplier-quotes/q1/lines");
+    expect(newPath("/api/inquiries/i1/factory-requests")).toBe("/api/inquiries/i1/supplier-requests");
+    // `factory` alone is a stored kind in an address, and a word inside a segment is someone's data: left alone.
+    expect(newPath("/api/ledger/parties/factory/f1")).toBe("/api/ledger/parties/factory/f1");
+    expect(newPath("/api/search/factory-test")).toBe("/api/search/factory-test");
+    // Every old route, in the place it had the word; a value someone chose (a role "Factories") is never touched.
+    for (const [from, to] of [
+      ["/api/factories/s1/notes", "/api/suppliers/s1/notes"],
+      ["/api/orders/o1/factory-payments", "/api/orders/o1/supplier-payments"],
+      ["/api/orders/o1/factory-plan", "/api/orders/o1/supplier-plan"],
+      ["/api/orders/o1/factory-facts", "/api/orders/o1/supplier-facts"],
+      ["/api/orders/o1/factory-order", "/api/orders/o1/supplier-order"],
+      ["/api/inquiries/i1/factory-quotes", "/api/inquiries/i1/supplier-quotes"],
+      ["/api/insights/facts/factories/groups", "/api/insights/facts/suppliers/groups"],
+      ["/api/insights/facts/factory-orders", "/api/insights/facts/supplier-orders"],
+      ["/api/factory-payments/p1/file", "/api/supplier-payments/p1/file"],
+      ["/api/roles/factories", "/api/roles/factories"],
+      ["/api/roles/factory-orders", "/api/roles/factory-orders"],
+      ["/api/settings/factories", "/api/settings/factories"],
+    ])
+      expect(newPath(from), from).toBe(to);
   });
 
   it("the bare word (step B): its old twin for everyone but the web that says it reads it (supplier.2)", async () => {

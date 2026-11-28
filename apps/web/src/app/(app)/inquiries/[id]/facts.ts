@@ -7,7 +7,7 @@ import { failedWhat, isFailed, part, type Failed } from "@/lib/part";
 
 /** The inquiry's supplier requests (who was asked, who answered). Read once per page, shared by the frame and the tab. */
 export const requestsOf = cache((id: string) =>
-  part("who was asked for prices", () => api.get<SupplierRequests>(`/inquiries/${id}/factory-requests`)),
+  part("who was asked for prices", () => api.get<SupplierRequests>(`/inquiries/${id}/supplier-requests`)),
 );
 
 /** What the frame says about the supplier side: offers in, suppliers asked and answered, who is still to answer. For people who see supplier prices. */

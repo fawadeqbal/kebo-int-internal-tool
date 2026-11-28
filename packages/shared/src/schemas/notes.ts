@@ -51,7 +51,7 @@ export const noteInput = z.object({
 });
 export type NoteInput = z.infer<typeof noteInput>;
 
-/** POST /orders/:id/notes, /customers/:id/notes, /factories/:id/notes. */
+/** POST /orders/:id/notes, /customers/:id/notes, /suppliers/:id/notes. */
 export const recordNoteInput = noteInput.extend({ body: text(4000, "Write a note first") });
 export type RecordNoteInput = z.infer<typeof recordNoteInput>;
 

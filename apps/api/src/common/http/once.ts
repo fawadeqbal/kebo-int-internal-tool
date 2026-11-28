@@ -5,6 +5,13 @@ import type { Request, Response } from "express";
 import { from, lastValueFrom, type Observable } from "rxjs";
 import { PrismaService } from "../../database/prisma.service";
 import { withNewNames } from "@kebo/shared";
+import { newPath } from "../names/old-names";
+
+/** "POST /api/factory-payments/p1/void" → "POST /api/supplier-payments/p1/void": a kept key's save, by its new address. */
+const actionOf = (kept: string): string => {
+  const at = kept.indexOf(" ");
+  return at < 0 ? kept : `${kept.slice(0, at)} ${newPath(kept.slice(at + 1))}`.slice(0, 200);
+};
 
 /**
  * One-time keys for money saves. A client sends `Idempotency-Key: <key>` with a save (the web's forms one per
@@ -46,7 +53,9 @@ export class OnceInterceptor implements NestInterceptor {
   async once(userId: string, key: string, req: Request, res: Response, run: () => Promise<unknown>): Promise<unknown> {
     if (!ONCE_KEY.test(key)) throw new HttpException({ message: "This save's one-time key is not valid. Reload and try again." }, HttpStatus.BAD_REQUEST);
     const db = this.prisma.db;
-    const action = `${req.method} ${(req.originalUrl ?? req.url).split("?")[0]}`.slice(0, 200);
+    // By the new address (rename R1b): a save sent to the old address and repeated at the new is the same save. A key
+    // kept before the change has the old one, which is read the same way.
+    const action = `${req.method} ${newPath((req.originalUrl ?? req.url).split("?")[0]!)}`.slice(0, 200);
     // The body as it arrived: old names are read as new ones on the way in, and a save that is repeated
     // must look the same as the first time it was sent.
     const sent = (req as Request & { bodyAsSent?: unknown }).bodyAsSent ?? req.body;
@@ -64,7 +73,7 @@ export class OnceInterceptor implements NestInterceptor {
       // The first one failed meanwhile and let the key go: this one does the save.
       if (!row && Date.now() <= until) continue;
       if (!row) throw new HttpException({ message: "This is still being saved. Wait a moment, then reload to see it." }, HttpStatus.CONFLICT);
-      if (row.action !== action || row.fingerprint !== fingerprint) {
+      if (actionOf(row.action) !== action || row.fingerprint !== fingerprint) {
         throw new HttpException(
           { message: "This was already saved with other details. Close the window and check the list before saving again." },
           HttpStatus.UNPROCESSABLE_ENTITY,

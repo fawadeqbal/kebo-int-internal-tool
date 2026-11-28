@@ -67,7 +67,7 @@ export class FactsController {
   /** Suppliers per period × group (by=factory|company): spend, to pay, ready on time, offers won of sent, claims. */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
-  @Get("factories/groups")
+  @Get("suppliers/groups")
   supplierGroups(@CurrentUser() user: SessionUser, @Query(Validate(supplierQuery)) q: z.infer<typeof supplierQuery>) {
     return this.read.supplierGroups(user, q);
   }
@@ -91,7 +91,7 @@ export class FactsController {
   /** ?supplierId → that supplier's orders: owed, paid, to pay, ready date, stage (Suppliers › Overview). */
   @RequireFeature("insights")
   @SignedIn("checked inside: expenses.manage, reports.view")
-  @Get("factory-orders")
+  @Get("supplier-orders")
   supplierOrders(@CurrentUser() user: SessionUser, @Query(Validate(z.object({ supplierId: z.string().uuid() }))) q: { supplierId: string }) {
     return this.read.supplierOrders(user, q);
   }

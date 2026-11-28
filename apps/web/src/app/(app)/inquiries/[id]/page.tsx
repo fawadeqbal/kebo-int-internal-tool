@@ -99,7 +99,7 @@ export default async function DealOverview({ params, searchParams }: { params: P
               {opt?.supplier && (
                 <div>
                   <span className="block text-xs text-muted">Purchase order</span>
-                  <Link href={`/orders/${order.id}/factory`} className="text-text hover:underline">
+                  <Link href={`/orders/${order.id}/supplier`} className="text-text hover:underline">
                     {opt.supplier.name}
                   </Link>
                 </div>

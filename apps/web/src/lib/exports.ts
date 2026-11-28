@@ -211,7 +211,7 @@ async function customers(q: Q): Promise<SheetSpec> {
 }
 
 async function suppliers(q: Q): Promise<SheetSpec> {
-  const rows = await allPages<SupplierRow>("/factories", { q: q.q, mine: q.mine === "1" ? "true" : undefined, city: q.city, owner: q.owner, status: q.status });
+  const rows = await allPages<SupplierRow>("/suppliers", { q: q.q, mine: q.mine === "1" ? "true" : undefined, city: q.city, owner: q.owner, status: q.status });
   return {
     name: `Suppliers ${stamp()}`,
     title: "Suppliers",

@@ -563,7 +563,7 @@ async function run(page, list, title) {
   const orders = await hrefs(page, "/orders?status=all", /^\/orders\/[0-9a-f-]{36}$/, 6);
   const inquiries = [];
   for (const stage of ["new", "sourcing", "quoted", "won", "lost"]) inquiries.push(...(await hrefs(page, `/inquiries?stage=${stage}`, /^\/inquiries\/[0-9a-f-]{36}$/, 1)));
-  const steps = ["", "/payment", "/factory", "/production", "/shipping", "/documents", "/delivery", "/costs", "/history"];
+  const steps = ["", "/payment", "/supplier", "/production", "/shipping", "/documents", "/delivery", "/costs", "/history"];
   const extra = [
     ...orders.flatMap((o) => steps.map((s) => o + s)),
     ...inquiries.flatMap((d) => ["", "/needs", "/sourcing", "/quotation", "/costs", "/files", "/history"].map((s) => d + s)),
@@ -590,7 +590,7 @@ async function run(page, list, title) {
     "/reports",
     "/reports/profit",
     "/reports/customers",
-    "/reports/factories",
+    "/reports/suppliers",
     "/reports/cash",
     "/reports/people",
     "/reports/people/targets",

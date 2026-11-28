@@ -127,7 +127,7 @@ export async function fieldsAction(orderId: string, target: string, _prev: Actio
           // One ready date per supplier: "readyOn__<supplier id>" fields are each supplier's own.
           const each = Object.keys(v).filter((k) => k.startsWith(READY_OF));
           if (each.length) details.readyBy = each.map((k) => ({ supplierId: k.slice(READY_OF.length), readyOn: v[k] || null }));
-          if (Object.keys(fo).length) await api.patch(`/orders/${orderId}/factory-order`, fo);
+          if (Object.keys(fo).length) await api.patch(`/orders/${orderId}/supplier-order`, fo);
           if (Object.keys(details).length) await api.patch(`/orders/${orderId}/details`, { ...details, reason: reasonOf(form) });
           return null;
         }

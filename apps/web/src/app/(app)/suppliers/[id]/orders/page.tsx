@@ -60,7 +60,7 @@ export default async function SupplierOrders({ params }: { params: Promise<{ id:
             {rows.map((o) => (
               <PhoneRow
                 key={o.id}
-                href={`/orders/${o.id}/factory`}
+                href={`/orders/${o.id}/supplier`}
                 title={o.refNo}
                 line={[o.customer, o.readyOn ? `ready ${date(o.readyOn)}` : null].filter(Boolean).join(" · ")}
                 status={state(o)}
@@ -80,9 +80,9 @@ export default async function SupplierOrders({ params }: { params: Promise<{ id:
             </THead>
             <tbody>
               {rows.map((o) => (
-                <DataRow key={o.id} href={`/orders/${o.id}/factory`}>
+                <DataRow key={o.id} href={`/orders/${o.id}/supplier`}>
                   <Td>
-                    <RefCode href={`/orders/${o.id}/factory`}>{o.refNo}</RefCode>
+                    <RefCode href={`/orders/${o.id}/supplier`}>{o.refNo}</RefCode>
                   </Td>
                   <Td>{o.customer}</Td>
                   <Td className="whitespace-nowrap">{o.readyOn ? date(o.readyOn) : "—"}</Td>

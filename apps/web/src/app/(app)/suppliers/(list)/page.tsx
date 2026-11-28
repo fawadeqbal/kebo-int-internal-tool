@@ -49,17 +49,17 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
   const money = can(me, "expenses.manage") && can(me, "reports.view") && (await hasFeature("insights"));
   const year = new Date().getFullYear();
   const [data, all, mine, peoplePart, editingPart, owedPart, groupsPart, yearPart, lastYearPart] = await Promise.all([
-    api.get<List>("/factories", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
-    api.get<List>("/factories", { pageSize: 1 }),
-    api.get<List>("/factories", { pageSize: 1, mine: "true" }),
+    api.get<List>("/suppliers", { ...query, page: toPage(sp.page), pageSize: toPageSize(sp.size) }),
+    api.get<List>("/suppliers", { pageSize: 1 }),
+    api.get<List>("/suppliers", { pageSize: 1, mine: "true" }),
     part("the people to choose from", () => getPeople()),
-    panel === "edit-factory" ? part("the supplier to edit", () => api.get<SupplierDetail>(`/factories/${sp.id}`)) : null,
+    panel === "edit-factory" ? part("the supplier to edit", () => api.get<SupplierDetail>(`/suppliers/${sp.id}`)) : null,
     // What we owe each supplier and what we bought from it (people who see money, with Insights).
     money ? part("what we owe suppliers", () => api.get<Owed>("/insights/facts/owed", { side: "payable" })) : null,
-    money ? part("what we bought from each supplier", () => api.get<SupplierGroups>("/insights/facts/factories/groups", { period: "all", by: "factory" })) : null,
+    money ? part("what we bought from each supplier", () => api.get<SupplierGroups>("/insights/facts/suppliers/groups", { period: "all", by: "factory" })) : null,
     money
       ? part("this year's buying", () =>
-          api.get<SupplierGroups>("/insights/facts/factories/groups", {
+          api.get<SupplierGroups>("/insights/facts/suppliers/groups", {
             period: "all",
             by: "factory",
             from: `${year}-01-01`,
@@ -69,7 +69,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
       : null,
     money
       ? part("last year's buying", () =>
-          api.get<SupplierGroups>("/insights/facts/factories/groups", {
+          api.get<SupplierGroups>("/insights/facts/suppliers/groups", {
             period: "all",
             by: "factory",
             from: `${year - 1}-01-01`,

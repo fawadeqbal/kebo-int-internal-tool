@@ -86,7 +86,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
     since: r.items.reduce((a, x) => (x.spentOn < a ? x.spentOn : a), r.items[0]?.spentOn ?? now),
   }));
   const fromHref: Partial<Record<CostSheetRow["from"], string>> = {
-    factory: `${base}/factory`,
+    factory: `${base}/supplier`,
     shipment: `${base}/shipping`,
     payment: `${base}/payment`,
   };
@@ -103,7 +103,7 @@ export default async function OrderCostsPage({ params }: { params: Promise<{ id:
         ) : r.borneBy === "factory" ? (
           <Badge tone="info">Off the supplier</Badge>
         ) : r.kind === "goods" && r.state !== "paid" && r.state !== "estimate" ? (
-          <Link href={`${base}/factory`} className={ROW_LINK}>
+          <Link href={`${base}/supplier`} className={ROW_LINK}>
             {ORDER_TAB_LABEL.factory} →
           </Link>
         ) : r.state === "to_pay" && e && canEdit ? (

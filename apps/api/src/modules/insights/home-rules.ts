@@ -100,7 +100,7 @@ export function supplierSentence(s: { name: string; judged: number; late: number
     level: "warn",
     lead: `${s.name} is late again.`,
     text: `Late on the ready date in ${s.late} of its last ${s.judged} orders${now}.`,
-    href: "/reports/factories",
+    href: "/reports/suppliers",
     link: "Suppliers",
   };
 }

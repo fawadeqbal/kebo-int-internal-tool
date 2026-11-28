@@ -47,7 +47,7 @@ export default async function SupplierCosts({ params }: { params: Promise<{ id: 
     supplierOf(id),
     part("its other costs", () => api.get<ExpenseList>("/expenses", { supplierId: id })),
     supplierPayablesOf(id),
-    insights ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/factory-orders", { supplierId: id })) : null,
+    insights ? part("its orders", () => api.get<SupplierOrders>("/insights/facts/supplier-orders", { supplierId: id })) : null,
     ledgerOn ? part("the statement from the books", () => api.get<LedgerParty>(`/ledger/parties/factory/${id}`, { from: "2000-01-01", to: today })) : null,
   ]);
   const costs = dataOf(costsPart);

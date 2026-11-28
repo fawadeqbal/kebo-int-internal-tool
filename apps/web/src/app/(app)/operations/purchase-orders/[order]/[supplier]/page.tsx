@@ -79,7 +79,7 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       ? `${defaults.priceBasis.basis}${defaults.priceBasis.place ? ` ${defaults.priceBasis.place}` : ""}`
       : null;
   const taxes = [...new Set(lines.map((l) => `${l.supplierPrice!.taxIncluded ? "Tax included" : "Without tax"} · ${Number(l.supplierPrice!.taxRate)}%`))];
-  const orderHref = `/orders/${o.id}/factory`;
+  const orderHref = `/orders/${o.id}/supplier`;
   const byId = new Map(payments.map((x) => [x.id, x]));
   // What each payment paid: the parts of the plan it went to, as on the order's Supplier order tab.
   const paidFor = new Map<string, string[]>();

@@ -56,14 +56,14 @@ export class NotesController {
 
   /** sourcing.manage (who sees suppliers) */
   @SignedIn("anyone signed in to the company")
-  @Get("factories/:id/notes")
+  @Get("suppliers/:id/notes")
   factory(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string) {
     return this.notes.list(user, "factory", id);
   }
 
   /** As on orders, without contactId (suppliers have no contact list) — sourcing.manage */
   @SignedIn("checked inside: the record and who they are")
-  @Post("factories/:id/notes")
+  @Post("suppliers/:id/notes")
   addToSupplier(@CurrentUser() user: SessionUser, @Param("id", ParseUUIDPipe) id: string, @Body(Validate(recordNoteInput)) body: RecordNoteInput) {
     return this.notes.add(user, "factory", id, body);
   }

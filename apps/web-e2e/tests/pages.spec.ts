@@ -58,6 +58,19 @@ test("/factories still lands on /suppliers", async ({ page }) => {
   await page.waitForURL((u) => u.pathname === "/suppliers");
 });
 
+// The supplier's own addresses say supplier (rename R1b, 28 Nov 2026): links in notifications, emails and bookmarks
+// from before still open the pages.
+test("an order's /factory tab and /reports/factories still land on their new addresses", async ({ page }) => {
+  const order = foundPages()["/orders/[id]/supplier"];
+  test.skip(!order, "no order in the demo data");
+  const old = order!.replace(/\/supplier$/, "/factory");
+  expect((await page.goto(old))?.status() ?? 0).toBeLessThan(400);
+  await page.waitForURL((u) => u.pathname === new URL(order!, "http://x").pathname);
+  await expect(page.getByRole("link", { name: /^Purchase order/ }).first()).toHaveAttribute("aria-current", "page");
+  expect((await page.goto("/reports/factories"))?.status() ?? 0).toBeLessThan(400);
+  await page.waitForURL((u) => u.pathname === "/reports/suppliers");
+});
+
 // A month that does not exist in the address (typed, or an old link): the page opens, not the error page (that it
 // opens on this month is periodOf's unit test, apps/web/test/period.test.ts).
 for (const address of ["/payments?p=2025-13", "/money/company-costs?p=2025-13", "/reports?month=2025-13", "/payments?p=2025-00"]) {
