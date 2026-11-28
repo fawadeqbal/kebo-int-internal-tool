@@ -77,7 +77,7 @@ describe("search everything", () => {
     expect(group(other, "customers")).toBeUndefined();
     expect((await find(looker, inquiry.refNo)).exact).toBeNull();
     expect(group(await find(looker, `Jinan ${tag}`), "suppliers")).toBeUndefined();
-    expect(group(await find(sana, `Jinan ${tag}`), "suppliers")).toMatchObject({ total: 1, items: [{ href: `/suppliers/${supplierId}` }] });
+    expect(group(await find(sana, `Jinan ${tag}`), "suppliers")).toMatchObject({ total: 1, items: [{ href: `/factories/${supplierId}` }] });
     // The same as the inquiries list says for the same words.
     const listed = (await api(app, sana).get(`/inquiries?${new URLSearchParams({ q: tag })}`).expect(200)).body;
     expect(group(await find(sana, tag), "inquiries")!.total).toBe(listed.total ?? listed.items?.length ?? listed.length);

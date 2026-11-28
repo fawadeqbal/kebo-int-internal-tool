@@ -296,7 +296,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ kind: 
           <CardBody>
             {fileKind && fileId ? (
               <AttachedFile
-                src={`/files/${fileKind === "customer" ? "payments" : fileKind === "supplier" ? "factory-payments" : "expenses"}/${fileId}`}
+                src={`/files/${fileKind === "customer" ? "payments" : fileKind === "supplier" ? "supplier-payments" : "expenses"}/${fileId}`}
                 file={p.file}
                 what={fileKind === "expense" ? "Receipt" : "Bank slip"}
                 canChange={canAttach}

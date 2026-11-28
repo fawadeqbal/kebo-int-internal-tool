@@ -156,6 +156,22 @@ describe("a phone app from before the rename keeps working", () => {
     // `factory` alone is a stored kind in an address, and a word inside a segment is someone's data: left alone.
     expect(newPath("/api/ledger/parties/factory/f1")).toBe("/api/ledger/parties/factory/f1");
     expect(newPath("/api/search/factory-test")).toBe("/api/search/factory-test");
+    // Every old route, in the place it had the word; a value someone chose (a role "Factories") is never touched.
+    for (const [from, to] of [
+      ["/api/factories/s1/notes", "/api/suppliers/s1/notes"],
+      ["/api/orders/o1/factory-payments", "/api/orders/o1/supplier-payments"],
+      ["/api/orders/o1/factory-plan", "/api/orders/o1/supplier-plan"],
+      ["/api/orders/o1/factory-facts", "/api/orders/o1/supplier-facts"],
+      ["/api/orders/o1/factory-order", "/api/orders/o1/supplier-order"],
+      ["/api/inquiries/i1/factory-quotes", "/api/inquiries/i1/supplier-quotes"],
+      ["/api/insights/facts/factories/groups", "/api/insights/facts/suppliers/groups"],
+      ["/api/insights/facts/factory-orders", "/api/insights/facts/supplier-orders"],
+      ["/api/factory-payments/p1/file", "/api/supplier-payments/p1/file"],
+      ["/api/roles/factories", "/api/roles/factories"],
+      ["/api/roles/factory-orders", "/api/roles/factory-orders"],
+      ["/api/settings/factories", "/api/settings/factories"],
+    ])
+      expect(newPath(from), from).toBe(to);
   });
 
   it("the bare word (step B): its old twin for everyone but the web that says it reads it (supplier.2)", async () => {

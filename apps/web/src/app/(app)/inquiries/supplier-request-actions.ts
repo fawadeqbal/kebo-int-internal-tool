@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { api } from "@/lib/api";
 import { attempt, formValues, type ActionState } from "@/lib/actions";
 
-/** Asking suppliers for a price on an inquiry (see the API's /inquiries/:id/factory-requests). */
+/** Asking suppliers for a price on an inquiry (see the API's /inquiries/:id/supplier-requests). */
 
 const refresh = (dealId: string) => revalidatePath(`/inquiries/${dealId}`, "layout");
 

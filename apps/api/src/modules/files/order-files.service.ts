@@ -32,6 +32,7 @@ import {
   type OrderFileSource,
   type OrderFileUpdateInput,
   type OrderFileUploadInput,
+  orderTabPath,
 } from "@kebo/shared";
 import { DomainError, ForbiddenError, NotFoundError } from "@kebo/utils";
 import { PrismaService, type Tx } from "../../database/prisma.service";
@@ -253,7 +254,7 @@ export class OrderFilesService {
           link === "paper"
             ? { link, label: `Document · ${paper!.label}`, href: `${base}/documents?tab=all#papers` }
             : link === "section"
-                ? { link, label: ORDER_SECTION_LABEL[section!], href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : ORDER_SECTION_TAB[section!]}`.replace(/\/$/, "") }
+                ? { link, label: ORDER_SECTION_LABEL[section!], href: `${base}/${ORDER_SECTION_TAB[section!] === "overview" ? "" : orderTabPath(ORDER_SECTION_TAB[section!])}`.replace(/\/$/, "") }
               : link === "step"
                 ? {
                     link,

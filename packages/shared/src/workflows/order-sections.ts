@@ -581,4 +581,10 @@ export const STEP_PATH: Record<FlowStep, string> = {
   delivery: "delivery",
 };
 
+/**
+ * The address of an order's tab under /orders/:id (rename R1b, 28 Nov 2026): its key, but the supplier step's is
+ * "supplier" while its stored key is still factory (until R3). Every link to a tab goes through this.
+ */
+export const orderTabPath = (tab: string): string => (tab === "factory" ? STEP_PATH.factory : tab);
+
 export const stepLabel = (step: FlowStep) => FLOW_STEP_LABEL[step];

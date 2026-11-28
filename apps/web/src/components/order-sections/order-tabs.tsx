@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ORDER_TAB_LABEL, STEP_PATH, type OrderTab } from "@kebo/shared";
+import { ORDER_TAB_LABEL, orderTabPath, type OrderTab } from "@kebo/shared";
 import { TabRow } from "@/components/common/record-tabs";
 
 /** Pages that belong to a tab without being it (their own address, the tab's place in the line). */
@@ -21,19 +21,16 @@ function useTab(base: string): OrderTab {
  * first day. A stage carries one small word for where it stands, read from
  * its data.
  */
-/** A tab's address under the order: its key, but the supplier step's is "supplier" (the stored step is still factory). */
-const pathOf = (key: OrderTab) => (key === "factory" ? STEP_PATH.factory : key);
-
 export function OrderTabs({ base, tabs }: { base: string; tabs: { key: OrderTab; word?: string }[] }) {
   const at = useTab(base);
   return (
     <TabRow
       label="Order"
       items={tabs.map((t) => ({
-        href: t.key === "overview" ? base : `${base}/${pathOf(t.key)}`,
+        href: t.key === "overview" ? base : `${base}/${orderTabPath(t.key)}`,
         label: ORDER_TAB_LABEL[t.key],
         tag: t.word,
-        active: at === pathOf(t.key),
+        active: at === orderTabPath(t.key),
       }))}
     />
   );

@@ -16,6 +16,7 @@ import {
   type SearchKind,
   type SearchQuery,
   type SearchResult,
+  orderTabPath,
 } from "@kebo/shared";
 import { PrismaService } from "../../database/prisma.service";
 import type { SessionUser } from "../../common/auth/session-user";
@@ -183,7 +184,7 @@ export class SearchService {
           ref: null,
           sub: line(countryName(r.country), r.contacts[0]?.name, r.owner ? `looked after by ${r.owner.name}` : null),
           badge: null,
-          href: `/suppliers/${r.id}`,
+          href: `/factories/${r.id}`,
         })),
     };
   }
@@ -414,6 +415,6 @@ export class SearchService {
     if (order.refNo.toUpperCase() === `${prefix}-${tail}`) return { kind: "orders", label: order.refNo, href: `/orders/${order.id}` };
     const tab = PAPER_TAB[prefix!];
     if (!tab) return null;
-    return { kind: tab === "factory" && prefix === "FP" ? "payments" : "orders", label: t, href: `/orders/${order.id}/${tab}` };
+    return { kind: tab === "factory" && prefix === "FP" ? "payments" : "orders", label: t, href: `/orders/${order.id}/${orderTabPath(tab)}` };
   }
 }

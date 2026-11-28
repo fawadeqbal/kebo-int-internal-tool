@@ -466,8 +466,8 @@ export async function loadCustomers(p: Period, today: string) {
 export async function loadSuppliers(p: Period) {
   const span = { from: p.from, to: p.to };
   const [period, ever, orders] = await Promise.all([
-    facts<SupplierGroups>("factories/groups", { ...span, period: "all", by: "factory" }),
-    facts<SupplierGroups>("factories/groups", { period: "all", by: "factory" }),
+    facts<SupplierGroups>("suppliers/groups", { ...span, period: "all", by: "factory" }),
+    facts<SupplierGroups>("suppliers/groups", { period: "all", by: "factory" }),
     facts<OrderGroups>("orders/groups", { ...span, period: "all" }),
   ]);
   const c = period.currency;

@@ -171,7 +171,7 @@ export interface FactOrders {
   rows: FactOrderRow[];
 }
 
-/** GET /insights/facts/factory-orders?supplierId: one supplier's orders (the supplier's "Purchase orders"). */
+/** GET /insights/facts/supplier-orders?supplierId: one supplier's orders (the supplier's "Purchase orders"). */
 export interface SupplierOrders {
   currency: string;
   rows: {

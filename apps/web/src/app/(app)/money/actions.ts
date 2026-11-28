@@ -247,7 +247,11 @@ export async function costChoicesAction(): Promise<ExpenseTargets | Failed | nul
 
 /** Removes the proof kept with a payment: `in` from a customer, `out` to a supplier. */
 export async function removePaymentFileAction(side: "in" | "out", paymentId: string, orderId: string): Promise<ActionState> {
-  const r = await attempt(null, () => api.delete(`/${side === "in" ? "payments" : "factory-payments"}/${paymentId}/file`), "File removed.");
+  const r = await attempt(
+    null,
+    () => api.delete(`/${side === "in" ? "payments" : "supplier-payments"}/${paymentId}/file`),
+    "File removed.",
+  );
   if (r.ok) refresh(orderId);
   return r;
 }

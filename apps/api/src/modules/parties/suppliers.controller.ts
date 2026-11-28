@@ -20,7 +20,7 @@ const supplierList = listQuery.extend({
   status: z.preprocess(blank, z.enum(["offers", "none"]).optional()),
 });
 
-@ApiTags("factories")
+@ApiTags("suppliers")
 @Controller("suppliers")
 export class SuppliersController {
   constructor(private readonly factories: SuppliersService) {}

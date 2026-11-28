@@ -111,7 +111,7 @@ async function figures(kind: Kind, id: string, span: { from?: string; to?: strin
   }
   if (kind === "factory") {
     const [f, last] = await Promise.all([
-      facts<SupplierGroups>("factories/groups", { ...span, period: "all", by: "factory", supplierId: id }),
+      facts<SupplierGroups>("suppliers/groups", { ...span, period: "all", by: "factory", supplierId: id }),
       facts<FactOrders>("orders", { ...span, supplierId: id, limit: 1 }),
     ]);
     const r = f.rows[0];

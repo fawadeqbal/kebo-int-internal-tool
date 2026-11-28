@@ -412,6 +412,17 @@ describe("money v2", () => {
     expect(JSON.stringify(history)).toContain("refund expected");
   });
 
+  it("a save sent to the old address and repeated at the new one, with the same key, is one save (R1b)", async () => {
+    const id = await newOrder();
+    const key = crypto.randomUUID();
+    const body = { supplierId, kind: "deposit", amount: 1200, currency: "CNY", rate: 7.1, paidOn: today };
+    const first = (await api(app, manager).post(`/orders/${id}/factory-payments`, body).set("idempotency-key", key).expect(201)).body;
+    const again = (await api(app, manager).post(`/orders/${id}/supplier-payments`, body).set("idempotency-key", key).expect(201)).body;
+    expect(again).toEqual(first);
+    const m = await money(id);
+    expect(m.suppliers.payments.filter((p: { amount: string }) => p.amount === "1200.00")).toHaveLength(1);
+  });
+
   it("keeps the new tables to the company and the order's people", async () => {
     // Someone who may not see the customer's orders sees none of their money.
     const id = await newOrder();

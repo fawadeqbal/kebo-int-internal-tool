@@ -22,7 +22,7 @@ export interface RecordRef {
 }
 
 export const recordLink = (type: RecordType, id: string) =>
-  ({ inquiry: `/inquiries/${id}`, order: `/orders/${id}`, customer: `/customers/${id}`, factory: `/suppliers/${id}` })[type];
+  ({ inquiry: `/inquiries/${id}`, order: `/orders/${id}`, customer: `/customers/${id}`, factory: `/factories/${id}` })[type];
 
 const NAMES: Record<RecordType, string> = { inquiry: "Inquiry", order: "Order", customer: "Customer", factory: "Supplier" };
 
@@ -30,7 +30,7 @@ type Db = PrismaService["db"];
 
 /**
  * The record when this person may see it, with its label; otherwise 404 (as every page of a record they
- * do not see answers), or 403 for suppliers without sourcing.manage (as GET /factories/:id answers).
+ * do not see answers), or 403 for suppliers without sourcing.manage (as GET /suppliers/:id answers).
  */
 export async function seeRecord(db: Db, user: SessionUser, type: RecordType, id: string): Promise<RecordRef> {
   const ref = (label: string, customerId: string | null): RecordRef => ({ type, id, label, link: recordLink(type, id), customerId });

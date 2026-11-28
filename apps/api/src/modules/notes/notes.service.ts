@@ -174,7 +174,7 @@ export class NotesService {
       return asked.some((a) => a === full || a === first || a.split(/\s+/)[0] === first);
     });
     if (!named.length) return;
-    const link = type === "inquiry" ? `/inquiries/${id}` : type === "order" ? `/orders/${id}/history` : type === "customer" ? `/customers/${id}/notes` : `/suppliers/${id}/notes`;
+    const link = type === "inquiry" ? `/inquiries/${id}` : type === "order" ? `/orders/${id}/history` : type === "customer" ? `/customers/${id}/notes` : `/factories/${id}/notes`;
     const [ref, ...rest] = label.split(" · ");
     const what = { inquiry: "inquiry", order: "order", customer: "customer", factory: "supplier" }[type];
     await this.notifications.send(
@@ -195,7 +195,7 @@ export class NotesService {
     );
   }
 
-  /** POST /orders|customers|factories/:id/notes → the note as lists show it. */
+  /** POST /orders|customers|suppliers/:id/notes → the note as lists show it. */
   async add(user: SessionUser, type: RecordType, id: string, input: NoteInput) {
     const { row, target } = await this.create(user, type, id, input);
     return this.view(user, target, row);

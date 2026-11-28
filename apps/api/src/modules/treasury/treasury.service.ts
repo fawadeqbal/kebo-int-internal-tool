@@ -74,7 +74,7 @@ const amount = (currency: string, d: Prisma.Decimal) =>
   `${currency} ${Number(d).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const statusOf = (voidedAt: Date | null): PaymentStatus => (voidedAt ? "void" : "recorded");
 const customerLink = (c: { id: string; name: string } | null) => (c ? { label: c.name, href: `/customers/${c.id}` } : null);
-const supplierLink = (f: { id: string; name: string }) => ({ label: f.name, href: `/suppliers/${f.id}` });
+const supplierLink = (f: { id: string; name: string }) => ({ label: f.name, href: `/factories/${f.id}` });
 const orderLink = (o: { id: string; refNo: string }) => ({ label: o.refNo, href: `/orders/${o.id}` });
 /** A record's file as its page shows and changes it. */
 const fileOf = (f: { id: string; fileName: string; mimeType: string; size: number } | undefined) =>

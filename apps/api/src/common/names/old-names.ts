@@ -35,7 +35,9 @@ const knowsBareNames = (headers: NamedRequest["headers"]): boolean => namesOf(he
 /**
  * Step R1b (28 Nov 2026): the API's addresses say supplier. The old ones are read as the new, from anyone: a phone
  * app installed before, an address the API gave out before (`voidPath`), the web of the day before during a deploy.
- * Whole path segments only: `factory` alone is a stored kind in an address (`/ledger/parties/factory/:id`).
+ * Only where the old routes had the word, as a whole segment: right after /api (`/api/factories/…`), or after
+ * /api/orders/:id, /api/inquiries/:id or /api/insights/facts. Anywhere else it may be a value someone chose (a role
+ * named "Factories" has the key `factories`), and `factory` alone is a stored kind (`/ledger/parties/factory/:id`).
  */
 const OLD_SEGMENTS: Readonly<Record<string, string>> = {
   factories: "suppliers",
@@ -50,11 +52,16 @@ const OLD_SEGMENTS: Readonly<Record<string, string>> = {
 };
 
 /** `/api/factory-quotes/q1/lines` → `/api/supplier-quotes/q1/lines`. Any other address comes back as it is. */
-export const newPath = (path: string): string =>
-  path
-    .split("/")
-    .map((s) => (Object.hasOwn(OLD_SEGMENTS, s) ? OLD_SEGMENTS[s]! : s))
-    .join("/");
+export function newPath(path: string): string {
+  const s = path.split("/"); // ["", "api", first, second, third, …]
+  if (s[1] !== "api") return path;
+  const renameAt = (i: number) => {
+    if (Object.hasOwn(OLD_SEGMENTS, s[i] ?? "")) s[i] = OLD_SEGMENTS[s[i]!]!;
+  };
+  renameAt(2);
+  if (s[2] === "orders" || s[2] === "inquiries" || (s[2] === "insights" && s[3] === "facts")) renameAt(4);
+  return s.join("/");
+}
 
 /** A phone app from before the change: the phone app's user agent, and no word that it knows the new names. */
 export const isOldPhone = (headers: NamedRequest["headers"]): boolean =>
